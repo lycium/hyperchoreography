@@ -1,0 +1,5 @@
+hyperchoreography
+hyperchoreography_test
+*.tmp
+*.state
+.DS_Store
