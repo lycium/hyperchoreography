@@ -320,8 +320,9 @@ int main() {
     cat.push(a);
     double raw = loop_distance(a.h.N, a.mode_list(), a.h.d, a.coef.data(), b.mode_list(), b.h.d, b.coef.data());
     long dup = cat.find_duplicate(b);                               // same action, genuinely different loops
-    b.h.action *= 1 + 1e-6; long far = cat.find_duplicate(b);       // a genuinely different action must not fold
-    CHECK(dup == 0 && far < 0 && raw > 1e-2, "continuous family folds on the action, though the loops are %.2f apart, and a 1e-6 action shift does not fold", raw); }
+    Record c = b; c.h.action *= 1 + 1e-6;    long fa = cat.find_duplicate(c);   // a real action gap: distinct orbit
+    Record e = b; e.h.minsep *= 1 + 1e-2;    long fm = cat.find_duplicate(e);   // same action, different geometry
+    CHECK(dup == 0 && fa < 0 && fm < 0 && raw > 1e-2, "continuous family folds on action+energy though the loops are %.2f apart; a 1e-6 action gap or a 1%% minsep gap does not fold", raw); }
 
   std::printf("\n%s (%d failures)\n", fails ? "SOME TESTS FAILED" : "ALL TESTS PASSED", fails);
   return fails ? 1 : 0;

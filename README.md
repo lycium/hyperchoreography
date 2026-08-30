@@ -53,6 +53,13 @@ Naming convention: **dimension first, then bodies** (`d3n4.bin`); `list` sorts b
   structure the budget calls for. Eight of the twenty records in `catalog/d7_n{8,9,10}.bin` are genuine
   orbits; the other twelve are *relative equilibria* — rigid configurations, trivial however high their
   `deff`, which the rigidity defect of §4 now separates and rejects.
+* **154 seven-dimensional relative choreographies, 76 of them `deff = 7`**, in 30 minutes on 18 cores in
+  the frame the sweep of §13.1 picked out (`--omega g2:1,6`), against a catalogue that held **two**
+  `deff = 7` orbits before session 5 and nine before session 6 — `catalog/d7_n10_g2_16.bin`. All certified:
+  no missing Morse data, no near-collision, every return error below 1e-9; the `χ*` champion (id 18,
+  `A = 20.105976864`, `χ* = 253.7`) verifies at shift residual 4e-12, full-period return 1e-11 and energy
+  drift 7e-15. Six records carry `nullity > 4` and are therefore continuous families rather than isolated
+  orbits (§4).
 * **A ten-dimensional relative choreography.** `d = 10, N = 10` in a rotating frame on the calibrated line
   `Σw = 0` (§14): `deff = 10/10`, `A = 40.995282456`, shift residual 7e-13, full-period return 1e-12, energy
   drift 2e-14, all ten inertial principal values ≥ 0.64, rigidity defect 0.44 — and time-reversible,

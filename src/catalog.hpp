@@ -113,9 +113,13 @@ struct Catalog {
       if (same_spectrum(r, c)) dist = 0;
       // Points of a continuous family are genuinely different loops — loop_distance is right to separate them
       // and χ* really does vary along the family — but the catalogue wants one entry with a hit count, not a
-      // sampling of the family. The action is exactly constant along it, so match it to round-off.
-      if (std::fabs(c.h.action - r.h.action) <= 1e-9 * std::fabs(r.h.action) &&
-          std::fabs(c.h.minsep - r.h.minsep) <= 1e-6 * std::fabs(r.h.minsep)) dist = 0;
+      // sampling of the family. Action and energy are exactly constant along a family, so match them to
+      // round-off; minsep is not, but it separates the case this must not fold — distinct orbits whose
+      // actions happen to agree closely, which at d=7 N=10 differ in minsep by percents (and in Morse index,
+      // not yet computed at this point). Heuristic, and deliberately narrow.
+      if (std::fabs(c.h.action - r.h.action) <= 1e-8 * std::fabs(r.h.action) &&
+          std::fabs(c.h.energy - r.h.energy) <= 1e-8 * std::fabs(r.h.energy) &&
+          std::fabs(c.h.minsep - r.h.minsep) <= 1e-3 * std::fabs(r.h.minsep)) dist = 0;
       if (dist < bestd) { bestd = dist; best = (long)it->second; }
     }
     if (dist_out) *dist_out = bestd;
