@@ -18,13 +18,14 @@ struct RecHdr {                     // fixed-size record header, 152 bytes
 static_assert(sizeof(RecHdr) == 8 + 24 + 48 + 88, "RecHdr layout");
 
 // extra[]: 0 = calibration twist χ*, 1 = χ* / jet scale, 2 = the rung's jet order k, 3 = ‖A_k‖ / jet scale,
-// 4..7 reserved, then d² entries of Ω for a rotating frame.
+// 4 = rigidity defect, 5..7 reserved, then d² entries of Ω for a rotating frame.
 // Legacy files have nextra = 0 and read back unchanged.
 struct Record {
   RecHdr h;
   std::vector<int32_t> modes; std::vector<double> coef, Lsv, pca, extra; std::string sym;
   static constexpr int NEX = 8;
   double twist() const { return extra.empty() ? 0.0 : extra[0]; }
+  double rigid() const { return extra.size() > 4 ? extra[4] : -1.0; }   // 0 = relative equilibrium, −1 = not computed
   const double* omega() const { return extra.size() >= (size_t)(NEX + h.d * h.d) ? &extra[NEX] : nullptr; }
   int64_t& id() { return h.id; }  int N() const { return h.N; }  int d() const { return h.d; }
 

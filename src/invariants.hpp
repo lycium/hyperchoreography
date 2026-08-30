@@ -39,6 +39,22 @@ inline CurveStats curve_stats(const Problem& P, const double* x, Work& w) {
   return S;
 }
 
+// Rigidity defect: a relative equilibrium moves rigidly, so every mutual distance is constant. The
+// choreography shift sends the pair (j,k) to (j−k,0), so ⌊N/2⌋ separations exhaust the test, and a common
+// rotation cancels, so the answer does not depend on Ω. Zero ⇔ rigid — the high-d analogue of the N-gon.
+inline double rigid_defect(const Problem& P, const double* x, Work& w) {
+  const int M = P.M, d = P.d, MN = M / P.N; double worst = 0;
+  synth(P, x, w.Q.data()); const double* Q = w.Q.data();
+  for (int p = 1; p <= P.N / 2; p++) {
+    double lo = INF, hi = 0;
+    for (int j = 0; j < M; j++) { double r2 = 0;
+      for (int a = 0; a < d; a++) { double e = Q[(size_t)a * 2 * M + j + p * MN] - Q[(size_t)a * 2 * M + j]; r2 += e * e; }
+      lo = std::min(lo, r2); hi = std::max(hi, r2); }
+    if (hi > 0) worst = std::max(worst, 1.0 - std::sqrt(lo / hi));
+  }
+  return worst;
+}
+
 // per-mode power P_m = |c_m|² + |s_m|²
 inline std::vector<double> mode_power(const Problem& P, const double* x) {
   std::vector<double> pw(P.nm, 0.0);
@@ -84,6 +100,36 @@ inline void sample_curve(const std::vector<int>& modes, int d, const double* x, 
     for (int mu = 0; mu < nm; mu++) { double c = std::cos(modes[mu] * t), s = std::sin(modes[mu] * t);
       for (int a = 0; a < d; a++) out[(size_t)j * D + a] += c * x[(2 * mu) * d + a] + s * x[(2 * mu + 1) * d + a]; } }
 }
+// deff of the physical motion. A rotating frame can raise the loop's rank (a fixed point sweeps a circle) or
+// lower it (a circularly polarised mode at rate −w becomes a linear oscillation), so the loop's own rank is
+// not the dimension the orbit occupies. Body k traces exp(Ωt)q(t + 2πk/N) = exp(−2πΩk/N)·(body 0's path), so
+// the occupied subspace is the sum of N rotated copies. Invariant under a common rotation of q and Ω.
+inline int inertial_deff(int N, const std::vector<int>& modes, int d, const double* x, const double* om, std::vector<double>& sv, double rel_tol = 1e-8) {
+  int mx = 0; for (int m : modes) mx = std::max(mx, m);
+  double wmx = 0; for (int i = 0; i < d * d; i++) wmx = std::max(wmx, std::fabs(om[i]));
+  const int Mc = std::max(64, 4 * (mx + (int)std::ceil(wmx) + 1));
+  std::vector<double> q, S((size_t)d * d, 0.0), Ai, R, u(d), w;
+  sample_curve(modes, d, x, Mc, 1.0, 0.0, d, q);
+  for (int j = 0; j < Mc; j++) {
+    Ai.assign(om, om + (size_t)d * d); const double t = 2 * PI * j / Mc; for (double& e : Ai) e *= t;
+    la::expm_skew(d, Ai, R);
+    for (int a = 0; a < d; a++) { double t2 = 0; for (int b = 0; b < d; b++) t2 += R[(size_t)a * d + b] * q[(size_t)j * d + b]; u[a] = t2; }
+    for (int a = 0; a < d; a++) for (int b = 0; b < d; b++) S[(size_t)a * d + b] += u[a] * u[b];
+  }
+  std::vector<double> G((size_t)d * d, 0.0), Rk, R2;
+  for (int k = 0; k < N; k++) {                                     // Σ_k exp(−2πΩk/N) S exp(+2πΩk/N)
+    Ai.assign(om, om + (size_t)d * d); const double t = -2 * PI * k / N; for (double& e : Ai) e *= t;
+    la::expm_skew(d, Ai, Rk); R2.assign((size_t)d * d, 0.0);
+    for (int a = 0; a < d; a++) for (int b = 0; b < d; b++) { double t2 = 0;
+      for (int i = 0; i < d; i++) t2 += Rk[(size_t)a * d + i] * S[(size_t)i * d + b]; R2[(size_t)a * d + b] = t2; }
+    for (int a = 0; a < d; a++) for (int b = 0; b < d; b++) { double t2 = 0;
+      for (int i = 0; i < d; i++) t2 += R2[(size_t)a * d + i] * Rk[(size_t)b * d + i]; G[(size_t)a * d + b] += t2; }
+  }
+  la::sym_eig(d, G, w); sv.resize(d); int deff = 0;
+  for (int c = 0; c < d; c++) { sv[c] = std::sqrt(std::max(0.0, w[d - 1 - c])); if (w[d - 1 - c] > rel_tol * w[d - 1]) deff++; }
+  return deff;
+}
+
 // ||A||² + ||B||² − 2 ||AᵀB||_*
 inline double procrustes_res2(int Mc, int D, const std::vector<double>& A, const std::vector<double>& B, double nA, double nB) {
   std::vector<double> C((size_t)D * D, 0.0);

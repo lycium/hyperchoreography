@@ -18,7 +18,7 @@ struct Config {
   int threads = 0; uint64_t seed = 1; long trials = LONG_MAX; double minutes = 1e30;
   std::string out = "catalog.bin";
   int lbfgs_min = 20, lbfgs_max = 400, newton_iters = 60; double gtol = 1e-10, ret_tol = 1e-8, ret_reject = 1e-1;
-  int K0min = 2, K0max = 6; double minsep = 2e-3; int min_deff = 1;
+  int K0min = 2, K0max = 6; double minsep = 2e-3; int min_deff = 1; double min_rigid = 1e-6;
   const std::vector<Record>* seeds = nullptr; double kick_min = 0.02, kick_max = 0.5;
   int Ms = 2048, Kout_max = 512; double shoot_tol = 1e-12, ret_double = 1e-4;
   std::string starts = "random,torus,vertical";                                        // comma list; kick needs seeds
@@ -340,6 +340,8 @@ inline void record_extras(const Config& cfg, Record& rec, Ctx& ctx) {
   std::vector<double> x(P.n, 0.0);
   for (size_t k = 0; k < rec.modes.size(); k++) { int m = rec.modes[k]; if (m > P.K) break; auto it = std::lower_bound(P.modes.begin(), P.modes.end(), m); if (it == P.modes.end() || *it != m) continue;
     int mu = (int)(it - P.modes.begin()); for (int a = 0; a < P.d; a++) { x[(2 * mu) * P.d + a] = rec.coef[k * 2 * P.d + a]; x[(2 * mu + 1) * P.d + a] = rec.coef[k * 2 * P.d + P.d + a]; } }
+  if ((int)rec.extra.size() >= Record::NEX) rec.extra[4] = rigid_defect(P, x.data(), ctx.w);
+  if (const double* om = rec.omega()) { std::vector<double> isv; rec.h.deff = inertial_deff(rec.h.N, rec.mode_list(), rec.h.d, rec.coef.data(), om, isv); }
   double gn = 0; ctx.g.resize(P.n); double A0 = action_grad(P, x.data(), ctx.g.data(), ctx.w);
   if (!std::isfinite(A0)) return; for (double v : ctx.g) gn += v * v;
   rec.h.grad_norm = std::sqrt(gn);                       // residual of the truncation, before the polish
@@ -351,8 +353,10 @@ inline void record_extras(const Config& cfg, Record& rec, Ctx& ctx) {
 
 // ODE validation, cover unwinding, shooting certification, Fourier re-extraction, canonical frame → record
 inline bool certify(const Config& cfg, const Problem*& P, std::vector<double>& x, const Symmetry& S, Ctx& ctx, Record& rec, std::string& why) {
-  // deff can only be lost downstream, so gate before the ODE work; 1e-12 keeps the gate permissive
+  // at Ω = 0 deff can only be lost downstream, so gate before the ODE work; 1e-12 keeps the gate permissive
   if (cfg.min_deff > 1) { std::vector<double> xc(x), sv; if (canonical_frame(P->nb, P->d, xc, sv, 1e-12) < cfg.min_deff) { why = "effective dimension below filter"; return false; } }
+  // rigid loops are the N-gon's high-d analogue and dominate the deff filter in a rotating frame
+  if (rigid_defect(*P, x.data(), ctx.w) < cfg.min_rigid) { why = "relative equilibrium"; return false; }
   // one mode doubling if badly under-resolved
   NBody<double>& nb = ctx.integrator(cfg);
   double ret = return_error(*P, x.data(), nb);
@@ -379,14 +383,19 @@ inline bool certify(const Config& cfg, const Problem*& P, std::vector<double>& x
   if (!orbit_fit(P->N, P->d, 1.0, O, ctx, cfg.Ms, cfg.Kout_max, P->Om.empty() ? nullptr : &P->Om)) { why = "orbit sampling failed"; return false; }
   O.residual = res;
   std::vector<double> sv, Rc; int deff = canonical_frame((int)O.modes.size() * 2, P->d, O.coef, sv, 1e-8, P->Om.empty() ? nullptr : &Rc);
+  const int d = P->d; std::vector<double> Omc;
+  if (!P->Om.empty()) { Omc.assign((size_t)d * d, 0.0);                                    // Ω → R Ω Rᵀ
+    for (int a = 0; a < d; a++) for (int b = 0; b < d; b++) { double t = 0;
+      for (int i = 0; i < d; i++) for (int j = 0; j < d; j++) t += Rc[(size_t)a * d + i] * P->Om[(size_t)i * d + j] * Rc[(size_t)b * d + j];
+      Omc[(size_t)a * d + b] = t; }
+    std::vector<double> isv; deff = inertial_deff(P->N, O.modes, d, O.coef.data(), Omc.data(), isv);   // the dimension actually occupied
+  }
   if (deff < cfg.min_deff) { why = "effective dimension below filter"; return false; }
   rec.h.N = P->N; rec.h.d = P->d; rec.h.K = O.K; rec.h.M = O.Ms; rec.h.alpha = 1.0; rec.modes.assign(O.modes.begin(), O.modes.end()); rec.coef = O.coef; rec.h.nm = (int32_t)O.modes.size();
   rec.h.deff = deff; rec.h.cover = cover; rec.h.action = O.action; rec.h.energy = O.energy; rec.h.energy_std = 0; rec.h.rms = O.rms; rec.h.maxr = O.maxr;
   rec.h.minsep = O.minsep; rec.h.Lnorm = O.Lnorm; rec.Lsv = O.Lsv; rec.pca = sv; rec.h.morse = -1; rec.h.nullity = -1; rec.h.grad_norm = -1; rec.h.ret_err = res;
-  const int d = P->d; rec.extra.assign(Record::NEX + (P->Om.empty() ? 0 : (size_t)d * d), 0.0);
-  if (!P->Om.empty()) for (int a = 0; a < d; a++) for (int b = 0; b < d; b++) { double t = 0;      // Ω → R Ω Rᵀ
-    for (int i = 0; i < d; i++) for (int j = 0; j < d; j++) t += Rc[(size_t)a * d + i] * P->Om[(size_t)i * d + j] * Rc[(size_t)b * d + j];
-    rec.extra[Record::NEX + (size_t)a * d + b] = t; }
+  rec.extra.assign(Record::NEX + Omc.size(), 0.0);
+  std::copy(Omc.begin(), Omc.end(), rec.extra.begin() + Record::NEX);
   return true;
 }
 

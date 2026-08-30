@@ -116,6 +116,29 @@ int main() {
     std::vector<double> sv; std::vector<double> xc = x; int deff = canonical_frame(P.nb, P.d, xc, sv);
     CHECK(res.converged && std::fabs(S.rms - R) < 1e-10 && deff == 2, "N=%d d=%d converged in %d its, |grad| %.1e, rms %.10f (R=%.10f), deff %d, energy %.8f, morse %d nullity %d", N, d, res.iters, res.gnorm, S.rms, R, deff, S.energy, I.neg, I.zero); }
 
+  std::printf("[rigidity defect]\n");
+  { int N = 5, d = 4; Problem P; P.init(N, d, 12); Work w; w.resize(P); double R = circle_radius(N);
+    std::vector<double> x(P.n, 0.0);
+    x[0] = R; x[d + 1] = R;                                        // the N-gon: rigid, in any dimension
+    double rg = rigid_defect(P, x.data(), w);
+    x[2 * d + 2] = 0.2 * R;                                        // one transverse mode breaks rigidity
+    double rb = rigid_defect(P, x.data(), w);
+    CHECK(rg < 1e-14 && rb > 1e-2, "N-gon %.1e vs N-gon + one transverse mode %.4f", rg, rb); }
+
+  std::printf("[inertial effective dimension]\n");
+  { const int N = 4, d = 4; std::vector<int> md = {1};                          // a planar circle, rank 2
+    std::vector<double> c(2 * d, 0.0); c[0] = 1.0; c[d + 1] = 1.0;
+    std::vector<double> Om((size_t)d * d, 0.0), sv;
+    int flat = inertial_deff(N, md, d, c.data(), Om.data(), sv);                // Ω = 0: the loop's own rank
+    Om[0 * d + 3] = 1.0; Om[3 * d + 0] = -1.0;                                  // a plane the loop does not span
+    int up = inertial_deff(N, md, d, c.data(), Om.data(), sv);
+    // a rate that counter-rotates the loop freezes each body, but the N rotated copies still span the plane
+    Om.assign((size_t)d * d, 0.0); Om[0 * d + 1] = 1.0; Om[1 * d + 0] = -1.0;
+    int keep = inertial_deff(N, md, d, c.data(), Om.data(), sv);
+    md[0] = N; Om[0 * d + 1] = N; Om[1 * d + 0] = -N;                           // w ≡ 0 (mod N): the copies coincide
+    int down = inertial_deff(N, md, d, c.data(), Om.data(), sv);
+    CHECK(flat == 2 && up == 3 && keep == 2 && down == 1, "circle in R^4: Omega=0 -> %d, transverse rate -> %d, counter-rotating -> %d, counter-rotating with w = 0 mod N -> %d (expect 2, 3, 2, 1)", flat, up, keep, down); }
+
   std::printf("[random search smoke test N=3 d=2]\n");
   { Problem P; P.init(3, 2, 16); Work w; w.resize(P); Reduced Rd(P, nullptr, 0); int found = 0; std::vector<double> actions;
     auto t0 = std::chrono::steady_clock::now();

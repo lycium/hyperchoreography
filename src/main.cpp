@@ -25,19 +25,19 @@ struct Args {
 static void usage() {
   std::puts("hyperchoreography — N-body choreography search in any dimension\n"
     "  hyperchoreography search  --N 3 --d 2 [--K 16 --Kmax 64] [--sym none|random|cyc:p|fano:p|\"t+1/2 s[-1,-2]; ...\"] [--threads T] [--seed S]\n"
-    "                [--trials n] [--minutes m] [--out catalog.bin] [--alpha-start 2 --alpha-steps 8] [--min-deff k]\n"
+    "                [--trials n] [--minutes m] [--out catalog.bin] [--alpha-start 2 --alpha-steps 8] [--min-deff k --min-rigid 1e-6]\n"
     "                [--lbfgs-min 20 --lbfgs-max 400 --newton 60 --gtol 1e-10 --ret-tol 1e-8 --K0 2 --K0max 6 --minsep 2e-3]\n"
     "                [--phase1 action|gradnorm|mixed] [--seed-from other.bin --kick-min 0.02 --kick-max 0.5]\n"
     "                [--starts random,torus,vertical,hyper,fano,kick] [--K-index 48] [--Ms 2048 --Kout-max 512 --shoot-tol 1e-12 --ret-double 1e-4]\n"
     "                [--omega \"w1,w2,...\" | --omega su:w1,... | --omega g2:p,q]   rotating frame: q_j(t) = exp(Omega t) q(t + 2 pi j/N)\n"
     "                [--tol-inv 1e-4 --tol-dist 1e-3 --checkpoint 30 --ret-reject 1e-1]   (resumes if catalog/state exist)\n"
-    "  hyperchoreography list    catalog.bin [--N n] [--deff k] [--min-deff k] [--sort action|id|hits|twist]\n"
+    "  hyperchoreography list    catalog.bin [--N n] [--deff k] [--min-deff k] [--sort action|id|hits|twist|rigid]\n"
     "  hyperchoreography show    catalog.bin --id i                (JSON dump of one record)\n"
     "  hyperchoreography export  catalog.bin --id i [--samples 720] [--out curve.csv]   (body positions over one period)\n"
     "  hyperchoreography verify  catalog.bin --id i                (double-precision Taylor integration checks)\n"
     "  hyperchoreography refine  catalog.bin --id i --digits 60 [--K 64] [--out refined.txt]   (MPFR shooting Newton)\n"
     "  hyperchoreography merge   out.bin in1.bin in2.bin ...       (union with de-duplication)\n"
-    "  hyperchoreography extras  catalog.bin [--K-index 48]        (recompute Morse index, nullity and the calibration twist)\n"
+    "  hyperchoreography extras  catalog.bin [--K-index 48]        (recompute Morse index, nullity, twist and rigidity)\n"
     "  hyperchoreography symmetry catalog.bin [--id i] [--tol 1e-6] (detect the symmetry group of each stored loop)\n"
     "  hyperchoreography continue catalog.bin [--id i | --root circle] --N n --d d [--K 24] [--covers 7] [--alpha-lo 0.6 --alpha-hi 2.4 --depth 2] [--out found.bin]\n"
     "                                                  (bifurcation-tree exploration by continuation in the potential exponent)\n"
@@ -53,7 +53,7 @@ static int cmd_search(const Args& a) {
   cfg.N = (int)a.num("N", 3); cfg.d = (int)a.num("d", 2); cfg.K = (int)a.num("K", 16); cfg.Kmax = (int)a.num("Kmax", std::max(4 * cfg.K, 64));
   cfg.sym = named_sym(a.get("sym", "none"), cfg.d); cfg.threads = (int)a.num("threads", std::thread::hardware_concurrency()); cfg.seed = (uint64_t)a.num("seed", 1);
   cfg.trials = (long)a.num("trials", (double)LONG_MAX); cfg.minutes = a.num("minutes", 1e30); cfg.out = a.get("out", "catalog.bin");
-  cfg.alpha_start = a.num("alpha-start", 1.0); cfg.alpha_steps = (int)a.num("alpha-steps", 8); cfg.min_deff = (int)a.num("min-deff", 1);
+  cfg.alpha_start = a.num("alpha-start", 1.0); cfg.alpha_steps = (int)a.num("alpha-steps", 8); cfg.min_deff = (int)a.num("min-deff", 1); cfg.min_rigid = a.num("min-rigid", 1e-6);
   cfg.lbfgs_min = (int)a.num("lbfgs-min", 20); cfg.lbfgs_max = (int)a.num("lbfgs-max", 400); cfg.newton_iters = (int)a.num("newton", 60);
   cfg.gtol = a.num("gtol", 1e-10); cfg.ret_tol = a.num("ret-tol", 1e-8); cfg.K0min = (int)a.num("K0", 2); cfg.K0max = (int)a.num("K0max", 6);
   cfg.minsep = a.num("minsep", 2e-3); cfg.verbose = a.has("verbose"); cfg.checkpoint_secs = (int)a.num("checkpoint", 30);
@@ -113,10 +113,10 @@ static int cmd_search(const Args& a) {
 static int cmd_list(const Args& a) {
   Catalog cat = load_cat(a.pos.at(0)); int Nf = (int)a.num("N", 0), deff = (int)a.num("deff", 0), mind = (int)a.num("min-deff", 0); std::string sort = a.get("sort", "action");
   std::vector<const Record*> rs; for (auto& r : cat.recs) if ((!Nf || r.h.N == Nf) && (!deff || r.h.deff == deff) && r.h.deff >= mind) rs.push_back(&r);
-  std::sort(rs.begin(), rs.end(), [&](const Record* x, const Record* y) { if (sort == "id") return x->h.id < y->h.id; if (sort == "hits") return x->h.hits > y->h.hits; if (sort == "twist") return x->twist() > y->twist();
+  std::sort(rs.begin(), rs.end(), [&](const Record* x, const Record* y) { if (sort == "id") return x->h.id < y->h.id; if (sort == "hits") return x->h.hits > y->h.hits; if (sort == "twist") return x->twist() > y->twist(); if (sort == "rigid") return x->rigid() < y->rigid();
     if (x->h.deff != y->h.deff) return x->h.deff < y->h.deff; if (x->h.N != y->h.N) return x->h.N < y->h.N; return x->h.action < y->h.action; });
-  std::printf("%5s %2s/%-2s %2s %4s %14s %12s %5s %4s %7s %8s %10s %6s %5s %3s %s\n", "id", "de", "d", "N", "K", "action", "energy", "morse", "null", "minsep", "ret_err", "twist", "tw_rel", "hits", "cov", "sym");
-  for (auto r : rs) std::printf("%5lld %2d/%-2d %2d %4d %14.9f %12.7f %5d %4d %7.4f %8.1e %10.4g %6.3f %5d %3d %s\n", (long long)r->h.id, r->h.deff, r->h.d, r->h.N, r->h.K, r->h.action, r->h.energy, r->h.morse, r->h.nullity, r->h.minsep, r->h.ret_err, r->twist(), r->extra.size() > 1 ? r->extra[1] : 0.0, r->h.hits, r->h.cover, r->sym.c_str());
+  std::printf("%5s %2s/%-2s %2s %4s %14s %12s %5s %4s %7s %8s %10s %6s %8s %5s %3s %s\n", "id", "de", "d", "N", "K", "action", "energy", "morse", "null", "minsep", "ret_err", "twist", "tw_rel", "rigid", "hits", "cov", "sym");
+  for (auto r : rs) std::printf("%5lld %2d/%-2d %2d %4d %14.9f %12.7f %5d %4d %7.4f %8.1e %10.4g %6.3f %8.2e %5d %3d %s\n", (long long)r->h.id, r->h.deff, r->h.d, r->h.N, r->h.K, r->h.action, r->h.energy, r->h.morse, r->h.nullity, r->h.minsep, r->h.ret_err, r->twist(), r->extra.size() > 1 ? r->extra[1] : 0.0, r->rigid(), r->h.hits, r->h.cover, r->sym.c_str());
   std::printf("%zu records\n", rs.size());
   return 0;
 }

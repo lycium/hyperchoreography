@@ -45,12 +45,22 @@ Naming convention: **dimension first, then bodies** (`d3n4.bin`); `list` sorts b
   the Lagrange circle reappears as the mode-2 curve with an identical action to 10 digits.
 * **The first `d = 6` and `d = 8` choreographies.** Both dimensions were empty simply because nobody had run
   them: 30 s per `N` at `d = 6` gives 43 records (up to `deff = 5`), and 20 minutes at `d = 8` gives 13, all
-  `deff = 6` and all carrying non-zero Spin(7) Cayley twist.
+  `deff = 6` and all carrying non-zero Spin(7) Cayley twist. These runs predate the rigidity defect of §4
+  and were not kept, so what fraction of them was rigid is unknown.
 * **Genuinely seven-dimensional choreographies.** Two `deff = 7` orbits at `d = 7, N = 10`, certified to
-  2e-15 and 6e-15, plus seventeen `deff = 6` — nineteen of the twenty records in `catalog/d7_n{8,9,10}.bin`,
-  against a previous catalogue maximum of `deff = 4`. The `deff` budget of §5.1 predicted exactly which
-  `N` would work, and the principal values of the `deff = 7` orbits come out as `1 + 2 + 2 + 2`, the
-  polarisation structure the budget calls for.
+  2e-15 and 6e-15, against a previous catalogue maximum of `deff = 4`. The `deff` budget of §5.1 predicted
+  exactly which `N` would work, and their principal values come out as `1 + 2 + 2 + 2`, the polarisation
+  structure the budget calls for. Eight of the twenty records in `catalog/d7_n{8,9,10}.bin` are genuine
+  orbits; the other twelve are *relative equilibria* — rigid configurations, trivial however high their
+  `deff`, which the rigidity defect of §4 now separates and rejects.
+* **A ten-dimensional relative choreography.** `d = 10, N = 10` in a rotating frame on the calibrated line
+  `Σw = 0` (§14): `deff = 10/10`, `A = 40.995282456`, shift residual 7e-13, full-period return 1e-12, energy
+  drift 2e-14, all ten inertial principal values ≥ 0.64, rigidity defect 0.44 — and time-reversible,
+  `q(−t) = R q(t)` with `R` negating five axes. This is the `deff` budget's ceiling `2⌊N/2⌋`, reached
+  exactly. `d = 8, N = 10` gives six more at `deff = 8`. The frame is what opens them: with relative
+  equilibria filtered out, the inertial search finds **none** at `d = 8` in 60 331 trials while `--omega
+  su:1,2,3` finds six in 8 799, and `Σw = 0` beats an arbitrary rate vector (`1,2,3,4` gives one).
+  `d = 12, N = 12` is not yet reachable: 0 records in 8 537 trials, at a quarter of the trial rate.
 * **The calibration ladder** (§14): for the proper subgroup `G ⊂ SO(d)` stabilising a `k`-form `ψ`, the
   pairing of `ψ` with the loop's jet moment is an invariant no `O(d)` invariant of the loop can see. It is
   implemented for every dimension — `G₂` at `d = 7`, `Spin(7)` at `d = 8`, `SU(n)` at `d = 2n` — and the
@@ -126,6 +136,21 @@ A Fourier critical point is never accepted on its own merits:
 * **Canonical frame.** Coefficients are rotated into the principal axes of `XᵀX` with fixed column signs;
   `deff` = number of non-negligible principal values. A planar loop found in a 4-D search is catalogued with
   `deff = 2` and compares equal to its 2-D twin.
+* **Rigidity defect.** A relative equilibrium moves rigidly, so every mutual distance is constant. The
+  choreography shift sends the pair `(j,k)` to `(j−k,0)`, so `⌊N/2⌋` separations exhaust the test, and a
+  common rotation cancels, so the answer is independent of `Ω`. Zero means a rigid rotating configuration —
+  the high-dimensional analogue of the N-gon, and a *trivial* choreography however large its `deff`.
+  These dominate the high-`d` search: in a rotating frame at `d = 8, N = 10` they were 9 of the first 13
+  records, and 31 of the 170 records catalogued before this test existed are rigid (4 of 4 in
+  `d7_n9.bin`, 5 of 8 in `d7_n10.bin`). `search` rejects them by default (`--min-rigid`, default 1e-6);
+  the separation is clean, `1e-15…1e-13` against `0.1…0.7`.
+* **Effective dimension in a rotating frame.** `deff` is the dimension the motion actually occupies, which
+  is *not* the loop's own rank once `Ω ≠ 0`: `exp(Ωt)` raises it when a fixed point sweeps a circle, and
+  lowers it when a circularly polarised mode at rate `−w` becomes a linear oscillation. Body `k` traces
+  `exp(Ωt)q(t + 2πj/N) = exp(−2πΩk/N)·(`body 0's path`)`, so the occupied subspace is the sum of `N` rotated
+  copies, and a plane collapses only when `w_p ≡ 0 (mod N)`. At `Ω = 0` this is the loop's rank exactly, so
+  no inertial record changes. The cheap pre-filter still gates on the loop's own rank: measured over 49
+  records it discards a genuinely high-`deff` candidate 2 % of the time and buys 18 % more trials.
 * **Equivalence.** Two loops are the same choreography iff they agree up to time shift, time reversal,
   O(d) (rotations *and* reflections) and body relabelling. Candidates are filtered on invariants (action,
   energy, r.m.s. size; relative 1e-4) and then the Procrustes distance `min_{τ,ε,R} ‖A − R B(ε·+τ)‖` is
@@ -339,6 +364,12 @@ action and the Fourier coefficients (DFT of a dense-output period) to the reques
   14**, none of them twisted — while the trial *rate* rises, i.e. the starts fail earlier. So twist in the
   found orbits comes from the nonlinear mode cascade, not from the start. The family was written, measured
   and reverted; roadmap item 5 is the experiment that would change the verdict.
+* **The catalogue predates the rigidity test and is contaminated by relative equilibria** — 31 of 170
+  records, concentrated exactly where it hurts: 4 of 4 in `d7_n9.bin`, 5 of 8 in `d7_n10.bin`, 3 of 8 in
+  `d7_n8.bin`, against 6–34 % in `d ≤ 4`. They are not wrong (a rigid configuration whose bodies lie on one
+  curve *is* a choreography) but they are the trivial family, and they were being counted as high-`deff`
+  finds. `extras` now stores the defect on every record so they can be listed (`--sort rigid`) or dropped;
+  the files themselves are unchanged. The two `deff = 7` headline orbits are not among them.
 * Close-approach loops (minsep < 0.05) get 500+ modes; the shooting certification is fine, but the Fourier
   representation is then a poor basis — parallel shooting (Simó) would suit them better.
 * The `hits` counter is only saved at checkpoints; a kill between checkpoints loses ≤ 30 s of counts.
@@ -361,7 +392,10 @@ action and the Fourier coefficients (DFT of a dense-output period) to the reques
    remaining gap**: the catalogue reports a Morse index, which is not linear stability. Measured on
    `d2-3_n3 #2`: the reduced monodromy has symplectic defect 1.3e-07 against 9.4e+02 for `DΦ_T` taken
    directly, which loses five digits on the largest multiplier and all of them on the small ones.
-4. **The `d = 8` Spin(7) frontier**, which the reversal law of §14 now argues is the *better* rung to push:
+4. ~~**The `d = 8` Spin(7) frontier.**~~ Opened — see §1. A rotating frame on the calibrated line `Σw = 0`
+   reaches `deff = 8` at `d = 8, N = 10` and `deff = 10` at `d = 10, N = 10`, where the inertial search finds
+   nothing; what remains is to establish whether *inertial* orbits exist at those dimensions at all, and to
+   continue in `Ω` (item 1) back towards `Ω = 0` to find out. The original argument, still open, was:
    at `k = 4` time reversal does not silence the twist, and every one of the first 13 records carries it,
    against 24 of 98 at `k = 3`. A 20-minute run opened it (§1) and stopped at `deff = 6`; the budget of §5.1
    says `deff = 8` is reachable at `N ≥ 8`. `d = 5` and `d = 6` are equally unexplored — 30 s per `N` at
