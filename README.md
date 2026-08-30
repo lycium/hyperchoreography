@@ -17,9 +17,10 @@ make test             # numerical self-checks of every kernel (derivatives, symm
 ./hyperchoreography merge    all.bin d3n4.bin d3n4_machine2.bin                                # union of catalogues
 ./hyperchoreography bench    --d 4 --N 5 --K 24
 ```
-Dependencies: a C++20 compiler; MPFR + GMP for `refine` (`make NOMPFR=1` drops them). No other libraries —
-the linear algebra (symmetric eigensolver, pivoted LU), the optimisers, the Taylor integrator and the MPFR
-wrapper are all in `src/` (~2 500 lines).
+Dependencies: a C++20 compiler; MPFR + GMP for `refine` (`make NOMPFR=1` drops them); on macOS, Accelerate
+for LAPACK `dsyevd` above n = 64 (`make NOACCEL=1` drops it). No other libraries — the linear algebra
+(symmetric eigensolver, pivoted LU), the optimisers, the Taylor integrator and the MPFR wrapper are all in
+`src/` (~2 500 lines).
 
 Naming convention: **dimension first, then bodies** (`d3n4.bin`); `list` sorts by (deff, N, action).
 
@@ -85,7 +86,9 @@ A Fourier critical point is never accepted on its own merits:
 
 * **ODE validation.** Initial conditions of all N bodies are read off the series and integrated with a
   22nd-order Taylor method (automatic differentiation of the N-body recurrences, adaptive step) over `T/N`; the
-  shift residual `|Φ_{T/N}(Z) − SZ|` must be ≤ 1e-5 (one mode doubling is allowed if it is > 1e-4).
+  shift residual `|Φ_{T/N}(Z) − SZ|` must be ≤ `--ret-reject` (one mode doubling is allowed if it is > 1e-4).
+  The default 1e-1 is deliberately loose: the shooting Newton below is the real gate, and tightening it to
+  1e-5 discards candidates that shooting would have corrected, costing 2.5–4.5x in unique orbits per second.
 * **Shooting Newton.** The shooting map is then solved to `1e-12` (finite-difference Jacobian, tiny damping
   to suppress the gauge null space, centre of mass removed). Every catalogued orbit is a solution of the true
   equations to machine precision regardless of the Fourier truncation.
@@ -220,8 +223,12 @@ action and the Fourier coefficients (DFT of a dense-output period) to the reques
 * **`--sym random` is wasteful** (about half the draws give an empty fixed subspace or an infinite group).
   A curated list of groups per (d, N) — e.g. the crystallographic point groups and the Ferrario–Terracini
   classes — would be far more productive.
-* **Trial cost in d ≥ 4 is dominated by the dense Fourier Hessian** when a mode doubling is needed
-  (n = 2·nm·d). A Newton–Krylov variant (Hessian–vector products are cheap) would remove that.
+* **Trial cost in d ≥ 4 is dominated by the dense Fourier Hessian and its eigendecomposition** (n = 2·nm·d);
+  Accelerate's `dsyevd` covers the latter. A matrix-free Newton–Krylov step was measured and dropped: it only
+  breaks even near n ≈ 400 and is erratic beyond (0.88×–1.57×) once force evaluation dominates.
+* Double precision suffices: the action matches 40-digit MPFR to 1–2 ulp at 40 k quadrature nodes, and
+  re-shooting rejected candidates in MPFR recovers nothing that double misses. The ~1e-11 floor on the T/N
+  shift residual is Lyapunov amplification, not summation roundoff.
 * Close-approach loops (minsep < 0.05) get 500+ modes; the shooting certification is fine, but the Fourier
   representation is then a poor basis — parallel shooting (Simó) would suit them better.
 * The `hits` counter is only saved at checkpoints; a kill between checkpoints loses ≤ 30 s of counts.
@@ -240,7 +247,7 @@ action and the Fourier coefficients (DFT of a dense-output period) to the reques
    (test each candidate generator on the certified series), so records carry their full symmetry group.
 4. **Linear stability** (Floquet multipliers from the reduced monodromy `(S⁻¹ DΦ_{T/N})`, N-th roots of the
    full multipliers); the shooting Jacobian is already computed.
-5. **Newton–Krylov / preconditioned MINRES** for large K and d ≥ 4; FFT-based synthesis for K ≳ 200.
+5. **FFT-based synthesis** for K ≳ 200.
 6. **Strong-force homotopy classes.** At α ≥ 2 minimisers exist in every homotopy class in the plane (Moore,
    Montgomery); systematic enumeration by braid type followed by `--alpha-start` continuation.
 7. **Mountain-pass / string method** between catalogued minimisers to harvest index-1 saddles systematically.

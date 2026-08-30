@@ -1,14 +1,17 @@
-// Dense linear algebra: symmetric eigensolver (tred2/tql2), pivoted LU, RNG.
+// Dense linear algebra: symmetric eigensolver (tred2/tql2, LAPACK dsyevd when large), pivoted LU, RNG.
 #pragma once
 #include <vector>
 #include <cmath>
 #include <algorithm>
 #include <cstdint>
+#ifdef HAVE_ACCELERATE
+#include <Accelerate/Accelerate.h>
+#endif
 
 namespace la {
 
 // eigenvectors in the columns of V, eigenvalues ascending in d
-inline void sym_eig(int n, std::vector<double>& V, std::vector<double>& d) {
+inline void sym_eig_ref(int n, std::vector<double>& V, std::vector<double>& d) {
   static thread_local std::vector<double> e; e.assign(n, 0.0);
   d.assign(n, 0.0);
   auto A = [&](int i, int j) -> double& { return V[(size_t)i * n + j]; };
@@ -92,6 +95,32 @@ inline void sym_eig(int n, std::vector<double>& V, std::vector<double>& d) {
     for (int j = i + 1; j < n; j++) if (d[j] < p) { k = j; p = d[j]; }
     if (k != i) { d[k] = d[i]; d[i] = p; for (int j = 0; j < n; j++) std::swap(A(j, i), A(j, k)); }
   }
+}
+
+#ifdef HAVE_ACCELERATE
+// dsyevd returns eigenvectors as columns of a column-major array; transpose into our row-major layout
+inline bool sym_eig_lapack(int n, std::vector<double>& V, std::vector<double>& d) {
+  static thread_local std::vector<double> work; static thread_local std::vector<__LAPACK_int> iwork;
+  __LAPACK_int N = n, lda = n, lwork = 1 + 6 * n + 2 * n * n, liwork = 3 + 5 * n, info = 0;
+  d.resize(n);
+  if (work.size() < (size_t)lwork) work.resize(lwork);
+  if (iwork.size() < (size_t)liwork) iwork.resize(liwork);
+  dsyevd_("V", "L", &N, V.data(), &lda, d.data(), work.data(), &lwork, iwork.data(), &liwork, &info);
+  if (info) return false;
+  for (int i = 0; i < n; i++) for (int j = i + 1; j < n; j++) std::swap(V[(size_t)i * n + j], V[(size_t)j * n + i]);
+  return true;
+}
+#endif
+
+inline void sym_eig(int n, std::vector<double>& V, std::vector<double>& d) {
+#ifdef HAVE_ACCELERATE
+  if (n >= 64) {                                   // measured break-even against tred2/tql2
+    static thread_local std::vector<double> A0; A0.assign(V.begin(), V.end());
+    if (sym_eig_lapack(n, V, d)) return;
+    V.assign(A0.begin(), A0.end());                // dsyevd leaves V undefined when it fails
+  }
+#endif
+  sym_eig_ref(n, V, d);
 }
 
 // A x = b by partial-pivot elimination; false if singular

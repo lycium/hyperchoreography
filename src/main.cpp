@@ -29,7 +29,7 @@ static void usage() {
     "                [--lbfgs-min 20 --lbfgs-max 400 --newton 60 --gtol 1e-10 --ret-tol 1e-8 --K0 2 --K0max 6 --minsep 2e-3]\n"
     "                [--phase1 action|gradnorm|mixed] [--seed-from other.bin --kick-min 0.02 --kick-max 0.5]\n"
     "                [--starts random,torus,vertical,kick] [--K-index 48] [--Ms 2048 --Kout-max 512 --shoot-tol 1e-12 --ret-double 1e-4]\n"
-    "                [--tol-inv 1e-4 --tol-dist 1e-3 --checkpoint 30]                 (resumes if catalog/state exist)\n"
+    "                [--tol-inv 1e-4 --tol-dist 1e-3 --checkpoint 30 --ret-reject 1e-1]   (resumes if catalog/state exist)\n"
     "  hyperchoreography list    catalog.bin [--N n] [--deff k] [--min-deff k] [--sort action|id|hits]\n"
     "  hyperchoreography show    catalog.bin --id i                (JSON dump of one record)\n"
     "  hyperchoreography export  catalog.bin --id i [--samples 720] [--out curve.csv]   (body positions over one period)\n"
@@ -56,7 +56,7 @@ static int cmd_search(const Args& a) {
   cfg.minsep = a.num("minsep", 2e-3); cfg.verbose = a.has("verbose"); cfg.checkpoint_secs = (int)a.num("checkpoint", 30);
   cfg.tol_inv = a.num("tol-inv", 1e-4); cfg.tol_dist = a.num("tol-dist", 1e-3);
   cfg.phase1 = a.get("phase1", "mixed"); cfg.kick_min = a.num("kick-min", 0.02); cfg.kick_max = a.num("kick-max", 0.5);
-  cfg.Ms = (int)a.num("Ms", 2048); cfg.Kout_max = (int)a.num("Kout-max", 512); cfg.shoot_tol = a.num("shoot-tol", 1e-12); cfg.ret_double = a.num("ret-double", 1e-4);
+  cfg.Ms = (int)a.num("Ms", 2048); cfg.Kout_max = (int)a.num("Kout-max", 512); cfg.shoot_tol = a.num("shoot-tol", 1e-12); cfg.ret_reject = a.num("ret-reject", 1e-1); cfg.ret_double = a.num("ret-double", 1e-4);
   cfg.starts = a.get("starts", a.has("seed-from") ? "random,torus,vertical,kick" : "random,torus,vertical"); cfg.K_index = (int)a.num("K-index", 48);
   if (cfg.threads < 1) cfg.threads = 1;
   std::vector<Record> seeds;
@@ -83,7 +83,7 @@ static int cmd_search(const Args& a) {
       std::lock_guard<std::mutex> lk(mu);
       if (!o.ok) { failed++; reasons[o.why]++; continue; }
       double dist; long dup = cat.find_duplicate(o.rec, cfg.tol_inv, cfg.tol_dist, &dist);
-      if (dup >= 0) { cat.absorb((size_t)dup, o.rec); dups++; continue; }
+      if (dup >= 0) { if (cat.absorb((size_t)dup, o.rec)) morse_index(cfg, cat.recs[dup], ctx); dups++; continue; }
       morse_index(cfg, o.rec, ctx);                      // new records only
       o.rec.h.id = -1; size_t idx = cat.push(o.rec); found++; const Record& r = cat.recs[idx];
       std::printf("+ id=%lld d=%d/%d N=%d K=%d A=%.9f E=%.6f morse=%d null=%d minsep=%.3f ret=%.1e cover=%d sym=\"%s\" (trial %llu, %.2fs)\n", (long long)r.h.id, r.h.deff, r.h.d, r.h.N, r.h.K, r.h.action, r.h.energy, r.h.morse, r.h.nullity, r.h.minsep, r.h.ret_err, r.h.cover, r.sym.c_str(), (unsigned long long)tr, r.h.secs);
@@ -141,6 +141,7 @@ static int cmd_verify(const Args& a) {
   for (size_t i = 0; i < p.size(); i++) ret = std::max(ret, std::max(std::fabs(p[i] - pos[i]), std::fabs(v[i] - vel[i])));
   std::printf("record %lld: d=%d (deff=%d) N=%d K=%d action=%.12f energy=%.12f\n", (long long)r.h.id, r.h.d, r.h.deff, r.h.N, r.h.K, r.h.action, r.h.energy);
   std::printf("  shift residual |Phi_{T/N}(Z) - SZ|      = %.3e\n  full-period return |Phi_T(Z) - Z|   = %.3e  (%d Taylor steps)\n  energy drift over one period          = %.3e\n  energy from initial state             = %.12f\n", res, ret, steps, E1 - E0, E0);
+  if (std::fabs(E0 - r.h.energy) > 1e-6 * std::max(1.0, std::fabs(r.h.energy))) std::printf("  ** stale record: reconstructed energy %.9g disagrees with stored %.9g **\n", E0, r.h.energy);
   std::printf("  initial conditions (t=0):\n"); for (int k = 0; k < P.N; k++) { std::printf("   body %d  q =", k); for (int c = 0; c < P.d; c++) std::printf(" %+.15f", pos[k * P.d + c]); std::printf("   v ="); for (int c = 0; c < P.d; c++) std::printf(" %+.15f", vel[k * P.d + c]); std::printf("\n"); }
   return 0;
 }

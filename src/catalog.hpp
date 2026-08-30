@@ -28,7 +28,8 @@ struct Record {
     for (int mu = 0; mu < P.nm; mu++) for (int a = 0; a < P.d; a++) { coef[(size_t)mu * 2 * P.d + a] = x[(2 * mu) * P.d + a]; coef[(size_t)mu * 2 * P.d + P.d + a] = x[(2 * mu + 1) * P.d + a]; }
   }
   void to_problem(Problem& P, std::vector<double>& x) const {
-    P.init(h.N, h.d, h.K, h.M, h.alpha); x.assign(P.n, 0.0); const int d = h.d;
+    int M = h.M % h.N ? 0 : h.M;                          // legacy records stored an M not divisible by N
+    P.init(h.N, h.d, h.K, M, h.alpha); x.assign(P.n, 0.0); const int d = h.d;
     for (size_t k = 0; k < modes.size(); k++) { auto it = std::lower_bound(P.modes.begin(), P.modes.end(), modes[k]); if (it == P.modes.end() || *it != modes[k]) continue;
       int mu = (int)(it - P.modes.begin()); for (int a = 0; a < d; a++) { x[(2 * mu) * d + a] = coef[k * 2 * d + a]; x[(2 * mu + 1) * d + a] = coef[k * 2 * d + d + a]; } }
   }
@@ -97,10 +98,12 @@ struct Catalog {
     double rc = cand.h.ret_err > 0 ? cand.h.ret_err : 1e-300, ro = cur.h.ret_err > 0 ? cur.h.ret_err : 1e-300;
     if (rc < 0.1 * ro) return true; if (ro < 0.1 * rc) return false; return cand.h.K < cur.h.K;
   }
-  void absorb(size_t idx, const Record& cand, int add_hits = 1) {
+  bool absorb(size_t idx, const Record& cand, int add_hits = 1) {          // true when cand replaced the record
     Record& cur = recs[idx]; cur.h.hits += add_hits;
     if (better(cand, cur)) { int64_t id = cur.h.id; int hits = cur.h.hits; double a = cur.h.action; cur = cand; cur.h.id = id; cur.h.hits = hits;
-      if (a != cur.h.action) { for (auto it = index.lower_bound(a); it != index.end() && it->first == a; ++it) if (it->second == idx) { index.erase(it); break; } index.emplace(cur.h.action, idx); } }
+      if (a != cur.h.action) { for (auto it = index.lower_bound(a); it != index.end() && it->first == a; ++it) if (it->second == idx) { index.erase(it); break; } index.emplace(cur.h.action, idx); }
+      return true; }
+    return false;
   }
   void save(const std::string& path) const {
     std::string tmp = path + ".tmp"; FILE* f = std::fopen(tmp.c_str(), "wb"); if (!f) throw std::runtime_error("cannot write " + tmp);

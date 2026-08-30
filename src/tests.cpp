@@ -20,6 +20,14 @@ int main() {
     for (int k = 0; k < n; k++) for (int i = 0; i < n; i++) { double s = 0; for (int j = 0; j < n; j++) s += A0[i * n + j] * A[j * n + k]; err = std::max(err, std::fabs(s - w[k] * A[i * n + k])); }
     for (int k = 0; k < n; k++) for (int l = 0; l < n; l++) { double s = 0; for (int i = 0; i < n; i++) s += A[i * n + k] * A[i * n + l]; orth = std::max(orth, std::fabs(s - (k == l))); }
     CHECK(err < 1e-10 && orth < 1e-10, "eigen residual %.2e orthonormality %.2e", err, orth); }
+#ifdef HAVE_ACCELERATE
+  { int n = 130; la::Rng rng(5); std::vector<double> A((size_t)n * n), A0;      // above the threshold: dsyevd path
+    for (int i = 0; i < n; i++) for (int j = i; j < n; j++) A[i * n + j] = A[j * n + i] = rng.normal();
+    A0 = A; std::vector<double> w; la::sym_eig(n, A, w); double err = 0, orth = 0;
+    for (int k = 0; k < n; k++) for (int i = 0; i < n; i++) { double s = 0; for (int j = 0; j < n; j++) s += A0[(size_t)i * n + j] * A[(size_t)j * n + k]; err = std::max(err, std::fabs(s - w[k] * A[(size_t)i * n + k])); }
+    for (int k = 0; k < n; k++) { double s = 0; for (int i = 0; i < n; i++) s += A[(size_t)i * n + k] * A[(size_t)i * n + k]; orth = std::max(orth, std::fabs(s - 1)); }
+    CHECK(err < 1e-9 && orth < 1e-12, "dsyevd residual %.2e orthonormality %.2e", err, orth); }
+#endif
 
   std::printf("[action derivatives]\n");
   for (int cfg = 0; cfg < 3; cfg++) {

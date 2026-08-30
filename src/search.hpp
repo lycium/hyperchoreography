@@ -16,7 +16,7 @@ struct Config {
   std::string phase1 = "mixed";                // action | gradnorm | mixed
   int threads = 0; uint64_t seed = 1; long trials = LONG_MAX; double minutes = 1e30;
   std::string out = "catalog.bin";
-  int lbfgs_min = 20, lbfgs_max = 400, newton_iters = 60; double gtol = 1e-10, ret_tol = 1e-8, ret_reject = 1e-5;
+  int lbfgs_min = 20, lbfgs_max = 400, newton_iters = 60; double gtol = 1e-10, ret_tol = 1e-8, ret_reject = 1e-1;
   int K0min = 2, K0max = 6; double minsep = 2e-3; int min_deff = 1;
   const std::vector<Record>* seeds = nullptr; double kick_min = 0.02, kick_max = 0.5;
   int Ms = 2048, Kout_max = 512; double shoot_tol = 1e-12, ret_double = 1e-4;
