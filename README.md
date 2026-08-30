@@ -394,8 +394,11 @@ action and the Fourier coefficients (DFT of a dense-output period) to the reques
    directly, which loses five digits on the largest multiplier and all of them on the small ones.
 4. ~~**The `d = 8` Spin(7) frontier.**~~ Opened — see §1. A rotating frame on the calibrated line `Σw = 0`
    reaches `deff = 8` at `d = 8, N = 10` and `deff = 10` at `d = 10, N = 10`, where the inertial search finds
-   nothing; what remains is to establish whether *inertial* orbits exist at those dimensions at all, and to
-   continue in `Ω` (item 1) back towards `Ω = 0` to find out. The original argument, still open, was:
+   nothing, and **the frame is essential**: relaxing `Ω = sΩ₀` on five orbits, two branches reach `s = 0` on
+   the *rigid* family (`deff` 2 and 4) and three stall, one already rigid to 2e-15 with `deff` still reading
+   8. That is natural-parameter continuation, so a stall may be a fold; the pseudo-arclength test wants `Ω`
+   in `Continuer` (hard-wired to `α` by `grad_alpha`), cheap since the kinetic operator is exactly quadratic
+   in `Ω`: `∂(∇A)/∂s = C + 2sD`. The original argument, still open, was:
    at `k = 4` time reversal does not silence the twist, and every one of the first 13 records carries it,
    against 24 of 98 at `k = 3`. A 20-minute run opened it (§1) and stopped at `deff = 6`; the budget of §5.1
    says `deff = 8` is reachable at `N ≥ 8`. `d = 5` and `d = 6` are equally unexplored — 30 s per `N` at
