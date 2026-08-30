@@ -1,4 +1,4 @@
-// CLI: search | continue | list | show | export | verify | refine | merge | bench
+// CLI: search | continue | list | show | export | verify | refine | merge | extras | symmetry | bench
 #include "search.hpp"
 #include "continue.hpp"
 #include <thread>
@@ -24,18 +24,21 @@ struct Args {
 
 static void usage() {
   std::puts("hyperchoreography — N-body choreography search in any dimension\n"
-    "  hyperchoreography search  --N 3 --d 2 [--K 16 --Kmax 64] [--sym none|random|\"t+1/2 s[-1,-2]; ...\"] [--threads T] [--seed S]\n"
+    "  hyperchoreography search  --N 3 --d 2 [--K 16 --Kmax 64] [--sym none|random|cyc:p|fano:p|\"t+1/2 s[-1,-2]; ...\"] [--threads T] [--seed S]\n"
     "                [--trials n] [--minutes m] [--out catalog.bin] [--alpha-start 2 --alpha-steps 8] [--min-deff k]\n"
     "                [--lbfgs-min 20 --lbfgs-max 400 --newton 60 --gtol 1e-10 --ret-tol 1e-8 --K0 2 --K0max 6 --minsep 2e-3]\n"
     "                [--phase1 action|gradnorm|mixed] [--seed-from other.bin --kick-min 0.02 --kick-max 0.5]\n"
-    "                [--starts random,torus,vertical,kick] [--K-index 48] [--Ms 2048 --Kout-max 512 --shoot-tol 1e-12 --ret-double 1e-4]\n"
+    "                [--starts random,torus,vertical,hyper,fano,kick] [--K-index 48] [--Ms 2048 --Kout-max 512 --shoot-tol 1e-12 --ret-double 1e-4]\n"
+    "                [--omega \"w1,w2,...\" | --omega su:w1,... | --omega g2:p,q]   rotating frame: q_j(t) = exp(Omega t) q(t + 2 pi j/N)\n"
     "                [--tol-inv 1e-4 --tol-dist 1e-3 --checkpoint 30 --ret-reject 1e-1]   (resumes if catalog/state exist)\n"
-    "  hyperchoreography list    catalog.bin [--N n] [--deff k] [--min-deff k] [--sort action|id|hits]\n"
+    "  hyperchoreography list    catalog.bin [--N n] [--deff k] [--min-deff k] [--sort action|id|hits|twist]\n"
     "  hyperchoreography show    catalog.bin --id i                (JSON dump of one record)\n"
     "  hyperchoreography export  catalog.bin --id i [--samples 720] [--out curve.csv]   (body positions over one period)\n"
     "  hyperchoreography verify  catalog.bin --id i                (double-precision Taylor integration checks)\n"
     "  hyperchoreography refine  catalog.bin --id i --digits 60 [--K 64] [--out refined.txt]   (MPFR shooting Newton)\n"
     "  hyperchoreography merge   out.bin in1.bin in2.bin ...       (union with de-duplication)\n"
+    "  hyperchoreography extras  catalog.bin [--K-index 48]        (recompute Morse index, nullity and the calibration twist)\n"
+    "  hyperchoreography symmetry catalog.bin [--id i] [--tol 1e-6] (detect the symmetry group of each stored loop)\n"
     "  hyperchoreography continue catalog.bin [--id i | --root circle] --N n --d d [--K 24] [--covers 7] [--alpha-lo 0.6 --alpha-hi 2.4 --depth 2] [--out found.bin]\n"
     "                                                  (bifurcation-tree exploration by continuation in the potential exponent)\n"
     "  hyperchoreography bench   [--N 3 --d 2 --K 16]              (kernel timings)");
@@ -48,7 +51,7 @@ static const Record& rec_by_id(const Catalog& c, long id) { for (auto& r : c.rec
 static int cmd_search(const Args& a) {
   Config cfg;
   cfg.N = (int)a.num("N", 3); cfg.d = (int)a.num("d", 2); cfg.K = (int)a.num("K", 16); cfg.Kmax = (int)a.num("Kmax", std::max(4 * cfg.K, 64));
-  cfg.sym = a.get("sym", "none"); cfg.threads = (int)a.num("threads", std::thread::hardware_concurrency()); cfg.seed = (uint64_t)a.num("seed", 1);
+  cfg.sym = named_sym(a.get("sym", "none"), cfg.d); cfg.threads = (int)a.num("threads", std::thread::hardware_concurrency()); cfg.seed = (uint64_t)a.num("seed", 1);
   cfg.trials = (long)a.num("trials", (double)LONG_MAX); cfg.minutes = a.num("minutes", 1e30); cfg.out = a.get("out", "catalog.bin");
   cfg.alpha_start = a.num("alpha-start", 1.0); cfg.alpha_steps = (int)a.num("alpha-steps", 8); cfg.min_deff = (int)a.num("min-deff", 1);
   cfg.lbfgs_min = (int)a.num("lbfgs-min", 20); cfg.lbfgs_max = (int)a.num("lbfgs-max", 400); cfg.newton_iters = (int)a.num("newton", 60);
@@ -58,6 +61,7 @@ static int cmd_search(const Args& a) {
   cfg.phase1 = a.get("phase1", "mixed"); cfg.kick_min = a.num("kick-min", 0.02); cfg.kick_max = a.num("kick-max", 0.5);
   cfg.Ms = (int)a.num("Ms", 2048); cfg.Kout_max = (int)a.num("Kout-max", 512); cfg.shoot_tol = a.num("shoot-tol", 1e-12); cfg.ret_reject = a.num("ret-reject", 1e-1); cfg.ret_double = a.num("ret-double", 1e-4);
   cfg.starts = a.get("starts", a.has("seed-from") ? "random,torus,vertical,kick" : "random,torus,vertical"); cfg.K_index = (int)a.num("K-index", 48);
+  cfg.omega_text = a.get("omega", ""); cfg.omega = parse_omega(cfg.omega_text, cfg.d);
   if (cfg.threads < 1) cfg.threads = 1;
   std::vector<Record> seeds;
   if (a.has("seed-from")) { Catalog sc = load_cat(a.get("seed-from")); seeds = sc.recs; cfg.seeds = &seeds; std::printf("seeding from %zu catalogue solutions (%s)\n", seeds.size(), a.get("seed-from").c_str()); }
@@ -65,7 +69,7 @@ static int cmd_search(const Args& a) {
 
   Catalog cat; bool resumed = false; try { resumed = cat.load(cfg.out); } catch (std::exception& e) { std::fprintf(stderr, "%s\n", e.what()); return 1; }
   SearchState st; if (!(st.load(cfg.out + ".state") && st.seed == (int64_t)cfg.seed)) { st = SearchState(); st.seed = (int64_t)cfg.seed; }
-  std::printf("hyperchoreography search: d=%d N=%d K=%d..%d sym=\"%s\" starts=%s phase1=%s alpha_start=%g threads=%d seed=%llu out=%s\n", cfg.d, cfg.N, cfg.K, cfg.Kmax, cfg.sym.c_str(), cfg.starts.c_str(), cfg.phase1.c_str(), cfg.alpha_start, cfg.threads, (unsigned long long)cfg.seed, cfg.out.c_str());
+  std::printf("hyperchoreography search: d=%d N=%d K=%d..%d sym=\"%s\" omega=\"%s\" starts=%s phase1=%s alpha_start=%g threads=%d seed=%llu out=%s\n", cfg.d, cfg.N, cfg.K, cfg.Kmax, cfg.sym.c_str(), cfg.omega_text.c_str(), cfg.starts.c_str(), cfg.phase1.c_str(), cfg.alpha_start, cfg.threads, (unsigned long long)cfg.seed, cfg.out.c_str());
   if (resumed) std::printf("resuming: %zu records in catalog, trial counter at %lld\n", cat.recs.size(), (long long)st.next_trial);
   std::signal(SIGINT, on_signal); std::signal(SIGTERM, on_signal);
 
@@ -83,8 +87,8 @@ static int cmd_search(const Args& a) {
       std::lock_guard<std::mutex> lk(mu);
       if (!o.ok) { failed++; reasons[o.why]++; continue; }
       double dist; long dup = cat.find_duplicate(o.rec, cfg.tol_inv, cfg.tol_dist, &dist);
-      if (dup >= 0) { if (cat.absorb((size_t)dup, o.rec)) morse_index(cfg, cat.recs[dup], ctx); dups++; continue; }
-      morse_index(cfg, o.rec, ctx);                      // new records only
+      if (dup >= 0) { if (cat.absorb((size_t)dup, o.rec)) record_extras(cfg, cat.recs[dup], ctx); dups++; continue; }
+      record_extras(cfg, o.rec, ctx);                      // new records only
       o.rec.h.id = -1; size_t idx = cat.push(o.rec); found++; const Record& r = cat.recs[idx];
       std::printf("+ id=%lld d=%d/%d N=%d K=%d A=%.9f E=%.6f morse=%d null=%d minsep=%.3f ret=%.1e cover=%d sym=\"%s\" (trial %llu, %.2fs)\n", (long long)r.h.id, r.h.deff, r.h.d, r.h.N, r.h.K, r.h.action, r.h.energy, r.h.morse, r.h.nullity, r.h.minsep, r.h.ret_err, r.h.cover, r.sym.c_str(), (unsigned long long)tr, r.h.secs);
       std::fflush(stdout);
@@ -109,10 +113,10 @@ static int cmd_search(const Args& a) {
 static int cmd_list(const Args& a) {
   Catalog cat = load_cat(a.pos.at(0)); int Nf = (int)a.num("N", 0), deff = (int)a.num("deff", 0), mind = (int)a.num("min-deff", 0); std::string sort = a.get("sort", "action");
   std::vector<const Record*> rs; for (auto& r : cat.recs) if ((!Nf || r.h.N == Nf) && (!deff || r.h.deff == deff) && r.h.deff >= mind) rs.push_back(&r);
-  std::sort(rs.begin(), rs.end(), [&](const Record* x, const Record* y) { if (sort == "id") return x->h.id < y->h.id; if (sort == "hits") return x->h.hits > y->h.hits;
+  std::sort(rs.begin(), rs.end(), [&](const Record* x, const Record* y) { if (sort == "id") return x->h.id < y->h.id; if (sort == "hits") return x->h.hits > y->h.hits; if (sort == "twist") return x->twist() > y->twist();
     if (x->h.deff != y->h.deff) return x->h.deff < y->h.deff; if (x->h.N != y->h.N) return x->h.N < y->h.N; return x->h.action < y->h.action; });
-  std::printf("%5s %2s/%-2s %2s %4s %14s %12s %5s %4s %7s %8s %5s %3s %s\n", "id", "de", "d", "N", "K", "action", "energy", "morse", "null", "minsep", "ret_err", "hits", "cov", "sym");
-  for (auto r : rs) std::printf("%5lld %2d/%-2d %2d %4d %14.9f %12.7f %5d %4d %7.4f %8.1e %5d %3d %s\n", (long long)r->h.id, r->h.deff, r->h.d, r->h.N, r->h.K, r->h.action, r->h.energy, r->h.morse, r->h.nullity, r->h.minsep, r->h.ret_err, r->h.hits, r->h.cover, r->sym.c_str());
+  std::printf("%5s %2s/%-2s %2s %4s %14s %12s %5s %4s %7s %8s %10s %6s %5s %3s %s\n", "id", "de", "d", "N", "K", "action", "energy", "morse", "null", "minsep", "ret_err", "twist", "tw_rel", "hits", "cov", "sym");
+  for (auto r : rs) std::printf("%5lld %2d/%-2d %2d %4d %14.9f %12.7f %5d %4d %7.4f %8.1e %10.4g %6.3f %5d %3d %s\n", (long long)r->h.id, r->h.deff, r->h.d, r->h.N, r->h.K, r->h.action, r->h.energy, r->h.morse, r->h.nullity, r->h.minsep, r->h.ret_err, r->twist(), r->extra.size() > 1 ? r->extra[1] : 0.0, r->h.hits, r->h.cover, r->sym.c_str());
   std::printf("%zu records\n", rs.size());
   return 0;
 }
@@ -125,9 +129,13 @@ static int cmd_export(const Args& a) {
   const int N = r.h.N, d = r.h.d; std::fprintf(f, "t");
   for (int k = 0; k < N; k++) for (int c = 0; c < d; c++) std::fprintf(f, ",q%d_%c", k, "xyzwuv"[c]);
   std::fprintf(f, "\n");
+  const double* om = r.omega(); std::vector<double> Rt, Ai;
   for (int j = 0; j < S; j++) { double t = 2 * PI * j / S; std::fprintf(f, "%.10f", t);
+    if (om) { Ai.assign(om, om + (size_t)d * d); for (double& e : Ai) e *= t; la::expm_skew(d, Ai, Rt); }
     for (int k = 0; k < N; k++) { double tk = t + 2 * PI * k / N; std::vector<double> q(d, 0.0);
       for (size_t mu = 0; mu < r.modes.size(); mu++) { double c = std::cos(r.modes[mu] * tk), s = std::sin(r.modes[mu] * tk); for (int c2 = 0; c2 < d; c2++) q[c2] += c * r.coef[mu * 2 * d + c2] + s * r.coef[mu * 2 * d + d + c2]; }
+      if (om) { std::vector<double> qi(d, 0.0);                                   // inertial: exp(Ωt) q(t + 2πk/N)
+        for (int a = 0; a < d; a++) for (int b = 0; b < d; b++) qi[a] += Rt[(size_t)a * d + b] * q[b]; q.swap(qi); }
       for (int c2 = 0; c2 < d; c2++) std::fprintf(f, ",%.12f", q[c2]); }
     std::fprintf(f, "\n"); }
   std::fclose(f); std::printf("wrote %s (%d samples, %d bodies, %dD)\n", out.c_str(), S, N, d); return 0;
@@ -136,11 +144,17 @@ static int cmd_export(const Args& a) {
 static int cmd_verify(const Args& a) {
   Catalog cat = load_cat(a.pos.at(0)); const Record& r = rec_by_id(cat, (long)a.num("id", 0)); Problem P; std::vector<double> x; r.to_problem(P, x);
   std::vector<double> pos, vel; initial_state(P, x.data(), pos, vel); NBody<double> nb(P.N, P.d, P.alpha, 22);
-  double E0 = nbody_energy(P.N, P.d, P.alpha, pos.data(), vel.data()); double res = chore_residual(nb, pos, vel, 1e-16);
+  double E0 = nbody_energy(P.N, P.d, P.alpha, pos.data(), vel.data());
+  double res = chore_residual(nb, pos, vel, 1e-16, P.gshift());
   std::vector<double> p = pos, v = vel; int steps = nb.integrate(p, v, 2 * PI, 1e-16); double E1 = nbody_energy(P.N, P.d, P.alpha, p.data(), v.data()), ret = 0;
-  for (size_t i = 0; i < p.size(); i++) ret = std::max(ret, std::max(std::fabs(p[i] - pos[i]), std::fabs(v[i] - vel[i])));
+  std::vector<double> GN;                                    // after one period a twisted orbit closes up to exp(2πΩ)
+  if (!P.Om.empty()) { std::vector<double> A(P.Om); for (double& e : A) e *= 2 * PI; la::expm_skew(P.d, A, GN); }
+  for (int k = 0; k < P.N; k++) for (int c = 0; c < P.d; c++) { double tp = pos[k * P.d + c], tv = vel[k * P.d + c];
+    if (!GN.empty()) { tp = tv = 0; for (int b = 0; b < P.d; b++) { tp += GN[(size_t)c * P.d + b] * pos[k * P.d + b]; tv += GN[(size_t)c * P.d + b] * vel[k * P.d + b]; } }
+    ret = std::max(ret, std::max(std::fabs(p[k * P.d + c] - tp), std::fabs(v[k * P.d + c] - tv))); }
   std::printf("record %lld: d=%d (deff=%d) N=%d K=%d action=%.12f energy=%.12f\n", (long long)r.h.id, r.h.d, r.h.deff, r.h.N, r.h.K, r.h.action, r.h.energy);
-  std::printf("  shift residual |Phi_{T/N}(Z) - SZ|      = %.3e\n  full-period return |Phi_T(Z) - Z|   = %.3e  (%d Taylor steps)\n  energy drift over one period          = %.3e\n  energy from initial state             = %.12f\n", res, ret, steps, E1 - E0, E0);
+  if (!P.Om.empty()) std::printf("  rotating frame: Omega stored with the record\n");
+  std::printf("  shift residual |Phi_{T/N}(Z) - G S Z|  = %.3e\n  full-period return |Phi_T(Z) - G^N Z| = %.3e  (%d Taylor steps)\n  energy drift over one period          = %.3e\n  energy from initial state             = %.12f\n", res, ret, steps, E1 - E0, E0);
   if (std::fabs(E0 - r.h.energy) > 1e-6 * std::max(1.0, std::fabs(r.h.energy))) std::printf("  ** stale record: reconstructed energy %.9g disagrees with stored %.9g **\n", E0, r.h.energy);
   std::printf("  initial conditions (t=0):\n"); for (int k = 0; k < P.N; k++) { std::printf("   body %d  q =", k); for (int c = 0; c < P.d; c++) std::printf(" %+.15f", pos[k * P.d + c]); std::printf("   v ="); for (int c = 0; c < P.d; c++) std::printf(" %+.15f", vel[k * P.d + c]); std::printf("\n"); }
   return 0;
@@ -153,6 +167,41 @@ static int cmd_merge(const Args& a) {
   for (size_t i = 1; i < a.pos.size(); i++) { Catalog in = load_cat(a.pos[i]);
     for (auto& r : in.recs) { long dup = out.find_duplicate(r, tol_inv, tol_dist); if (dup >= 0) { out.absorb((size_t)dup, r, r.h.hits); merged++; } else { Record c = r; c.h.id = -1; out.push(c); added++; } } }
   out.save(a.pos[0]); std::printf("merged: %ld added, %ld duplicates folded; %s has %zu records\n", added, merged, a.pos[0].c_str(), out.recs.size()); return 0;
+}
+
+static int cmd_extras(const Args& a) {
+  Catalog cat = load_cat(a.pos.at(0)); const int Ki = (int)a.num("K-index", 48); long n = 0;
+  for (auto& r : cat.recs) {
+    if (r.extra.empty()) r.extra.assign(Record::NEX, 0.0);                 // legacy record, no extras yet
+    Config cfg; cfg.N = r.h.N; cfg.d = r.h.d; cfg.K = r.h.K; cfg.K_index = Ki; cfg.minsep = 0;
+    Ctx ctx;                                  // fresh: Ctx caches problems by K alone, and (N, d) vary here
+    record_extras(cfg, r, ctx); n++;
+  }
+  cat.save(a.pos[0]); std::printf("recomputed extras for %ld records -> %s\n", n, a.pos[0].c_str()); return 0;
+}
+
+static int cmd_symmetry(const Args& a) {
+  Catalog cat = load_cat(a.pos.at(0)); double tol = a.num("tol", 1e-6); long id = a.has("id") ? (long)a.num("id", 0) : -1;
+  std::printf("%5s %2s/%-2s %2s %14s %10s %5s %5s %4s  %s\n", "id", "de", "d", "N", "action", "twist", "|G|", "shift", "rev", "generators of  q(eps t + theta) = R q(t)");
+  for (auto& r : cat.recs) {
+    if (id >= 0 && r.h.id != id) continue;
+    int cont = 0;
+    auto g = detect_symmetry(r.h.N, r.mode_list(), r.h.d, r.h.deff, r.coef.data(), &cont, tol);
+    const LoopSym *gen = nullptr, *rev = nullptr;
+    int nsh = (cont & 1) ? 0 : 1, nrv = 0;                        // the identity is always among the shifts
+    for (auto& e : g) {
+      if (e.eps > 0) { if (e.p == 0) continue; nsh++; if (!gen || (double)e.p / e.q < (double)gen->p / gen->q) gen = &e; }
+      else { nrv++; if (!rev) rev = &e; }
+    }
+    std::string t = gen ? gen->text : "";
+    if (rev) { size_t sp = rev->text.find(' ');                   // theta is a time origin; re-origin it to 0
+      t += (t.empty() ? "" : "; ") + std::string("t-0/1") + (sp == std::string::npos ? "" : rev->text.substr(sp)); }
+    if (cont & 2) t += (t.empty() ? "" : "; ") + std::string("t-* (a circle of reversals)");
+    std::string sh = (cont & 1) ? "S1" : std::to_string(nsh), go = cont ? "inf" : std::to_string(nsh + nrv);
+    std::printf("%5lld %2d/%-2d %2d %14.9f %10.4g %5s %5s %4s  %s\n", (long long)r.h.id, r.h.deff, r.h.d, r.h.N, r.h.action, r.twist(),
+                go.c_str(), sh.c_str(), (nrv || (cont & 2)) ? "yes" : "no", t.empty() ? "(trivial)" : t.c_str());
+  }
+  return 0;
 }
 
 static int cmd_continue(const Args& a) {
@@ -187,7 +236,7 @@ static int cmd_continue(const Args& a) {
     if (!certify(cfg, Pp, xs, Symmetry(), ctx, rec, why)) return;
     long dup = outc.find_duplicate(rec, cfg.tol_inv, cfg.tol_dist);
     if (dup >= 0) { outc.absorb((size_t)dup, rec); dups++; std::printf("  [%s] → known solution id=%lld (A=%.9f)\n", tag.c_str(), (long long)outc.recs[dup].h.id, rec.h.action); return; }
-    morse_index(cfg, rec, ctx); rec.sym = "continue:" + tag; outc.push(rec); added++; const Record& r = outc.recs.back();
+    record_extras(cfg, rec, ctx); rec.sym = "continue:" + tag; outc.push(rec); added++; const Record& r = outc.recs.back();
     std::printf("+ id=%lld d=%d/%d N=%d K=%d A=%.9f E=%.6f morse=%d null=%d minsep=%.3f ret=%.1e cover=%d  (%s)\n", (long long)r.h.id, r.h.deff, r.h.d, r.h.N, r.h.K, r.h.action, r.h.energy, r.h.morse, r.h.nullity, r.h.minsep, r.h.ret_err, r.h.cover, tag.c_str());
     outc.save(outp);
   };
@@ -199,6 +248,7 @@ static int cmd_continue(const Args& a) {
 
 static int cmd_bench(const Args& a) {
   Config cfg; cfg.N = (int)a.num("N", 3); cfg.d = (int)a.num("d", 2); cfg.K = (int)a.num("K", 16); cfg.Kmax = (int)a.num("Kmax", 4 * cfg.K);
+  cfg.omega = parse_omega(a.get("omega", ""), cfg.d);
   Ctx ctx; const Problem& P = ctx.problem(cfg, cfg.K); ctx.w.resize(P); la::Rng rng(1); std::vector<double> x, g(P.n), v(P.n), Hv(P.n), H; random_guess(P, rng, 4, 1.0, x);
   double kin, pot; action_grad(P, x.data(), nullptr, ctx.w, &kin, &pot); double lam = optimal_scale(kin, pot, 1.0); for (double& e : x) e *= lam; for (double& e : v) e = rng.normal();
   auto time = [&](const char* name, int reps, auto fn) { auto t0 = std::chrono::steady_clock::now(); for (int i = 0; i < reps; i++) fn(); double us = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count() / reps; std::printf("  %-28s %10.1f us\n", name, us); };
@@ -215,6 +265,7 @@ static int cmd_bench(const Args& a) {
 #ifdef HAVE_MPFR
 static int cmd_refine(const Args& a) {
   Catalog cat = load_cat(a.pos.at(0)); const Record& r = rec_by_id(cat, (long)a.num("id", 0)); Problem P; std::vector<double> x; r.to_problem(P, x);
+  if (r.omega()) throw std::runtime_error("refine does not support rotating-frame records yet (record has Omega)");
   int digits = (int)a.num("digits", 50), Kout = (int)a.num("K", P.K); std::string outp = a.get("out", "");
   mpfr_prec_t bits = (mpfr_prec_t)(digits * 3.3219280948873626 + 96); mpreal::set_default_prec(bits);
   const int N = P.N, d = P.d, nd = N * d, n2 = 2 * nd; int order = (int)(1.15 * digits) + 6; double itol = std::pow(10.0, -(digits + 4));
@@ -262,6 +313,8 @@ int main(int argc, char** argv) {
     if (cmd == "export") return cmd_export(a);
     if (cmd == "verify") return cmd_verify(a);
     if (cmd == "merge") return cmd_merge(a);
+    if (cmd == "extras") return cmd_extras(a);
+    if (cmd == "symmetry") return cmd_symmetry(a);
     if (cmd == "bench") return cmd_bench(a);
     if (cmd == "continue") return cmd_continue(a);
 #ifdef HAVE_MPFR

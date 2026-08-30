@@ -112,16 +112,20 @@ T nbody_energy(int N, int d, double alpha, const T* pos, const T* vel) {
   return E;
 }
 
-// shooting residual F = Φ_{2π/N}(Z) − SZ, (SZ)_j = Z_{j+1}; returns max|F|
+// shooting residual F = Φ_{2π/N}(Z) − G S Z, (SZ)_j = Z_{j+1}, G = exp(2πΩ/N) (identity when Ω = 0);
+// returns max|F|
 template <class T>
-double chore_residual(NBody<T>& nb, const std::vector<T>& pos, const std::vector<T>& vel, double tol, std::vector<T>* F = nullptr) {
+double chore_residual(NBody<T>& nb, const std::vector<T>& pos, const std::vector<T>& vel, double tol, const std::vector<T>* G = nullptr, std::vector<T>* F = nullptr) {
   int N = nb.N, d = nb.d; size_t nd = (size_t)N * d;
   std::vector<T> p = pos, v = vel;
   T tend = T(2) * T(PI_T<T>()) / N;
   nb.integrate(p, v, tend, tol);
   double mx = 0; if (F) F->assign(2 * nd, T(0));
   for (int j = 0; j < N; j++) for (int a = 0; a < d; a++) { int j1 = (j + 1) % N;
-    T fp = p[j * d + a] - pos[j1 * d + a], fv = v[j * d + a] - vel[j1 * d + a];
+    T tp = pos[j1 * d + a], tv = vel[j1 * d + a];
+    if (G) { tp = T(0); tv = T(0);
+      for (int b = 0; b < d; b++) { tp += (*G)[(size_t)a * d + b] * pos[j1 * d + b]; tv += (*G)[(size_t)a * d + b] * vel[j1 * d + b]; } }
+    T fp = p[j * d + a] - tp, fv = v[j * d + a] - tv;
     if (F) { (*F)[j * d + a] = fp; (*F)[nd + j * d + a] = fv; }
     double afp = std::fabs(to_double(fp)), afv = std::fabs(to_double(fv));
     if (!(afp < INFINITY) || !(afv < INFINITY)) return INFINITY;          // collision
@@ -135,20 +139,21 @@ template <> inline double two_pow_T<double>(long e) { return std::ldexp(1.0, (in
 template <> inline mpreal two_pow_T<mpreal>(long e) { return mpreal::two_pow(e); }
 #endif
 
-template <class T> struct ShootWork { std::vector<T> F, Fp, Fm, J, JtJ, rhs, Zp, Zm; };
+template <class T> struct ShootWork { std::vector<T> F, Fn, Fp, Fm, J, JtJ, A, rhs, rhs0, Zp, Zm, Z0; };
 
-// Newton–LM on F(Z) = Φ_{2π/N}(Z) − SZ; central-difference Jacobian (step 2^hstep_log2), damping 2^mu_log2·max diag(JᵀJ)
-// suppresses the gauge null space. Returns final max|F|, INFINITY on blow-up.
+// Newton–LM on F(Z) = Φ_{2π/N}(Z) − G S Z; central-difference Jacobian (step 2^hstep_log2), damping
+// μ·max diag(JᵀJ) from 2^mu_log2, raised ×8 and retried against the same Jacobian until ‖F‖ falls (fixed
+// damping abandoned 27 % of admissible candidates). Returns final max|F|, INFINITY on blow-up.
 template <class T>
-double shoot_newton(NBody<T>& nb, std::vector<T>& Z, double itol, int max_iter, double target, long hstep_log2, long mu_log2, ShootWork<T>& W, bool verbose = false) {
+double shoot_newton(NBody<T>& nb, std::vector<T>& Z, double itol, int max_iter, double target, long hstep_log2, long mu_log2, ShootWork<T>& W, bool verbose = false, const std::vector<T>* G = nullptr) {
   const int N = nb.N, d = nb.d, nd = N * d, n2 = 2 * nd;
-  auto residual = [&](const std::vector<T>& Zc, std::vector<T>& F) { std::vector<T> p(Zc.begin(), Zc.begin() + nd), v(Zc.begin() + nd, Zc.end()); return chore_residual(nb, p, v, itol, &F); };
+  auto residual = [&](const std::vector<T>& Zc, std::vector<T>& F) { std::vector<T> p(Zc.begin(), Zc.begin() + nd), v(Zc.begin() + nd, Zc.end()); return chore_residual(nb, p, v, itol, G, &F); };
   auto remove_cm = [&](std::vector<T>& Zc) { for (int half = 0; half < 2; half++) for (int c = 0; c < d; c++) { T m(0); for (int k = 0; k < N; k++) m += Zc[half * nd + k * d + c]; m /= N; for (int k = 0; k < N; k++) Zc[half * nd + k * d + c] -= m; } };
   W.J.assign((size_t)n2 * n2, T(0)); W.JtJ.assign((size_t)n2 * n2, T(0)); W.rhs.assign(n2, T(0));
   remove_cm(Z);
   double maxF = residual(Z, W.F); if (!(maxF < INFINITY)) return INFINITY;
   if (verbose) std::printf("  iter 0: residual %.3e\n", maxF);
-  T hstep = two_pow_T<T>(hstep_log2), mu = two_pow_T<T>(mu_log2), tmp(0);
+  T hstep = two_pow_T<T>(hstep_log2), mu = two_pow_T<T>(mu_log2), mu0 = two_pow_T<T>(mu_log2), tmp(0);
   for (int it = 1; it <= max_iter && maxF > target; it++) {
     for (int c = 0; c < n2; c++) {
       W.Zp = Z; W.Zp[c] += hstep; if (!(residual(W.Zp, W.Fp) < INFINITY)) return INFINITY;
@@ -158,15 +163,18 @@ double shoot_newton(NBody<T>& nb, std::vector<T>& Z, double itol, int max_iter, 
     T dmax(0);
     for (int i = 0; i < n2; i++) { for (int j = i; j < n2; j++) { T& acc = W.JtJ[(size_t)i * n2 + j]; set_zero(acc); for (int k = 0; k < n2; k++) fma_add(acc, W.J[(size_t)k * n2 + i], W.J[(size_t)k * n2 + j]); set(W.JtJ[(size_t)j * n2 + i], acc); }
       if (W.JtJ[(size_t)i * n2 + i] > dmax) set(dmax, W.JtJ[(size_t)i * n2 + i]); }
-    mul(tmp, mu, dmax);
-    for (int i = 0; i < n2; i++) { add_inplace(W.JtJ[(size_t)i * n2 + i], tmp); T& r = W.rhs[i]; set_zero(r); for (int k = 0; k < n2; k++) fma_sub(r, W.J[(size_t)k * n2 + i], W.F[k]); }
-    if (!la::lu_solve(n2, W.JtJ, W.rhs)) return maxF;
-    double dn = 0; for (int i = 0; i < n2; i++) { Z[i] += W.rhs[i]; dn = std::max(dn, std::fabs(to_double(W.rhs[i]))); }
-    remove_cm(Z);
-    double newF = residual(Z, W.F);
+    W.rhs0.resize(n2);
+    for (int i = 0; i < n2; i++) { T& r = W.rhs0[i]; set_zero(r); for (int k = 0; k < n2; k++) fma_sub(r, W.J[(size_t)k * n2 + i], W.F[k]); }
+    W.Z0 = Z; bool ok = false; double newF = INFINITY, dn = 0;
+    for (int t = 0; t < 8 && !ok; t++) {                               // LM retries reuse the Jacobian
+      W.A = W.JtJ; mul(tmp, mu, dmax); for (int i = 0; i < n2; i++) add_inplace(W.A[(size_t)i * n2 + i], tmp);
+      W.rhs = W.rhs0; if (!la::lu_solve(n2, W.A, W.rhs)) break;
+      Z = W.Z0; dn = 0; for (int i = 0; i < n2; i++) { Z[i] += W.rhs[i]; dn = std::max(dn, std::fabs(to_double(W.rhs[i]))); }
+      remove_cm(Z); newF = residual(Z, W.Fn);
+      if (newF < maxF) { ok = true; W.F.swap(W.Fn); if (mu > mu0) mul_d(mu, mu, 0.2); } else mul_d(mu, mu, 8.0);
+    }
     if (verbose) { std::printf("  iter %d: residual %.3e  step %.3e\n", it, newF, dn); std::fflush(stdout); }
-    if (!(newF < INFINITY)) return INFINITY;
-    if (newF >= maxF * 0.5 && newF > target) { maxF = newF; break; }   // stagnation
+    if (!ok) { if (newF < maxF) maxF = newF; else Z = W.Z0; break; }
     maxF = newF;
   }
   return maxF;

@@ -12,6 +12,7 @@ namespace la {
 
 // eigenvectors in the columns of V, eigenvalues ascending in d
 inline void sym_eig_ref(int n, std::vector<double>& V, std::vector<double>& d) {
+  if (n < 1) { d.clear(); return; }
   static thread_local std::vector<double> e; e.assign(n, 0.0);
   d.assign(n, 0.0);
   auto A = [&](int i, int j) -> double& { return V[(size_t)i * n + j]; };
@@ -87,6 +88,7 @@ inline void sym_eig_ref(int n, std::vector<double>& V, std::vector<double>& d) {
         }
         p = -s * s2 * c3 * el1 * e[l] / dl1; e[l] = s * p; d[l] = c * p;
       } while (std::fabs(e[l]) > eps * tst1 && iter < 80);
+      if (iter >= 80) { d.assign(n, 0.0); return; }           // never return silent garbage
     }
     d[l] += f; e[l] = 0.0;
   }
@@ -105,7 +107,7 @@ inline bool sym_eig_lapack(int n, std::vector<double>& V, std::vector<double>& d
   d.resize(n);
   if (work.size() < (size_t)lwork) work.resize(lwork);
   if (iwork.size() < (size_t)liwork) iwork.resize(liwork);
-  dsyevd_("V", "L", &N, V.data(), &lda, d.data(), work.data(), &lwork, iwork.data(), &liwork, &info);
+  dsyevd_("V", "U", &N, V.data(), &lda, d.data(), work.data(), &lwork, iwork.data(), &liwork, &info);
   if (info) return false;
   for (int i = 0; i < n; i++) for (int j = i + 1; j < n; j++) std::swap(V[(size_t)i * n + j], V[(size_t)j * n + i]);
   return true;
@@ -155,6 +157,23 @@ inline std::vector<double> singular_values(int d, const std::vector<double>& C) 
   std::vector<double> sv(d);
   for (int i = 0; i < d; i++) sv[i] = std::sqrt(std::max(0.0, w[d - 1 - i]));
   return sv;
+}
+
+// exp of an n×n skew matrix by scaling and squaring
+inline void expm_skew(int n, const std::vector<double>& A, std::vector<double>& R) {
+  double nrm = 0; for (double v : A) nrm = std::max(nrm, std::fabs(v));
+  int sq = 0; while (nrm > 0.25) { nrm *= 0.5; sq++; }
+  std::vector<double> S(A), P((size_t)n * n, 0.0), T((size_t)n * n);
+  for (double& v : S) v = std::ldexp(v, -sq);
+  R.assign((size_t)n * n, 0.0); for (int i = 0; i < n; i++) { R[(size_t)i * n + i] = 1; P[(size_t)i * n + i] = 1; }
+  for (int k = 1; k <= 14; k++) {
+    for (int i = 0; i < n; i++) for (int j = 0; j < n; j++) { double s = 0; for (int l = 0; l < n; l++) s += P[(size_t)i * n + l] * S[(size_t)l * n + j]; T[(size_t)i * n + j] = s / k; }
+    P.swap(T); for (size_t i = 0; i < R.size(); i++) R[i] += P[i];
+  }
+  for (int r = 0; r < sq; r++) {
+    for (int i = 0; i < n; i++) for (int j = 0; j < n; j++) { double s = 0; for (int l = 0; l < n; l++) s += R[(size_t)i * n + l] * R[(size_t)l * n + j]; T[(size_t)i * n + j] = s; }
+    R.swap(T);
+  }
 }
 
 inline int gcd(int a, int b) { while (b) { int t = a % b; a = b; b = t; } return a < 0 ? -a : a; }
