@@ -156,10 +156,23 @@ A Fourier critical point is never accepted on its own merits:
   energy, r.m.s. size; relative 1e-4) and then the Procrustes distance `min_{τ,ε,R} ‖A − R B(ε·+τ)‖` is
   computed: for each discrete shift the optimal rotation is given by the nuclear norm of the d×d cross-
   covariance, and the best shift is refined continuously. Below 1e-3 (relative) the loops are identified.
+  One case defeats that test on purpose: a *continuous family* of solutions. Its points are genuinely
+  different loops — the Procrustes distance is right to separate them, and `χ*` varies along the family —
+  but they are one object, and a rotating frame can park the search on one and have it resample the family
+  indefinitely (`--omega g2:3,4` at `d = 7, N = 10` returns 21 records in 45 s that are all one family; see
+  §13.1). The action is exactly constant along a family, so matching it to round-off (1e-9 relative,
+  together with `minsep`) folds them into a single record with a hit count. `nullity` above the gauge
+  dimension is the independent signature — that family reads `nullity = 6` against the frame's 4.
 * **Morse index / nullity** of the full Fourier Hessian, computed only for new records. The series is
   re-polished to a genuine critical point of the truncation first (the index is undefined anywhere else) and
   the exact gauge directions — the time shift and the rotations that commute with `Ω` — are lifted out of
-  the spectrum by `H + σGGᵀ` instead of being classified by magnitude. `(morse, nullity)` is then stable
+  the spectrum by `H + σGGᵀ` instead of being classified by magnitude. That centraliser is taken as the
+  kernel of `ad_Ω` on `so(d)`, not by testing the coordinate generators `E_ab` one at a time: when the
+  frame's planes are not coordinate planes — the `g2` torus is the case that matters — no single `E_ab`
+  commutes with `Ω`, so the per-generator test finds none of the three torus directions and leaves them in
+  the spectrum as numerical zeros. Of the 179 catalogued records this reaches exactly the nine `g2`-frame
+  ones (`--omega su:` puts its rates on coordinate planes, where the old test was already right); one of
+  them read `(morse, nullity) = (127, 2)` and is `(126, 4)` — `1 + 3` — once the torus is lifted properly. `(morse, nullity)` is then stable
   across `K_index = 24…80`; before this it was not, and `nullity = 0` always meant this bug.
   The nullity is 1 + the number of rotation generators acting non-trivially; a larger value flags a
   degenerate (bifurcating) solution. A virial check `N·A + 6π·E = 0` guards every certified orbit.
@@ -232,11 +245,18 @@ while `N ≥ 8` admits `deff = 7` — and `N = 10` delivered it.
 The `hyper` start family excites one near-resonant mode per pattern `k`, circularly polarised in pairs
 (`2+2+1` on the five transverse directions of `d = 7`); it produced every `deff = 6` record.
 
-## 6. `continue` — bifurcation trees in the exponent α
+## 6. `continue` — bifurcation trees in the exponent α, or in the frame
 
-Pseudo-arclength continuation of a branch of critical points in `(x, α)`: tangent predictor, corrector =
-Newton–LM on the bordered system `[H, ∂∇A/∂α; Gᵀ, 0; tᵀ]` (G = analytic gauge generators, so the corrector is
-gauge-fixed), folds are traversed. Along a branch, a change of Morse index means a non-gauge eigenvalue crossed
+Pseudo-arclength continuation of a branch of critical points in `(x, s)`, where `s` is either the potential
+exponent α (`--param alpha`, the default) or the scale of the rotating frame, `Ω = sΩ₀` (`--param omega`,
+`s = 0` inertial). Tangent predictor, corrector = Newton–LM on the bordered system
+`[H, ∂∇A/∂s; Gᵀ, 0; tᵀ]` (G = analytic gauge generators, so the corrector is gauge-fixed), folds are
+traversed. Only `∂(∇A)/∂s` distinguishes the two parameters, and because the kinetic operator is exactly
+quadratic in `Ω` the frame derivative is one kernel (`kin_omega_ds`) rather than a new solver: the `mΩ` term
+is linear in `s`, the `Ω²` term quadratic. In `Ω` mode the `Config` and the base problem stay inertial and
+`Ω₀` lives only in the continuation parameter, so the report at `s = 0` certifies against the real inertial
+problem. Roots must match the mode — `--param omega` takes only records that carry a frame, `--param alpha`
+only records that do not, rather than silently dropping or inventing one. Along a branch, a change of Morse index means a non-gauge eigenvalue crossed
 zero; the crossing is located by bisection, the new branch is entered with the crossing eigenvector as the
 arclength tangent (which keeps the corrector off the parent), and followed in both directions. Every crossing
 of α = 1 is polished, certified and catalogued. Roots: catalogue records and the k-fold covers of the circle
@@ -376,11 +396,28 @@ action and the Fourier coefficients (DFT of a dense-output period) to the reques
 
 ## 12. Roadmap — what remains to be explored
 
-1. **Continuation in `Ω`.** The rotating frame is in (§13) but is only ever used at a fixed `Ω`. Continuing
-   in it turns isolated choreographies into families — Chenciner–Féjoz's "unchained polygons" mechanism —
-   and in `d ≥ 4` along the calibrated line `Σw = 0` of §14, which is where the torus relative equilibria and
-   their Lyapunov families live. `continue` already has the pseudo-arclength machinery; it needs `Ω` as a
-   second continuation parameter.
+1. ~~**Continuation in `Ω`.**~~ In — `continue --param omega` (§6) walks `Ω = sΩ₀` under the same
+   pseudo-arclength corrector as `α`, so a fold no longer ends a branch, and `s = 0` is certified against the
+   genuine inertial problem. **The verdict on `d = 7` is negative, and now it is quantitative.** Following
+   both directions from each of the nine `deff = 7` records of `catalog/d7_n10_g2.bin` (`K = 24`, 800
+   arclength steps, `s ∈ [−0.25, 1.5]`, no branch switching) gives 18 branches:
+
+   * **5 reach `s = 0`** (from records 2, 3, 5 twice, 7) — and **every one arrives on a relative
+     equilibrium**, rejected by the rigidity gate, then carries on to `s ≈ −0.28` where four of them share
+     the same Morse index 46, i.e. the same rigid family. This is the old natural-parameter result, but it
+     is no longer ambiguous: the folds *were* traversed and the branches still land on rigid motion.
+   * **1 is a closed isola** (record 0, the `χ* = 16.2` champion): from `s = 1` it passes several folds,
+     never leaves `s ∈ [0.98, 1.06]`, and returns to its own starting orbit. The opposite direction runs
+     3000 steps in the same window without escaping. Along it the tangent's `s`-component is 0.001–0.08, so
+     `dx/ds` is 10–1000× the loop scale, and the gauge-lifted condition number runs 3e3–3e5 — steep and
+     bounded, not stalled.
+   * The remaining 12 run out to the `s` bounds (mostly `s → 1.5`, away from the inertial problem) or stick.
+
+   So no high-`deff` relative choreography found so far deforms to an inertial choreography: they either
+   circle, run away from `s = 0`, or degenerate to a rigid body. The one route not yet tried is switching
+   branches off the isola — the Morse index genuinely crosses (6↔7) at `s ≈ 0.9829` and `s ≈ 0.9986`, which
+   is what `--depth` is for; the bifurcation bookkeeping now dedupes crossings so a closed branch cannot
+   re-spawn the same one forever.
 2. **Mine the symmetry classes instead of guessing them.** `hyperchoreography symmetry` emits exactly the
    text `--sym` consumes, so the loop closes: detect the groups that actually occur in the catalogue, keep
    the ones with a small fixed subspace, and re-search inside them. That is the curated table §11 wants, and
@@ -396,9 +433,9 @@ action and the Fourier coefficients (DFT of a dense-output period) to the reques
    reaches `deff = 8` at `d = 8, N = 10` and `deff = 10` at `d = 10, N = 10`, where the inertial search finds
    nothing, and **the frame is essential**: relaxing `Ω = sΩ₀` on five orbits, two branches reach `s = 0` on
    the *rigid* family (`deff` 2 and 4) and three stall, one already rigid to 2e-15 with `deff` still reading
-   8. That is natural-parameter continuation, so a stall may be a fold; the pseudo-arclength test wants `Ω`
-   in `Continuer` (hard-wired to `α` by `grad_alpha`), cheap since the kinetic operator is exactly quadratic
-   in `Ω`: `∂(∇A)/∂s = C + 2sD`. The original argument, still open, was:
+   8. That was natural-parameter continuation, so a stall may have been a fold; the pseudo-arclength
+   version is now in (item 1), and on the one branch followed to closure the answer is "neither" — a closed
+   isola around `s = 1`. The original argument, still open, was:
    at `k = 4` time reversal does not silence the twist, and every one of the first 13 records carries it,
    against 24 of 98 at `k = 3`. A 20-minute run opened it (§1) and stopped at `deff = 6`; the budget of §5.1
    says `deff = 8` is reachable at `N ≥ 8`. `d = 5` and `d = 6` are equally unexplored — 30 s per `N` at
@@ -450,6 +487,64 @@ rejected with a named reason rather than silently minimising the wrong functiona
 Validated exactly: at `Ω = −1` the Lagrange circle must reappear as the **mode-2** curve with an unchanged
 action, and it does — `A = 6.534776057` against the inertial `6.534776057`, `|∇A| = 1.3e-15`, twisted shift
 residual `1.7e-15`.
+
+### 13.1 Which frame — the `(p, q)` sweep
+
+At `d = 7` the frame is the whole game (`--omega g2:1,2` finds nine `deff = 7` orbits in 90 s where 25 986
+inertial trials find none), so *which* frame matters more than anything else. The space of frames is smaller
+than it looks: the action is `O(d)`-equivariant, so `Ω` enters only through its `O(7)` conjugacy class — the
+unordered multiset of `|rates|` — and `g2:p,q` has rates `{|p|, |q|, |p+q|}`. The whole `(p, q)` plane
+therefore collapses to `0 ≤ p ≤ q`: 29 cells with every rate `≤ 9`, swept at 45 s each
+(`--d 7 --N 10 --K 24 --starts hyper --min-deff 6`, 18 threads, one seed).
+
+**Count families, not records.** The naive score — certified `deff = 7` records per cell — is badly
+misleading, because a frame can put the search on a *continuous family* of solutions, which it then samples
+over and over. `g2:3,4` is the extreme case: 21 records in 45 s, of which **all 21 are one family**, sharing
+`A = 19.827310867` and `E`, `rms`, `minsep`, `morse = 6`, `nullity = 6` to every printed digit. They are not
+a de-duplication failure — `loop_distance` is right that they are different loops, and `χ*` genuinely varies
+along the family (12.9 to 61.9) — they are 21 points on one 2-parameter family, and `nullity = 6` says so
+exactly: 4 gauge (time shift + the `g2` torus) plus 2. Scored by distinct action instead, `g2:3,4` yields
+**one** `deff = 7` family and is near the bottom of the table. `find_duplicate` now folds a family into a
+single record with a hit count (the action is exactly constant along it, so it is matched to round-off).
+
+Re-scored that way, over 45 s / seed 1 and again over 180 s / seed 2:
+
+| rates | `deff = 7` families @45 s | @180 s | records @180 s |
+|---|---|---|---|
+| **{1, 6, 7}** (`g2:1,6`) | **15** | **28** | 59 (largest family 2) |
+| {1, 3, 4} (`g2:1,3`) | 9 | 17 | 39 (largest family 1) |
+| {1, 5, 6} (`g2:1,5`) | 8 | 10 | 48 |
+| {3, 6, 9} (`g2:3,6`) | 8 | — | |
+| {1, 2, 3}, {1, 7, 8}, {4, 5, 9} | 7 | — | |
+| {2, 3, 5} (`g2:2,3`) | 3 | 7 | 41 |
+| {3, 4, 7} (`g2:3,4`) | 1 | 1 | 78 (largest family 65) |
+
+`g2:1,6` wins on both budgets and is clean — 55 families from 59 records, almost no re-sampling — so it is
+the frame to harvest in:
+
+    ./hyperchoreography search --d 7 --N 10 --K 24 --omega g2:1,6 --starts hyper \
+        --min-deff 6 --threads 18 --minutes 600 --out catalog/d7_n10_g2_16.bin
+
+Three weaker regularities, in decreasing order of confidence:
+
+* **Degenerate frames are poor.** A zero or repeated rate enlarges the centraliser of `Ω`, and the
+  centraliser is exactly the gauge group (§4), so such a frame breaks fewer directions than it appears to:
+  the nine `{0, q, q}` and four `{q, q, 2q}` cells average 2 `deff = 7` families against 5.3 for the
+  sixteen cells with three distinct non-zero rates. Five of the top seven are `{1, q, q+1}`.
+* **Rates must be small.** Seven probe cells with a rate `≥ 10` return **zero** `deff = 7` families between
+  them. The frame zeroes the kinetic eigenvalue `π(m − w)²` of the mode `m = w` in its plane, so a rate pays
+  only if it names a mode that exists and is cheap; at `N = 10` the modes are `m ≢ 0 (mod 10)`, so a rate of
+  10 names nothing. But the control `{2, 9, 11}`, whose rates are all legal modes, is empty too, so what
+  this measures is rate *magnitude* — high modes cost too much action — not the mod-`N` gap by itself.
+* **The `g2` relation buys nothing; the orientation buys some.** On coordinate planes (`--omega "3,4,7"`)
+  the five `g2`-form triples average 4.0 `deff = 7` families against 5.2 for the nine off-`g2` ones — no
+  advantage to `w₃ = w₁ + w₂`. What the `g2` *orientation* buys, on the same rates, is 2–13× **per trial**
+  ({1,6,7}: 8.8e-3 against 8.2e-4; {1,5,6}: 5.5e-3 against 4.1e-4; {1,2,3}: 2.2×; {3,4,7}: a wash), because
+  the structured starts are built in coordinate planes and a frame whose eigenplanes are *not* coordinate
+  planes puts the start in all three at once. Coordinate frames run ~3× more trials for the same wall
+  clock — they die faster on the `deff` pre-filter — so per second the two only separate on the best rate
+  sets ({1,6,7} and {1,5,6}, 3–4× for `g2`). With four matched pairs this is suggestive, not settled. What
+  `g2` certainly buys is a frame preserving the associative 3-form, hence a meaningful conserved `χ*`.
 
 ## 14. The calibration ladder
 

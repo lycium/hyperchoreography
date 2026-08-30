@@ -127,6 +127,20 @@ inline void kin_omega(const Problem& P, const double* x, double* out) {
       gc[a] += PI * (u - 2 * m * os); gs[a] += PI * (w + 2 * m * oc); } }
 }
 
+// ∂/∂s of the rotating-frame kinetic gradient at Ω = sΩ₀: the mΩ term is linear in s and the Ω² term
+// quadratic, so the derivative the continuation corrector wants is one kernel of the same shape as kin_omega.
+// Ob = Ω₀ and ObOb = −Ω₀², both in the record's own frame; P supplies only the mode list.
+inline void kin_omega_ds(const Problem& P, const double* Ob, const double* ObOb, double s, const double* x, double* out) {
+  const int d = P.d;
+  for (int mu = 0; mu < P.nm; mu++) { const double m = P.modes[mu];
+    const double *c = x + (size_t)(2 * mu) * d, *sn = c + d;
+    double *gc = out + (size_t)(2 * mu) * d, *gs = gc + d;
+    for (int a = 0; a < d; a++) { double u = 0, w = 0, oc = 0, os = 0;
+      const double *o2 = ObOb + (size_t)a * d, *o1 = Ob + (size_t)a * d;
+      for (int b = 0; b < d; b++) { u += o2[b] * c[b]; w += o2[b] * sn[b]; oc += o1[b] * c[b]; os += o1[b] * sn[b]; }
+      gc[a] += PI * 2.0 * (s * u - m * os); gs[a] += PI * 2.0 * (s * w + m * oc); } }
+}
+
 // per shift: rho2 and f = w α ρ^{-α-2}; returns Σ_j w ρ^{-α}, or -1 on collision
 inline double pair_kernel(const Problem& P, const double* Q, int s, double wgt, double* rho2, double* f, double* fA, double* fI) {
   const int M = P.M, d = P.d;

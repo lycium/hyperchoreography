@@ -281,20 +281,39 @@ inline bool fano_guess(const Problem& P, la::Rng& rng, int p, std::vector<double
   return true;
 }
 
-// orthonormal gauge directions at x: time shift plus the rotations that survive the rotating frame
+// orthonormal gauge directions at x: the time shift, plus the rotations that survive the rotating frame.
+// Those are the centraliser {L in so(d) : [L, Omega] = 0}, taken as the kernel of ad_Omega in the E_ab basis:
+// when the frame's planes are not coordinate planes (the g2 torus) no single E_ab commutes, so testing them
+// one at a time finds nothing and leaves the true null directions in the spectrum.
 inline int gauge_basis(const Problem& P, const double* x, std::vector<double>& G) {
+  const int d = P.d, D = d * (d - 1) / 2;
+  std::vector<int> ia(D), ib(D);
+  for (int a = 0, k = 0; a < d; a++) for (int b = a + 1; b < d; b++, k++) { ia[k] = a; ib[k] = b; }
+  std::vector<double> L((size_t)D * D, 0.0); int nl = 0;                  // centraliser basis in E_ab coordinates
+  if (P.Om.empty()) { for (int k = 0; k < D; k++) L[(size_t)k * D + k] = 1.0; nl = D; }
+  else {
+    std::vector<double> M((size_t)D * D, 0.0), S((size_t)D * D, 0.0), ev; const double* O = P.Om.data();
+    for (int r = 0; r < D; r++) for (int c = 0; c < D; c++) { const int a = ia[r], b = ib[r], e = ia[c], f = ib[c];
+      double v = 0;                                                       // [Omega, E_ef]_{ab}, E_ef = e_e f^T - e_f e^T
+      if (b == f) v += O[(size_t)a * d + e];
+      if (b == e) v -= O[(size_t)a * d + f];
+      if (a == e) v -= O[(size_t)f * d + b];
+      if (a == f) v += O[(size_t)e * d + b];
+      M[(size_t)r * D + c] = v; }
+    for (int i = 0; i < D; i++) for (int j = i; j < D; j++) { double s = 0;
+      for (int k = 0; k < D; k++) s += M[(size_t)k * D + i] * M[(size_t)k * D + j];
+      S[(size_t)i * D + j] = S[(size_t)j * D + i] = s; }
+    la::sym_eig(D, S, ev);
+    double emax = 0; for (double v : ev) emax = std::max(emax, std::fabs(v));
+    for (int k = 0; k < D; k++) if (std::fabs(ev[k]) <= 1e-12 * emax)
+      { for (int i = 0; i < D; i++) L[(size_t)nl * D + i] = S[(size_t)i * D + k]; nl++; }
+  }
   std::vector<std::vector<double>> gs(1); deriv_coeffs(P, x, gs[0]);
-  for (int a = 0; a < P.d; a++) for (int b = a + 1; b < P.d; b++) {
-    if (!P.Om.empty()) { double cm = 0;                       // in a rotating frame only [L, Ω] = 0 stays gauge
-      for (int i = 0; i < P.d; i++) for (int j = 0; j < P.d; j++) { double lo = 0, ol = 0;
-        if (i == a) lo -= P.Om[(size_t)b * P.d + j];
-        if (i == b) lo += P.Om[(size_t)a * P.d + j];
-        if (j == b) ol -= P.Om[(size_t)i * P.d + a];
-        if (j == a) ol += P.Om[(size_t)i * P.d + b];
-        cm = std::max(cm, std::fabs(lo - ol)); }
-      if (cm > 1e-12) continue; }
-    std::vector<double> v(P.n, 0.0);
-    for (int i = 0; i < P.nb; i++) { v[i * P.d + a] = -x[i * P.d + b]; v[i * P.d + b] = x[i * P.d + a]; } gs.push_back(v); }
+  for (int k = 0; k < nl; k++) { std::vector<double> v(P.n, 0.0);
+    for (int r = 0; r < D; r++) { const double c = L[(size_t)k * D + r]; if (c == 0.0) continue;
+      const int a = ia[r], b = ib[r];
+      for (int i = 0; i < P.nb; i++) { v[i * d + a] -= c * x[i * d + b]; v[i * d + b] += c * x[i * d + a]; } }
+    gs.push_back(v); }
   double xn = 0; for (int i = 0; i < P.n; i++) xn += x[i] * x[i]; xn = std::sqrt(xn);
   std::vector<std::vector<double>> on;
   for (auto& g : gs) { for (auto& u : on) { double dp = 0; for (int i = 0; i < P.n; i++) dp += u[i] * g[i];

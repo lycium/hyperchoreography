@@ -1,6 +1,7 @@
 // Numerical self-checks (make test).
 #include "catalog.hpp"
 #include "search.hpp"
+#include "continue.hpp"
 #include "optim.hpp"
 #include "taylor.hpp"
 #include <cstdio>
@@ -174,6 +175,21 @@ int main() {
       double hv = 0; for (int k = 0; k < P.n; k++) hv += H[(size_t)i * P.n + k] * v[k];
       herr = std::max(herr, std::fabs(hv - Hv[i]) / (1 + std::fabs(Hv[i]))); }
     CHECK(gerr < 1e-6 && herr < 1e-9, "d=7 g2 frame: grad %.1e, H vs Hv %.1e", gerr, herr); }
+  { const int N = 5, d = 7, K = 10; Problem P; P.init(N, d, K); la::Rng rng(7);   // ∂(∇A)/∂s along Ω = sΩ₀
+    ContParam pp; pp.frame(g2_omega(1, 2), d); Work w; std::vector<double> x, ga(P.n), gp(P.n), gm(P.n);
+    const double s = 0.7, h = 1e-6;
+    pp.set(P, s); w.resize(P); random_guess(P, rng, 5, 1.0, x);
+    pp.dgrad(P, x.data(), ga.data(), s, w);
+    pp.set(P, s + h); action_grad(P, x.data(), gp.data(), w);
+    pp.set(P, s - h); action_grad(P, x.data(), gm.data(), w);
+    double e = 0, sc = 0; for (int i = 0; i < P.n; i++) { e = std::max(e, std::fabs((gp[i] - gm[i]) / (2 * h) - ga[i])); sc = std::max(sc, std::fabs(ga[i])); }
+    CHECK(e < 1e-6 * (1 + sc), "d(grad A)/ds at Ω = sΩ₀ vs central differences: %.1e (scale %.1f)", e, sc); }
+  { const int N = 5, d = 7, K = 10; Problem P; P.init(N, d, K); la::Rng rng(11);  // gauge = time shift + centraliser
+    std::vector<double> x, G; random_guess(P, rng, 5, 1.0, x);
+    int g0 = gauge_basis(P, x.data(), G);                                    // inertial: all of so(7)
+    P.set_omega(g2_omega(1, 2)); int g1 = gauge_basis(P, x.data(), G);       // distinct rates: the 3-torus
+    P.set_omega(g2_omega(0, 1)); int g2r = gauge_basis(P, x.data(), G);      // rates (0,1,1): so(3) ⊕ u(2)
+    CHECK(g0 == 22 && g1 == 4 && g2r == 8, "gauge dim: inertial %d, g2 torus %d, degenerate rates %d (expect 22 4 8)", g0, g1, g2r); }
 
   std::printf("[calibration ladder]\n");
   { struct { int d, k, id, dim; } rung[] = { {3,3,CAL_SIMPLE,3}, {4,2,CAL_SL,4}, {6,3,CAL_SL,8}, {7,3,CAL_G2,14}, {8,4,CAL_SPIN7,21}, {10,5,CAL_SL,24} };
@@ -296,6 +312,16 @@ int main() {
     same = same && cat.recs[1].omega() != nullptr && c2.recs[1].omega() != nullptr && cat.recs[0].omega() == nullptr;
     long dup = same ? c2.find_duplicate(cat.recs[1]) : -2;
     CHECK(same && err == 0 && dup == 1, "3 records written/read bit-exact (%zu coefficients, extra[] round trips), duplicate lookup -> %ld", cat.recs[0].coef.size(), dup); }
+  { Catalog cat; Problem P; P.init(3, 2, 8); la::Rng rng(9);        // two points of one continuous family
+    Record a, b; std::vector<double> x, y;                          // different loops, identical action
+    random_guess(P, rng, 3, 1.0, x); random_guess(P, rng, 3, 1.0, y);
+    a.set_solution(P, x.data()); b.set_solution(P, y.data());
+    for (Record* r : {&a, &b}) { r->h.action = 19.827310867; r->h.energy = -10.5187151; r->h.rms = 1.0; r->h.minsep = 1.8944; }
+    cat.push(a);
+    double raw = loop_distance(a.h.N, a.mode_list(), a.h.d, a.coef.data(), b.mode_list(), b.h.d, b.coef.data());
+    long dup = cat.find_duplicate(b);                               // same action, genuinely different loops
+    b.h.action *= 1 + 1e-6; long far = cat.find_duplicate(b);       // a genuinely different action must not fold
+    CHECK(dup == 0 && far < 0 && raw > 1e-2, "continuous family folds on the action, though the loops are %.2f apart, and a 1e-6 action shift does not fold", raw); }
 
   std::printf("\n%s (%d failures)\n", fails ? "SOME TESTS FAILED" : "ALL TESTS PASSED", fails);
   return fails ? 1 : 0;

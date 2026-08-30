@@ -111,6 +111,11 @@ struct Catalog {
       if (c.h.N != r.h.N || std::fabs(c.h.energy - r.h.energy) > tol_inv * std::fabs(r.h.energy) || std::fabs(c.h.rms - r.h.rms) > tol_inv * r.h.rms) continue;
       double dist = loop_distance(r.h.N, r.mode_list(), r.h.d, r.coef.data(), c.mode_list(), c.h.d, c.coef.data());
       if (same_spectrum(r, c)) dist = 0;
+      // Points of a continuous family are genuinely different loops — loop_distance is right to separate them
+      // and χ* really does vary along the family — but the catalogue wants one entry with a hit count, not a
+      // sampling of the family. The action is exactly constant along it, so match it to round-off.
+      if (std::fabs(c.h.action - r.h.action) <= 1e-9 * std::fabs(r.h.action) &&
+          std::fabs(c.h.minsep - r.h.minsep) <= 1e-6 * std::fabs(r.h.minsep)) dist = 0;
       if (dist < bestd) { bestd = dist; best = (long)it->second; }
     }
     if (dist_out) *dist_out = bestd;

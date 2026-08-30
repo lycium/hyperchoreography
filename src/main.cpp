@@ -39,7 +39,8 @@ static void usage() {
     "  hyperchoreography merge   out.bin in1.bin in2.bin ...       (union with de-duplication)\n"
     "  hyperchoreography extras  catalog.bin [--K-index 48]        (recompute Morse index, nullity, twist and rigidity)\n"
     "  hyperchoreography symmetry catalog.bin [--id i] [--tol 1e-6] (detect the symmetry group of each stored loop)\n"
-    "  hyperchoreography continue catalog.bin [--id i | --root circle] --N n --d d [--K 24] [--covers 7] [--alpha-lo 0.6 --alpha-hi 2.4 --depth 2] [--out found.bin]\n"
+    "  hyperchoreography continue catalog.bin [--id i | --root circle] --N n --d d [--K 24] [--covers 7] [--depth 2] [--out found.bin]\n"
+    "                [--param alpha --alpha-lo 0.6 --alpha-hi 2.4 | --param omega --s-lo -0.25 --s-hi 1.5]   (Omega = s Omega_0, s = 0 is inertial)\n"
     "                                                  (bifurcation-tree exploration by continuation in the potential exponent)\n"
     "  hyperchoreography bench   [--N 3 --d 2 --K 16]              (kernel timings)");
 }
@@ -206,20 +207,25 @@ static int cmd_symmetry(const Args& a) {
 
 static int cmd_continue(const Args& a) {
   Config cfg; ContCfg cc; cfg.N = (int)a.num("N", 3); cfg.d = (int)a.num("d", 2); cfg.K = (int)a.num("K", 24); cfg.Kmax = (int)a.num("Kmax", 2 * cfg.K);
-  cc.alpha_lo = a.num("alpha-lo", 0.6); cc.alpha_hi = a.num("alpha-hi", 2.4); cc.h0 = a.num("h0", 0.02); cc.hmax = a.num("hmax", 0.1); cc.depth = (int)a.num("depth", 2); cc.kick = a.num("kick", 0.05); cc.max_steps = (int)a.num("max-steps", 1500); cc.verbose = !a.has("quiet");
+  const bool omode = a.get("param", "alpha") == "omega";
+  cc.lo = omode ? a.num("s-lo", -0.25) : a.num("alpha-lo", 0.6); cc.hi = omode ? a.num("s-hi", 1.5) : a.num("alpha-hi", 2.4); cc.h0 = a.num("h0", 0.02); cc.hmax = a.num("hmax", 0.1); cc.depth = (int)a.num("depth", 2); cc.kick = a.num("kick", 0.05); cc.max_steps = (int)a.num("max-steps", 1500); cc.verbose = !a.has("quiet");
   std::string outp = a.get("out", a.pos.empty() ? "continued.bin" : a.pos[0]);
   Catalog cat; if (!a.pos.empty()) { try { cat.load(a.pos[0]); } catch (...) {} }
   Catalog outc; if (outp != (a.pos.empty() ? "" : a.pos[0])) { try { outc.load(outp); } catch (...) {} } else outc = cat;
-  std::vector<std::pair<std::vector<double>, std::string>> roots; Ctx ctx;
-  if (a.get("root") == "circle" || a.pos.empty()) {
+  std::vector<std::pair<std::vector<double>, std::string>> roots; std::vector<std::vector<double>> roms; Ctx ctx; long skipped = 0;
+  if (!omode && (a.get("root") == "circle" || a.pos.empty())) {
     const Problem& P = ctx.problem(cfg, cfg.K); std::vector<double> x(P.n, 0.0); double R3 = 0; for (int k = 1; k < cfg.N; k++) R3 += 1.0 / (4.0 * std::sin(PI * k / cfg.N)); double R = std::cbrt(R3);
-    x[0] = R; x[P.d + 1] = R; roots.emplace_back(x, "circle");
+    x[0] = R; x[P.d + 1] = R; roots.emplace_back(x, "circle"); roms.emplace_back();
   } else {
     for (auto& r : cat.recs) { if (a.has("id") && r.h.id != (long)a.num("id", 0)) continue; if (r.h.N != cfg.N || r.h.d > cfg.d) continue;
+      const double* om = r.omega();                                             // Ω-mode relaxes a frame; α-mode must not silently drop one
+      if (omode ? !om : om != nullptr) { skipped++; continue; }
       const Problem& P = ctx.problem(cfg, cfg.K); std::vector<double> x(P.n, 0.0);
       for (size_t k = 0; k < r.modes.size(); k++) { int m = r.modes[k]; if (m > P.K) break; auto it = std::lower_bound(P.modes.begin(), P.modes.end(), m); if (it == P.modes.end() || *it != m) continue; int mu = (int)(it - P.modes.begin());
         for (int c = 0; c < r.h.d; c++) { x[(2 * mu) * P.d + c] = r.coef[k * 2 * r.h.d + c]; x[(2 * mu + 1) * P.d + c] = r.coef[k * 2 * r.h.d + r.h.d + c]; } }
-      roots.emplace_back(x, "id" + std::to_string(r.h.id)); }
+      std::vector<double> O; if (omode) { O.assign((size_t)cfg.d * cfg.d, 0.0);      // the record's frame, embedded in d
+        for (int i = 0; i < r.h.d; i++) for (int j = 0; j < r.h.d; j++) O[(size_t)i * cfg.d + j] = om[(size_t)i * r.h.d + j]; }
+      roots.emplace_back(x, "id" + std::to_string(r.h.id)); roms.push_back(O); }
   }
   // k-fold covers of the roots (the transverse resonances live on the covers)
   int covers = (int)a.num("covers", 1); const Problem& P0 = ctx.problem(cfg, cfg.K); size_t nroots = roots.size();
@@ -228,7 +234,7 @@ static int cmd_continue(const Args& a) {
       for (int mu = 0; mu < P0.nm; mu++) { int m = P0.modes[mu]; bool has = false; for (int c = 0; c < P0.d && !has; c++) has = roots[r0].first[(2 * mu) * P0.d + c] != 0 || roots[r0].first[(2 * mu + 1) * P0.d + c] != 0;
         if (!has) continue; auto it = std::lower_bound(P0.modes.begin(), P0.modes.end(), k * m); if (it == P0.modes.end() || *it != k * m) { ok = false; break; } int mu2 = (int)(it - P0.modes.begin());
         for (int c = 0; c < P0.d; c++) { x[(2 * mu2) * P0.d + c] = lam * roots[r0].first[(2 * mu) * P0.d + c]; x[(2 * mu2 + 1) * P0.d + c] = lam * roots[r0].first[(2 * mu + 1) * P0.d + c]; } }
-      if (ok) roots.emplace_back(x, roots[r0].second + "x" + std::to_string(k)); } }
+      if (ok) { roots.emplace_back(x, roots[r0].second + "x" + std::to_string(k)); roms.push_back(roms[r0]); } } }
   ctx.w.resize(ctx.problem(cfg, cfg.Kmax)); long added = 0, dups = 0;
   Continuer C(cfg, cc, ctx, P0);
   C.on_solution = [&](std::vector<double>& x, const std::string& tag) {
@@ -240,8 +246,11 @@ static int cmd_continue(const Args& a) {
     std::printf("+ id=%lld d=%d/%d N=%d K=%d A=%.9f E=%.6f morse=%d null=%d minsep=%.3f ret=%.1e cover=%d  (%s)\n", (long long)r.h.id, r.h.deff, r.h.d, r.h.N, r.h.K, r.h.action, r.h.energy, r.h.morse, r.h.nullity, r.h.minsep, r.h.ret_err, r.h.cover, tag.c_str());
     outc.save(outp);
   };
-  std::printf("continuation in α ∈ [%.2f, %.2f] from %zu root(s), d=%d N=%d K=%d depth=%d → %s\n", cc.alpha_lo, cc.alpha_hi, roots.size(), cfg.d, cfg.N, cfg.K, cc.depth, outp.c_str());
-  for (auto& r : roots) { C.branches = 0; C.explore(r.first, r.second); }
+  if (skipped) std::printf("skipped %ld record(s) whose frame does not match --param %s\n", skipped, omode ? "omega" : "alpha");
+  std::printf("continuation in %s ∈ [%.2f, %.2f] from %zu root(s), d=%d N=%d K=%d depth=%d → %s\n", omode ? "s (Ω = sΩ₀)" : "α", cc.lo, cc.hi, roots.size(), cfg.d, cfg.N, cfg.K, cc.depth, outp.c_str());
+  for (size_t i = 0; i < roots.size(); i++) { C.branches = 0;
+    if (omode) { C.pp = ContParam(); C.pp.frame(roms[i], cfg.d); C.pp.guard_lo = cc.lo - 1.0; C.pp.guard_hi = cc.hi + 1.0; }
+    C.explore(roots[i].first, roots[i].second); }
   outc.save(outp); std::printf("continuation done: %ld new solutions, %ld already known; %s has %zu records\n", added, dups, outp.c_str(), outc.recs.size());
   return 0;
 }
