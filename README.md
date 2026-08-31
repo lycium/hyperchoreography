@@ -76,6 +76,20 @@ Naming convention: **dimension first, then bodies** (`d3n4.bin`); `list` sorts b
   equilibria filtered out, the inertial search finds **none** at `d = 8` in 60 331 trials while `--omega
   su:1,2,3` finds six in 8 799, and `Σw = 0` beats an arbitrary rate vector (`1,2,3,4` gives one).
   `d = 12, N = 12` is not yet reachable: 0 records in 8 537 trials, at a quarter of the trial rate.
+* **`d = 7` at `N = 11` and `N = 12`**, the two remaining cheap cells: 336 and 219 records, **149 and 125
+  distinct `deff = 7` families**, all validating clean. The frame ranking turns out **not** to transfer
+  between `N` — `{2, 3, 5}` is seventh of eight at `N = 10` and first at both 11 and 12, while `N = 10`'s
+  winner `{1, 6, 7}` drops to 7 and 3 families — so every new cell needs its own 45 s sweep (§13.3). Over a
+  full harvest the three cells are within 30 % of each other (2.5 / 2.7 / 2.1 families per minute), even
+  though the short sweep made `N = 11` look 1.3× better.
+* **`χ*` is not invariant under the rotating-frame gauge** (§13.4). Merging turned up two records agreeing
+  on every stored scalar — action to 14 digits, energy, `rms`, `Lnorm`, all seven `Lsv`, `morse`, `nullity`,
+  `pca` — whose twists differ **21×** (342.8 against 16.26). They are one physical motion in two frames,
+  `g2:1,7` and `g2:1,4`, whose rates pair as `w ↔ N − w`; `exp(Ωt) q(t)` is unchanged when a rate moves by
+  `N` and the modes compensate. `χ*` reads the stored loop, so it moves with that choice. It remains an
+  invariant of a record and a valid discriminator within one frame; cross-frame twist comparisons in
+  §13.1–§13.3 are not meaningful, and no canonical frame is defined yet.
+
 * **The rigidity threshold was a decade too low, and 50 relative equilibria were in the catalogue.** The
   stored defect is trimodal: 43 records at `≤ 2e-11`, a second cluster of 8 at `1.3e-6 … 4.0e-6`, then a
   **4300× empty gap** to the first genuine choreography at `1.7e-2`. The `--min-rigid` default of `1e-6` sat
@@ -690,6 +704,64 @@ every genuine one in the catalogue, and `χ*` is only a quality score **downstre
 never as a way to rank raw search output. Re-scored gated, the frame gives 1 family at `χ* = 84.8`, and the
 project's twist champion is unchanged: `d7_n10_g2_16` id 13, `χ* = 253.7`, `deff = 7/7`, rigidity 0.52.
 
+### 13.3 `N = 11` and `N = 12`, and why the frame must be re-swept for each `N`
+
+Same recipe as §13.1, `--d 7 --K 24 --starts hyper --min-deff 6`, ten `g2:p,q` cells at 45 s and the top
+four re-run at 150 s on a second seed, scored by distinct `deff = 7` families:
+
+| rates | `N = 10` @45 s | `N = 11` @45 s | @150 s | `N = 12` @45 s | @150 s |
+|---|---|---|---|---|---|
+| {2, 3, 5} (`g2:2,3`) | 3 | **15** | **30** | 10 | **18** |
+| {1, 3, 4} (`g2:1,3`) | 9 | 12 | 20 | 7 | — |
+| {2, 5, 7} (`g2:2,5`) | — | 8 | 19 | 2 | — |
+| {1, 2, 3} (`g2:1,2`) | 7 | 12 | 11 | 8 | — |
+| {1, 4, 5} (`g2:1,4`) | — | 7 | — | 12 | 16 |
+| {1, 5, 6} (`g2:1,5`) | 8 | 2 | — | 9 | 16 |
+| {1, 6, 7} (`g2:1,6`) | **15** | 7 | — | 3 | — |
+| {3, 4, 7} (`g2:3,4`) | 1 | 4 | — | 9 | 14 |
+
+**The ranking does not transfer between `N`.** `{2, 3, 5}` is seventh of eight at `N = 10` (3 families) and
+first at both `N = 11` and `N = 12`; `{1, 6, 7}`, which wins `N = 10` outright, drops to 7 and then 3. A new
+cell needs its own 45 s sweep — assuming the previous `N`'s frame carries over would have cost a factor of
+five here. The continuation note that guessed the ranking would transfer was wrong.
+
+Harvested in `g2:2,3` at 25 minutes each, and for comparison the `N = 10` file after re-gating:
+
+| cell | records | `deff = 7` families | minutes | families/min |
+|---|---|---|---|---|
+| `d7_n10_g2_16` (`g2:1,6`) | 142 | 75 | 30 | 2.5 |
+| `d7_n11_g2` (`g2:2,3`) | 150 | 67 | 25 | **2.7** |
+| `d7_n12_g2` (`g2:2,3`) | 95 | 53 | 25 | 2.1 |
+
+So the three cells are within 30 % of each other over a long harvest, even though the 150 s sweep made
+`N = 11` look 1.3× better per second — the short-budget rate overstates the long-budget rate everywhere,
+because families run out and the duplicate fraction climbs (1309 duplicates in 74 806 trials at `N = 11`,
+2398 in 58 780 at `N = 12`). Folding in each cell's sweep records brings the files to 336 and 219 records,
+149 and 125 `deff = 7` families. All three cells validate clean: no record with `ret_err > 1e-9`, a
+near-collision, or a rigidity defect below the gate.
+
+### 13.4 `χ*` is a property of the loop, not of the physical motion
+
+Merging the `N = 12` sweep into its harvest folded two records that agree on *every* scalar the catalogue
+stores — action to 14 digits (22.885183324259), energy to 15, `rms`, `Lnorm`, all seven `Lsv` to 9 digits,
+`morse = 6`, `nullity = 4`, `pca` to 6 — and disagree on the twist by a factor of **21**: `χ* = 342.8`
+against `16.26`. Neither is an optimiser failure; `calib_max` returns each value unchanged from 1 restart to
+80. The jet moments genuinely differ, `‖A₃‖ = 203.3` against `8.59`.
+
+The cause is visible in the mode spectra. One record carries its power at modes 7, 8, 9, the other at
+5, 4, 3 — the mirror `m ↔ N − m` — and their frames are `g2:1,7` (rates 1, 7, 8) and `g2:1,4` (rates
+1, 4, 5), paired by the same mirror `w ↔ N − w`. **They are one physical motion written in two frames.**
+`exp(Ωt) q(t)` is unchanged if a rate is shifted by `N` and the corresponding mode shifts to compensate, so
+for a relative choreography the pair `(Ω, q)` is a gauge choice, and `find_duplicate` was right to fold them.
+
+`χ*` is computed from the stored loop `q` alone. It is invariant under everything §14 claims — `O(d)`, time
+shift, reversal, relabelling — but **not under that frame gauge**, so twist is comparable *within* a frame
+and not *across* frames. The `best χ*` columns in §13.1–§13.3 rank cells that each carry their own frame,
+and are only meaningful cell by cell; the same caveat applies to any claim that one frame "has more twist"
+than another. What a cross-frame comparison would need is either a canonical choice of frame per orbit
+(the smallest `Σ|w|` representative, say) or a twist evaluated on the physical motion, and neither exists
+here yet.
+
 ## 14. The calibration ladder
 
 Let `G ⊂ SO(d)` be a proper subgroup stabilising a `k`-form `ψ`. Then
@@ -697,10 +769,15 @@ Let `G ⊂ SO(d)` be a proper subgroup stabilising a `k`-form `ψ`. Then
     A_k[q] = (1/2π) ∮ q ∧ q̇ ∧ … ∧ q^(k−1) dt ∈ Λ^k(R^d)        the **jet moment** of the loop
     χ*_ψ[q] = max over R ∈ O(d) of ⟨A_k, R·ψ⟩                    the **twist**
 
-`A_k` is `O(d)`-equivariant, so `χ*` is invariant under the whole equivalence group of a record — `O(d)`,
+`A_k` is `O(d)`-equivariant, so `χ*` is invariant under the whole equivalence group of a *record* — `O(d)`,
 time shift, time reversal, relabelling — while *seeing* `G`: it is not a function of any `O(d)` invariant,
 because the `G`-orbit of `ψ` is a proper subvariety of its `O(d)` orbit. `src/calib.hpp` implements the
 whole ladder uniformly (`Λ^k` on increasing multi-indices, exact quadrature, Riemannian ascent on `SO(d)`).
+
+**But a rotating-frame record is not determined by its loop.** `exp(Ωt) q(t)` is unchanged if a frame rate
+moves by `N` and the loop's modes shift to compensate, so `(Ω, q)` is a gauge choice and `χ*`, computed from
+`q` alone, moves with it — measured at a factor of 21 on one orbit (§13.4). Twist is comparable within a
+frame, not across frames.
 
 **The rungs, with their stabiliser dimensions computed, not looked up** (null space of `A ↦ A·ψ` on `so(d)`;
 these are pinned by `make test`):
