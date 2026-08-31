@@ -396,6 +396,40 @@ def path_labels(paths):
     return labels
 
 
+SAG_TARGET = 0.002       # chord sagitta as a fraction of the drawn radius: 0.35 px at the 420 px overlay
+SMAX = 1200              # sample ceiling: a near-collision cusp has unbounded curvature, so this must cap
+
+
+def polyline_stats(rows, d):
+    """What the drawn polyline loses, and how fast the dot crosses the frame.
+
+    Faceting is NOT the turning angle: it is the sagitta, chord * angle / 8, measured against the radius
+    the record is drawn at. That is why a 47-mode loop can facet five times worse than a 689-mode one --
+    the first has an arc 78 radii long, so each of its samples spans a long chord. Both numbers therefore
+    come out of the same quantity, arc length per unit radius. Sagitta falls as 1/S^2, chord and angle
+    contributing one power each."""
+    S = len(rows)
+    sag = []
+    arc = 0.0
+    maxr = 0.0
+    prev = None
+    for i in range(S):
+        a = rows[i]
+        b = rows[(i + 1) % S]
+        seg = [b[k] - a[k] for k in range(d)]
+        n = math.sqrt(sum(x * x for x in seg))
+        arc += n
+        maxr = max(maxr, math.sqrt(sum(x * x for x in a[:d])))
+        if prev is not None and n > 0.0 and prev[1] > 0.0:
+            c = sum(prev[0][k] * seg[k] for k in range(d)) / (prev[1] * n)
+            sag.append(n * math.acos(max(-1.0, min(1.0, c))) / 8.0)
+        prev = (seg, n)
+    if maxr <= 0.0:
+        return 0.0, 0.0
+    sag.sort()                                   # 99th percentile: one cusp must not set the budget
+    return (sag[int(0.99 * (len(sag) - 1))] / maxr if sag else 0.0), arc / maxr
+
+
 def build_record(binpath, path, rid, rigid, samples_max, tmpdir, warn, label=None):
     rec = cat_show(binpath, path, rid)
     N = int(rec["N"]); d = int(rec["d"]); deff = int(rec["deff"])
@@ -403,11 +437,27 @@ def build_record(binpath, path, rid, rigid, samples_max, tmpdir, warn, label=Non
     if S < N:
         S = N
     tmp = os.path.join(tmpdir, "e%d.csv" % (threading_ident(),))
-    try:
-        rows = cat_export(binpath, path, rid, S, tmp, N, d)
-    finally:
-        if os.path.exists(tmp):
-            os.remove(tmp)
+
+    def sample(n):
+        try:
+            return cat_export(binpath, path, rid, n, tmp, N, d)
+        finally:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+
+    rows = sample(S)
+    # At a fixed 240 samples the sagitta runs 0.02 px on a compact loop and 2.8 px on a long one. Twice,
+    # because near a cusp the 1/S^2 law understates what is needed.
+    sag, arc = polyline_stats(rows, d)
+    for _ in range(2):
+        if sag <= SAG_TARGET or S >= SMAX:
+            break
+        S2 = N * min(SMAX // N, int(math.ceil(S * math.sqrt(sag / SAG_TARGET))) // N + 1)
+        if S2 <= S:
+            break
+        S = S2
+        rows = sample(S)
+        sag, arc = polyline_stats(rows, d)
 
     om = rec.get("omega")
     rot = bool(om) and any(abs(v) > 1e-10 for v in om)
@@ -521,7 +571,7 @@ def build_record(binpath, path, rid, rigid, samples_max, tmpdir, warn, label=Non
         "ev": [g6(v) for v in ev],
         "Lsv": [g6(v) for v in rec.get("Lsv", [])],
         "pca": [g6(v) for v in rec.get("pca", [])],
-        "S": S, "sc": [float("%.9g" % v) for v in sc], "q": q,
+        "S": S, "ar": g6(arc), "sc": [float("%.9g" % v) for v in sc], "q": q,
     }
     if Gflat is not None:
         out["G"] = Gflat
@@ -587,7 +637,6 @@ header{position:sticky;top:0;z-index:40;background:var(--hdr);backdrop-filter:bl
   border-bottom:1px solid var(--edge);padding:10px 16px 8px}
 h1{font-size:15px;margin:0;font-weight:650;letter-spacing:-.01em;display:inline}
 .sub{color:var(--fg2);font-size:11.5px;margin-left:10px}
-.prov{color:var(--fg3);font-size:10.5px;margin-top:3px;word-break:break-all}
 .ctl{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-top:8px}
 .ctl label{color:var(--fg2);font-size:11px;display:flex;align-items:center;gap:5px}
 input[type=search],select,input[type=number]{background:var(--tile);color:var(--fg);
@@ -610,10 +659,31 @@ details.legend summary{cursor:pointer;color:var(--sel);font-size:11px;outline:no
 .legend .ramp{display:flex;gap:2px;align-items:center;flex-wrap:wrap;margin-top:3px}
 .legend .ramp i{width:20px;height:9px;border-radius:2px;display:inline-block;font-style:normal}
 main{padding:14px 16px 60px}
+@media(max-width:720px){
+  header{position:static}
+  .ctl{gap:5px 9px;margin-top:6px}
+  input[type=search]{width:140px}
+}
+.lede{color:var(--fg2);font-size:12px;max-width:74ch;margin:0 0 12px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-bottom:20px}
+.card2{display:block;background:var(--tile);border:1px solid var(--edge);border-radius:9px;
+  padding:10px 12px 8px;box-shadow:var(--shadow);text-decoration:none;color:inherit}
+.card2:hover{border-color:var(--sel)}
+.card2 .k{font-size:20px;font-weight:650;letter-spacing:-.02em;line-height:1}
+.card2 .n{font-size:11.5px;color:var(--fg);margin-top:5px;font-weight:600}
+.card2 .m{font-size:10.5px;color:var(--fg2);margin-top:2px}
+.card2 .bar{height:4px;border-radius:2px;margin-top:8px}
+#more{padding:20px 0 4px;text-align:center;color:var(--fg3);font-size:11px;min-height:1px}
+.back{font-size:11px;margin-left:10px;text-decoration:none}
 .sect{margin:0 0 6px;font-size:12px;font-weight:650;color:var(--fg2);
   border-bottom:1px solid var(--edge);padding-bottom:3px;margin-top:18px}
 .sect:first-child{margin-top:0}
 .sect em{font-style:normal;color:var(--fg3);font-weight:400}
+.sect.tog{cursor:pointer;user-select:none;padding:4px 6px;border:1px solid var(--edge);
+  border-radius:7px;background:var(--tile)}
+.sect.tog:hover{border-color:var(--sel)}
+.sect .chev{display:inline-block;width:11px;color:var(--fg3);transition:transform .12s}
+.sect.open .chev{transform:rotate(90deg)}
 /* --tw is the CANVAS width; the card adds its own 6px padding + 1px border on
    each side (box-sizing:border-box), so the card is --tw + 14. */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,calc(var(--tw) + 14px));
@@ -707,7 +777,7 @@ var YAW=34*Math.PI/180, PIT=24*Math.PI/180;
 
 /* body j at frame f lives on curve ci(g,j) at frame fi(g,j,f) */
 function ci(g,j){ return g.multi?j:0; }
-function fi(g,j,f){ return g.multi?f:((f+j*g.shift)%g.S); }
+function fi(g,j,f){ return g.multi?(f%g.S):((f+j*g.shift)%g.S); }
 
 function geom(r){
   if(r._g) return r._g;
@@ -874,13 +944,15 @@ function paintRibbon(r,g,ctx,W,H){
   }
 }
 
+/* f is fractional: snapped to sample indices, a long-arc orbit strobes -- one step is many pixels. */
 function paintDots(t,f){
   var g=t.g, r=t.r, ctx=t.dctx, W=t.W, s=t.mscale, cx=W/2, j;
   ctx.clearRect(0,0,W,W);
-  var col=dcol(r.de), k=W/168;
+  var col=dcol(r.de), k=W/168, f0=Math.floor(f), u=f-f0;
   for(j=0;j<r.N;j++){
-    var c=ci(g,j), ff=fi(g,j,f);
-    var x=cx+g.mx[c][ff]*s, y=cx-g.my[c][ff]*s;
+    var c=ci(g,j), ff=fi(g,j,f0), f1=fi(g,j,f0+1);
+    var x=cx+(g.mx[c][ff]+(g.mx[c][f1]-g.mx[c][ff])*u)*s,
+        y=cx-(g.my[c][ff]+(g.my[c][f1]-g.my[c][ff])*u)*s;
     ctx.fillStyle=rgba(TH.ink,0.55+0.45*(1-j/r.N));
     ctx.beginPath(); ctx.arc(x,y,2.4*k,0,TAU); ctx.fill();
     if(j===0){ ctx.lineWidth=1; ctx.strokeStyle=rgba(col,0.95);
@@ -892,15 +964,16 @@ function paintSDots(t,f){
   var g=t.g, r=t.r, ctx=t.sdctx, pw=t.pw, W=t.W, p,j;
   ctx.clearRect(0,0,W,pw+2+MH);
   ctx.fillStyle=rgba(TH.ink,0.85);
-  var rr=1.4, dd=rr*2;
+  var rr=1.4, dd=rr*2, f0=Math.floor(f), u=f-f0;
   for(p=0;p<P;p++){
     var x0=p*(pw+2), a=2*p, b=2*p+1, la=g.live[a], lb=g.live[b];
     if(!la&&!lb) continue;
     var cxp=x0+pw/2, cyp=pw/2;
     for(j=0;j<r.N;j++){
-      var A=g.arrs[ci(g,j)], o=fi(g,j,f)*g.d, X,Y;
-      if(la&&lb){ X=cxp+A[o+a]*(0.42*pw/g.axe[a]); Y=cyp-A[o+b]*(0.42*pw/g.axe[b]); }
-      else { var kk=la?a:b; X=cxp+A[o+kk]*(0.42*pw/g.axe[kk]); Y=cyp; }
+      var A=g.arrs[ci(g,j)], o=fi(g,j,f0)*g.d, o1=fi(g,j,f0+1)*g.d, X,Y;
+      var va=A[o+a]+(A[o1+a]-A[o+a])*u, vb=A[o+b]+(A[o1+b]-A[o+b])*u;
+      if(la&&lb){ X=cxp+va*(0.42*pw/g.axe[a]); Y=cyp-vb*(0.42*pw/g.axe[b]); }
+      else { var kk=la?a:b, vk=(kk===a?va:vb); X=cxp+vk*(0.42*pw/g.axe[kk]); Y=cyp; }
       ctx.fillRect(X-rr,Y-rr,dd,dd);
     }
   }
@@ -935,7 +1008,8 @@ function metaHTML(r){
   return '<div class="mrow"><span class="id">#'+r.i+'</span><span>'+badges(r)+'</span></div>'
    + '<div class="m2" style="color:var(--fg3)">'+esc(r.f)+'</div>'
    + '<div class="m2"><span class="deffdot" style="background:'+dcolS(r.de)+'"></span>'
-   + 'N=<b>'+r.N+'</b> · d '+r.d+' · deff <b>'+r.de+'</b>/'+budget(r)+' · A <b>'+fmt(r.A,3)+'</b></div>'
+   + 'N=<b>'+r.N+'</b> · d <b>'+r.de+'</b>/'+budget(r)+' · A <b>'+fmt(r.A,3)+'</b>'
+   + (r.d!==r.de ? '<span style="color:var(--fg3)"> · in R'+r.d+'</span>' : '')+'</div>'
    + '<div class="m2">morse '+r.mo+' · sep '+fmt(r.ms,3)+' · tw '+(Math.abs(r.tw)<1e-10?'0':fmt(r.tw,2))+'</div>';
 }
 
@@ -946,7 +1020,10 @@ function makeTile(r){
   var m=document.createElement('div'); m.className='cw main';
   var s=document.createElement('div'); s.className='cw strip';
   var b=document.createElement('div'); b.className='rb';
-  var t={r:r, el:el, main:m, strip:s, rb:b, active:false, cvs:null, lastF:-1};
+  /* Every record has the same period, so a loop 78 radii long sweeps the screen 15x faster than one
+     5 radii long: true, and unreadable in a grid. EVEN divides each tile's clock by its own arc length. */
+  var t={r:r, el:el, main:m, strip:s, rb:b, active:false, cvs:null, lastF:-1, ph:0,
+         sp:Math.max(0.2, Math.min(2, (META.arref||1)/(r.ar||META.arref||1)))};
   el._t=t;
   el.appendChild(m); el.appendChild(s); el.appendChild(b);
   var meta=document.createElement('div'); meta.innerHTML=metaHTML(r);
@@ -1023,18 +1100,20 @@ var visObs=new IntersectionObserver(function(es){
 
 
 /* --------------------------------------------------- one global rAF loop */
-var playing=!REDUCED, speed=1, phase=0, lastTs=0, rafId=0;
+var playing=!REDUCED, speed=1, lastTs=0, rafId=0, EVEN=true;
 function loop(ts){
   rafId=requestAnimationFrame(loop);
   if(!lastTs) lastTs=ts;
   var dt=(ts-lastTs)/1000; lastTs=ts;
   if(dt>0.25) dt=0.25;
-  if(playing){ phase+=dt*speed/PERIOD; phase-=Math.floor(phase); }
   VIS.forEach(function(t){
     if(!t.active) activate(t);
     if(!t.active||!t.dctx) return;
-    var f=(phase*t.r.S)|0; if(f>=t.r.S) f=t.r.S-1;
-    if(f===t.lastF) return;
+    /* Each tile accumulates its OWN phase. Scaling the shared one truncates the orbit: the global
+       sawtooth resets at 1, so a tile running at sp = 0.5 never gets past half its loop. */
+    if(playing){ t.ph+=dt*speed*(EVEN?t.sp:1)/PERIOD; t.ph-=Math.floor(t.ph); }
+    var f=t.ph*t.r.S;
+    if(t.lastF>=0 && Math.abs(f-t.lastF)<0.1) return;      // sub-pixel motion is not worth a repaint
     t.lastF=f; paintDots(t,f); paintSDots(t,f);
   });
 }
@@ -1043,7 +1122,7 @@ if(!REDUCED) startLoop();
 
 /* -------------------------------------------------------- filter / sort */
 var F={q:'',d:new Set(),N:new Set(),de:new Set(),rig:'all',rot:'all',
-       sort:'A',asc:true,group:1};
+       sort:'A',asc:true,group:'de'};
 function pass(r){
   if(F.d.size && !F.d.has(r.d)) return false;
   if(F.N.size && !F.N.has(r.N)) return false;
@@ -1053,7 +1132,7 @@ function pass(r){
   if(F.rot==='rot' && !r.rotf) return false;
   if(F.rot==='in' && r.rotf) return false;
   if(F.q){
-    var s=(r.f+' #'+r.i+' '+r.sym+' d'+r.d+' N'+r.N+' deff'+r.de).toLowerCase();
+    var s=(r.f+' #'+r.i+' '+r.sym+' d'+r.de+' deff'+r.de+' N'+r.N+' ambient'+r.d).toLowerCase();
     if(s.indexOf(F.q)<0) return false;
   }
   return true;
@@ -1065,45 +1144,106 @@ function cmp(a,b){
   if(va>vb) return F.asc?1:-1;
   return a.f<b.f?-1:a.f>b.f?1:a.i-b.i;
 }
+/* Throughout the page `d` is the EFFECTIVE dimension (the record's `de`), the reverse of the CLI's --d:
+   the ambient space is a search setting, not a property of the orbit. Tiles arrive a chunk at a time as
+   the sentinel below the grid comes into range; canvas creation is a second, independent laziness. */
+var STREAM=[], SHOWN=0, DONE=0, MATCH=0, CHUNK=60, curGrid=null, fillRaf=0;
+
+function sectKey(r){
+  if(F.group==='de') return [r.de];
+  if(F.group==='dn') return [r.de,r.N];
+  return [r.d,r.N];
+}
+/* Sections start closed, so nothing below the selection is built until it is asked for. */
+var OPEN=new Set();
+function rng(v){ v=v.slice().sort(function(a,b){return a-b;});
+  var u=[]; for(var i=0;i<v.length;i++) if(!i||v[i]!==v[i-1]) u.push(v[i]);
+  if(u.length===1) return ''+u[0];
+  return (u[u.length-1]-u[0]===u.length-1) ? u[0]+'–'+u[u.length-1] : u.join('/'); }
+function sectHTML(k,arr,open){
+  var t=(F.group==='d') ? 'ambient R<sup>'+k[0]+'</sup>'
+      : '<span class="deffdot" style="background:'+dcolS(k[0])+'"></span>d = '+k[0];
+  if(k.length>1) t+=' &nbsp; N = '+k[1];
+  var A=arr.map(function(r){return r.A;}), lo=Math.min.apply(null,A), hi=Math.max.apply(null,A);
+  return '<span class="chev">▸</span>'+t+' <em>&nbsp;— '+arr.length+' record'+(arr.length===1?'':'s')
+    + ' · N '+rng(arr.map(function(r){return r.N;}))
+    + ' · ambient '+rng(arr.map(function(r){return r.d;}))
+    + ' · action '+fmt(lo,2)+'–'+fmt(hi,2)+'</em>';
+}
 function render(){
-  var list=RECS.filter(pass);
-  list.sort(cmp);
-  var host=document.getElementById('grid');
-  host.textContent='';
-  var frag=document.createDocumentFragment();
-  if(F.group){
-    var keys=[], map={};
-    for(var i=0;i<list.length;i++){
-      var r=list[i], k=r.d+'|'+r.N;
-      if(!map[k]){ map[k]=[]; keys.push([r.d,r.N,k]); }
-      map[k].push(r);
+  var list=RECS.filter(pass); list.sort(cmp);
+  MATCH=list.length;
+  var host=document.getElementById('grid'); host.textContent='';
+  STREAM=[]; SHOWN=0; DONE=0; curGrid=null;
+  var i, heroes=[];
+  if(F.group!=='none' && F.group!=='d'){
+    heroes=list.filter(function(r){ return r.hero; });
+    if(heroes.length){
+      STREAM.push({h:'Selected orbits <em>&nbsp;— '+heroes.length+' picked from the whole catalogue</em>', fixed:1});
+      for(i=0;i<heroes.length;i++) STREAM.push({r:heroes[i]});
     }
-    keys.sort(function(a,b){ return (b[0]-a[0]) || (a[1]-b[1]); });
-    for(i=0;i<keys.length;i++){
-      var kk=keys[i], arr=map[kk[2]];
-      var h=document.createElement('div'); h.className='sect';
-      h.innerHTML='d = '+kk[0]+' &nbsp; N = '+kk[1]+' <em>&nbsp;— '+arr.length+' record'+(arr.length===1?'':'s')+'</em>';
-      frag.appendChild(h);
-      frag.appendChild(gridOf(arr));
-    }
-  } else { frag.appendChild(gridOf(list)); }
-  host.appendChild(frag);
-  document.getElementById('count').textContent='showing '+list.length+' of '+RECS.length+' records';
-}
-function gridOf(arr){
-  var g=document.createElement('div'); g.className='grid';
-  for(var i=0;i<arr.length;i++){
-    var r=arr[i], t=r._t||makeTile(r);
-    g.appendChild(t.el);
   }
-  return g;
+  if(F.group==='none'){
+    for(i=0;i<list.length;i++) STREAM.push({r:list[i]});
+  } else {
+    var keys=[], map={};
+    for(i=0;i<list.length;i++){
+      var k=sectKey(list[i]), key=k.join('|');
+      if(!map[key]){ map[key]=[]; keys.push({k:k,s:key}); }
+      map[key].push(list[i]);
+    }
+    keys.sort(function(a,b){ return (b.k[0]-a.k[0]) || ((a.k[1]||0)-(b.k[1]||0)); });
+    for(i=0;i<keys.length;i++){
+      var arr=map[keys[i].s], op=OPEN.has(keys[i].s);
+      STREAM.push({h:sectHTML(keys[i].k,arr,op), key:keys[i].s, open:op});
+      if(op) for(var j=0;j<arr.length;j++) STREAM.push({r:arr[j]});
+    }
+  }
+  MATCH=STREAM.reduce(function(n,it){ return n+(it.r?1:0); },0);
+  grow(); scheduleFill();
 }
+function toggleSect(key){
+  if(OPEN.has(key)) OPEN.delete(key); else OPEN.add(key);
+  render();
+}
+function grow(){
+  var frag=document.createDocumentFragment(), n=0;
+  while(SHOWN<STREAM.length && n<CHUNK){
+    var it=STREAM[SHOWN++];
+    if(it.h){
+      var h=document.createElement('div');
+      h.className='sect'+(it.fixed?'':' tog')+(it.open?' open':'');
+      h.innerHTML=it.h;
+      if(!it.fixed) h.addEventListener('click', (function(k){ return function(){ toggleSect(k); }; })(it.key));
+      frag.appendChild(h);
+      curGrid=document.createElement('div'); curGrid.className='grid'; frag.appendChild(curGrid);
+    } else {
+      if(!curGrid){ curGrid=document.createElement('div'); curGrid.className='grid'; frag.appendChild(curGrid); }
+      curGrid.appendChild((it.r._t||makeTile(it.r)).el); n++; DONE++;
+    }
+  }
+  document.getElementById('grid').appendChild(frag);
+  document.getElementById('count').textContent = (DONE<MATCH ? DONE+' of '+MATCH+' shown' : MATCH+' shown')
+    + ' · '+RECS.length+' on this page';
+}
+/* One rect read per frame, not a synchronous loop: chunks arrive until the sentinel is below the fold. */
+function scheduleFill(){ if(!fillRaf) fillRaf=requestAnimationFrame(fillStep); }
+function fillStep(){
+  fillRaf=0;
+  var s=document.getElementById('more');
+  if(SHOWN>=STREAM.length){ s.textContent=''; return; }
+  if(s.getBoundingClientRect().top <= window.innerHeight+900){ grow(); scheduleFill(); }
+  else s.textContent='… '+(MATCH-DONE)+' more below';
+}
+var moreObs=new IntersectionObserver(function(es){
+  if(es[0].isIntersecting) scheduleFill();
+},{rootMargin:'900px 0px'});
 """
 
 
 JS3 = r"""
 /* ------------------------------------------------------- detail overlay */
-var OV={r:null,g:null,ctx:null,W:420,yaw:YAW,pit:PIT,spin:true,ax:[0,1,2],
+var OV={r:null,g:null,ctx:null,W:420,yaw:YAW,pit:PIT,spin:true,ax:[0,1,2],ph:0,
         raf:0,drag:false,px:0,py:0,ext:1,last:0,sd:null,spw:0,sww:0,lastF:-1,
         sx:null,sy:null,sz:null};
 
@@ -1154,8 +1294,10 @@ function paintOrbit(f){
     for(t=0;t<NB;t++){ ctx.strokeStyle=rgba(col,a0+(a1v-a0)*(t/(NB-1))); ctx.stroke(paths[t]); }
   }
   for(var j=0;j<r.N;j++){
-    var Ab=g.arrs[ci(g,j)], oo=fi(g,j,f)*g.d;
-    var q1=Ab[oo+a[0]]||0, q2=(a[1]<g.d?Ab[oo+a[1]]:0)||0, q3=(a[2]<g.d?Ab[oo+a[2]]:0)||0;
+    var Ab=g.arrs[ci(g,j)], fb=Math.floor(f), ub=f-fb,
+        oo=fi(g,j,fb)*g.d, oo1=fi(g,j,fb+1)*g.d;
+    var lp=function(k){ if(k>=g.d) return 0; var v0=Ab[oo+k]||0; return v0+((Ab[oo1+k]||0)-v0)*ub; };
+    var q1=lp(a[0]), q2=lp(a[1]), q3=lp(a[2]);
     var bx=q1*cy-q2*sy, byt=q1*sy+q2*cy, by=byt*sp+q3*cp;
     var px=cx+bx*s, py=cx-by*s;
     ctx.fillStyle=rgba(TH.ink,0.55+0.45*(1-j/r.N));
@@ -1169,7 +1311,9 @@ function ovLoop(ts){
   if(!OV.last) OV.last=ts;
   var dt=(ts-OV.last)/1000; OV.last=ts; if(dt>0.25) dt=0.25;
   if(OV.spin && !OV.drag) OV.yaw+=dt*0.35;
-  var f=(phase*OV.g.S)|0; if(f>=OV.g.S) f=OV.g.S-1;
+  if(!playing) dt=0;
+  OV.ph+=dt*speed*(EVEN&&OV.r._t?OV.r._t.sp:1)/PERIOD; OV.ph-=Math.floor(OV.ph);
+  var f=OV.ph*OV.g.S;
   paintOrbit(f);
   if(OV.sd && f!==OV.lastF){ OV.lastF=f;
     paintSDots({g:OV.g,r:OV.r,sdctx:OV.sd,pw:OV.spw,W:OV.sww}, f); }
@@ -1207,7 +1351,8 @@ function openDetail(r){
   var path=META.paths[r.f]||('catalog/'+r.f);
   var kv=[
     ['file / id', esc(path)+' &nbsp; #'+r.i],
-    ['N, d, deff', r.N+', '+r.d+', <b>'+r.de+'</b> of budget '+budget(r)+' (=2&lfloor;N/2&rfloor;)'],
+    ['N, d', r.N+', <b>'+r.de+'</b> of budget '+budget(r)+' (=2&lfloor;N/2&rfloor;)'],
+    ['ambient', 'R<sup>'+r.d+'</sup>, the space the search ran in'],
     ['action', r.A],['energy', r.E],
     ['morse / nullity', r.mo+' / '+r.nu],
     ['min separation', r.ms],['rms / max r', fmt(r.rms,4)+' / '+fmt(r.mxr,4)],
@@ -1235,7 +1380,7 @@ function openDetail(r){
     +     '<button id="ovspin"'+(REDUCED?'':' class="on"')+'>auto-spin</button>'
     +     '<span class="hint">drag to orbit</span></div>'
     +   '<div style="margin-top:10px"><div class="hint">principal-plane strip — '
-    +     'deff = 2&times;(full panels) + (line panels)</div><div id="ovstrip"></div></div>'
+    +     'd = 2&times;(full panels) + (line panels)</div><div id="ovstrip"></div></div>'
     +   '<div style="margin-top:10px"><div class="hint">mutual distances |q<sub>0</sub>−q<sub>k</sub>|(t); '
     +     'flat lines = relative equilibrium. dashed = minsep '+fmt(r.ms,4)+'</div>'
     +     '<div id="ovrib"></div></div>'
@@ -1247,7 +1392,7 @@ function openDetail(r){
     +   '<div class="repro">./hyperchoreography show '+esc(path)+' --id '+r.i+'\n'
     +     './hyperchoreography export '+esc(path)+' --id '+r.i+' --samples 720 --out curve.csv</div>'
     + (isRigid(r)? '<div class="warnbox">This is a <b>relative equilibrium</b> (rigidity '+r.rig
-        +'): the configuration is frozen and merely rotates. However high its deff, it is dynamically trivial.</div>':'')
+        +'): the configuration is frozen and merely rotates. However high its d, it is dynamically trivial.</div>':'')
     + '</div></div></div>';
   ov.classList.add('on');
 
@@ -1310,6 +1455,7 @@ function setTileWidth(w){
   for(var i=0;i<TILES.length;i++){ deactivate(TILES[i]); sizeTile(TILES[i]); }
   requestAnimationFrame(function(){
     for(var i=0;i<TILES.length;i++) if(VIS.has(TILES[i])) activate(TILES[i]);
+    scheduleFill();
   });
 }
 function repaintAll(){
@@ -1343,16 +1489,23 @@ function init(){
   var ds={},ns={},des={};
   RECS.forEach(function(r){ ds[r.d]=1; ns[r.N]=1; des[r.de]=1; });
   var num=function(o){ return Object.keys(o).map(Number).sort(function(a,b){return a-b;}); };
-  chipRow('fd', num(ds), F.d, 'd');
+  chipRow('fd', num(ds), F.d, 'ambient');
   chipRow('fn', num(ns), F.N, 'N');
-  chipRow('fe', num(des), F.de, 'deff');
+  chipRow('fe', num(des), F.de, 'd');
+  F.group = META.group0 || (num(des).length>1 ? 'de' : 'd');   // one section per d is pointless on a single-d page
+  document.getElementById('group').value=F.group;
+  if(META.sort0){ F.sort=META.sort0; F.asc=false;
+    document.getElementById('sort').value=F.sort;
+    document.getElementById('dir').textContent='▼ desc'; }
+  moreObs.observe(document.getElementById('more'));
+  window.addEventListener('resize', scheduleFill);
 
   document.getElementById('q').addEventListener('input', function(){
     F.q=this.value.trim().toLowerCase(); render(); });
   document.getElementById('sort').addEventListener('change', function(){ F.sort=this.value; render(); });
   document.getElementById('dir').addEventListener('click', function(){
     F.asc=!F.asc; this.textContent=F.asc?'▲ asc':'▼ desc'; render(); });
-  document.getElementById('group').addEventListener('change', function(){ F.group=+this.value; render(); });
+  document.getElementById('group').addEventListener('change', function(){ F.group=this.value; render(); });
   document.getElementById('frig').addEventListener('change', function(){ F.rig=this.value; render(); });
   document.getElementById('frot').addEventListener('change', function(){ F.rot=this.value; render(); });
   document.getElementById('reset').addEventListener('click', function(){
@@ -1373,6 +1526,8 @@ function init(){
   pb.addEventListener('click', function(){ playing=!playing;
     this.textContent=playing?'⏸ pause':'▶ play';
     if(playing) startLoop(); });
+  document.getElementById('even').addEventListener('click', function(){
+    EVEN=!EVEN; this.classList.toggle('on', EVEN); });
   document.getElementById('spd').addEventListener('input', function(){
     speed=+this.value; document.getElementById('spdv').textContent=speed.toFixed(1)+'×'; });
 
@@ -1402,22 +1557,22 @@ PAGE = r"""<!doctype html>
 <style>__CSS__</style>
 </head><body>
 <header>
-  <h1>Hyperchoreography catalogue</h1><span class="sub">__SUB__</span>
-  <div class="prov">__PROV__</div>
+  <h1>Hyperchoreography catalogue</h1><span class="sub">__SUB__</span>__BACK__
   <div class="ctl">
     <input type="search" id="q" placeholder="search file, id, sym…">
     <label>sort
       <select id="sort">
         <option value="A">action</option><option value="tw">|twist|</option>
-        <option value="mo">morse index</option><option value="de">deff</option>
-        <option value="N">N</option><option value="d">d</option>
+        <option value="mo">morse index</option><option value="de">dimension</option>
+        <option value="N">N</option><option value="d">ambient dimension</option>
         <option value="ms">min separation</option><option value="E">energy</option>
         <option value="hits">hits</option><option value="rig">rigidity</option>
         <option value="ce">coef residual</option><option value="i">id</option>
       </select></label>
     <button id="dir">▲ asc</button>
     <label>group
-      <select id="group"><option value="1">by (d, N)</option><option value="0">none</option></select></label>
+      <select id="group"><option value="de">by dimension</option><option value="dn">by dimension, N</option>
+        <option value="d">by ambient dimension, N</option><option value="none">none</option></select></label>
     <label>rigid
       <select id="frig"><option value="all">all</option><option value="no">hide</option>
         <option value="only">only</option></select></label>
@@ -1428,12 +1583,12 @@ PAGE = r"""<!doctype html>
     <span class="count" id="count"></span>
   </div>
   <div class="ctl">
-    <span class="chips" id="fd"></span><span class="chips" id="fn"></span><span class="chips" id="fe"></span>
+    <span class="chips" id="fe"></span><span class="chips" id="fn"></span><span class="chips" id="fd"></span>
   </div>
   <div class="ctl">
     <span style="color:var(--fg2);font-size:11px">tile</span>
     <button class="szb" id="szs">S</button><button class="szb" id="szm">M</button><button class="szb" id="szl">L</button>
-    <button id="play">⏸ pause</button>
+    <button id="play">⏸ pause</button><button id="even" class="on">even speed</button>
     <label>speed <input type="range" id="spd" min="0.1" max="4" step="0.1" value="1" style="width:90px">
       <span id="spdv" class="mono" style="font-size:10.5px">1.0×</span></label>
     <span id="rmnote" style="display:none;color:var(--fg3);font-size:10.5px">reduced-motion: animation off by default</span>
@@ -1442,12 +1597,12 @@ PAGE = r"""<!doctype html>
     <div><b>Main view</b> — a static orthographic 3-D shadow of principal axes 1, 2, 3 of the
       <i>pooled</i> second moment (all N bodies, all samples). Depth is encoded as line opacity.
       The stored coordinate basis is meaningless (the action is O(d)-invariant), and a plain
-      (1,2)-plane plot renders a large class of high-deff records as a featureless circle — hence 3-D.
+      (1,2)-plane plot renders a large class of high-dimensional records as a featureless circle — hence 3-D.
       Dots are the bodies, brightest first, body 0 ringed.</div>
     <div><b>Strip</b> — one panel per principal plane (1,2), (3,4), (5,6)…, in three states:
       a <b>curve</b> = both axes live; a <b>horizontal line</b> = exactly one axis live;
       a <b>short grey rule</b> = neither (or the axis does not exist). So
-      <b>deff = 2×(curve panels) + (line panels)</b>, countable by eye.
+      <b>d = 2×(curve panels) + (line panels)</b>, countable by eye.
       Panels are normalised per axis, so shape here is qualitative only.</div>
     <div><b>Meter</b> — under each panel, two bars of height √(λ<sub>k</sub>/λ<sub>1</sub>):
       the magnitudes the strip's per-axis normalisation throws away. Grey = dead axis;
@@ -1455,10 +1610,13 @@ PAGE = r"""<!doctype html>
     <div><b>Ribbon</b> — the mutual distances |q<sub>0</sub>−q<sub>k</sub>|(t), k = 1…⌊N/2⌋, over one
       period, floor = 0. Dead-flat lines mean a <b>relative equilibrium</b> (rigid body rotation);
       wavy lines mean a genuine choreography. The lowest minimum is <i>minsep</i>.</div>
-    <div><b>deff colour</b>, fixed to 2…10 so it is stable across harvests:
+    <div><b>even speed</b> — every orbit has the same period, so a loop whose path is 80 radii long
+      sweeps the frame ~15× faster than one 5 radii long. On, each tile's clock is divided by its own
+      path length so the grid reads at one pace; off, all tiles share the true time base.</div>
+    <div><b>dimension colour</b>, fixed to 2…11 so it is stable across harvests:
       <span class="ramp" id="rampsw"></span></div>
     <div><b>Badges</b> — <span style="color:var(--b-rig)">rigid</span> relative equilibrium
-      (rigidity &lt; 1e-4, a clean gap in the data — trivial however high its deff); <span style="color:var(--b-rot)">frame {…}</span> rotating
+      (rigidity &lt; 1e-4, a clean gap in the data — trivial however high its d); <span style="color:var(--b-rot)">frame {…}</span> rotating
       frame with its rotation-rate multiset; <span style="color:var(--b-cov)">cover</span> multiple
       cover; <span style="color:var(--b-fam)">family</span> a continuous family (same N, same d, same action);
       <span style="color:var(--b-warn)">residual</span> a record whose certified state exceeds 1e-9 or
@@ -1466,12 +1624,12 @@ PAGE = r"""<!doctype html>
       Click any tile for the full record.</div>
   </div></details>
 </header>
-<main><div id="grid"></div></main>
+<main>__CARDS__<div id="grid"></div><div id="more"></div></main>
 <div id="ov"></div>
 <script type="application/json" id="DATA">__DATA__</script>
 <script>__JS__
 (function(){var s=document.getElementById('rampsw');if(!s)return;var h='';
-for(var k=2;k<=11;k++)h+='<i style="background:var(--c'+k+')" title="deff '+k+'"></i>';
+for(var k=2;k<=11;k++)h+='<i style="background:var(--c'+k+')" title="d = '+k+'"></i>';
 s.innerHTML=h+'<span style="margin-left:4px;color:var(--fg3)">2 → 11</span>';})();
 </script>
 </body></html>
@@ -1499,7 +1657,8 @@ def emit_page(records, meta, out_path, title, fragment=False):
     html = (PAGE.replace("__CSS__", CSS)
                 .replace("__TITLE__", title)
                 .replace("__SUB__", meta["sub"])
-                .replace("__PROV__", meta["prov"])
+                .replace("__BACK__", meta.get("back", ""))
+                .replace("__CARDS__", meta.get("cards", ""))
                 .replace("__DATA__", payload)
                 .replace("__JS__", js))
     if fragment:
@@ -1518,9 +1677,116 @@ def emit_page(records, meta, out_path, title, fragment=False):
     return len(html.encode("utf-8"))
 
 
+# Heroes for the front page. Nothing here can see the pictures, so the gate is on what makes an orbit
+# legible and the rank on what makes it worth looking at.
+def hero_gate(r):
+    return (r["rig"] >= 1e-2 and r["ms"] >= 0.10 and r["K"] <= 500 and r["ar"] <= 45
+            and r["mo"] >= 0 and r["re"] <= 1e-11 and (r["ce"] < 0 or r["ce"] <= 1e-7))
+
+
+# rms|q| / max|q|: 1 for a circle, 0.75 for the figure eight. Arc length cannot do this -- the eight is
+# 5.1 radii long against a circle's 6.28, so an arc floor drops the eight and keeps the rings.
+def roundness(r):
+    return r["rms"] / r["mxr"] if r["mxr"] else 1.0
+
+
+def pick_heroes(recs, want, pinned, excluded):
+    cand = [r for r in recs if hero_gate(r) and (r["f"], r["i"]) not in excluded]
+    if not cand:
+        return []
+
+    def z(vals):
+        m = sum(vals) / len(vals)
+        sd = (sum((v - m) ** 2 for v in vals) / len(vals)) ** 0.5 or 1.0
+        return lambda v: (v - m) / sd
+    zc = z([-roundness(r) for r in cand])
+    za = z([math.log(r["ar"]) for r in cand])
+    zs_ = z([math.log(r["ms"]) for r in cand])
+    zm = z([-math.log(1 + r["mo"]) for r in cand])
+    zh = z([math.log(1 + r["hits"]) for r in cand])
+    for r in cand:
+        r["_h"] = (1.0 * zc(-roundness(r))                       # shape, not a ring
+                   + 0.8 * za(math.log(r["ar"]))                 # something actually drawn
+                   + 0.5 * zs_(math.log(r["ms"]))                # still legible
+                   + 0.5 * zm(-math.log(1 + r["mo"]))            # near-minimising
+                   + 0.4 * zh(math.log(1 + r["hits"]))
+                   + 0.5 * (r["de"] == 2 * (r["N"] // 2))
+                   + 0.6 * (1 if r.get("sym") else 0)
+                   - 0.5 * max(0.0, math.log(r["K"] / 200.0) / math.log(3.0)))
+
+    def twin(r, chosen):                       # near-duplicate, or a near-identical picture
+        for c in chosen:
+            if abs(r["A"] - c["A"]) <= 1e-6 * max(1.0, abs(r["A"])):
+                return True
+            if (abs(r["ar"] - c["ar"]) <= 0.10 * c["ar"]
+                    and abs(r["ms"] - c["ms"]) <= 0.10 * c["ms"] and r["N"] == c["N"]):
+                return True
+        return False
+
+    out = []
+    dcap = max(3, want // 6)
+    # One guaranteed wildcard, the least symmetric orbit: no group survives detection, and among those the
+    # largest relative twist -- at k = 3 the twist is zero for anything time-reversible. chi* is not
+    # comparable across rotating frames, so it ranks only within that shortlist.
+    asym = [r for r in cand if not r.get("sym")]
+    if asym:
+        out.append(max(asym, key=lambda r: abs(r.get("twr", 0.0))))
+    keys = {(r["f"], r["i"]) for r in out}
+    for key in pinned:                         # --hero: forced in, and counted against `want`
+        for r in recs:
+            if (r["f"], r["i"]) == key and key not in keys:
+                out.append(r)
+                keys.add(key)
+    for r in sorted(cand, key=lambda r: -r["_h"]):
+        if len(out) >= want:
+            break
+        if r in out or twin(r, out):
+            continue
+        if roundness(r) > 0.97 and sum(1 for c in out if roundness(c) > 0.97) >= 2:
+            continue                           # the near-circular relative choreographies are one note
+        if sum(1 for c in out if c["de"] == r["de"]) >= dcap:
+            continue                           # a cap, not a quota: ungoverned this puts 38 of 40 at d = 2
+        out.append(r)
+    for r in recs:
+        r.pop("_h", None)
+    return sorted(out, key=lambda r: (-r["de"], r["N"], r["A"]))
+
+
+def cards_html(shards, lede):
+    cards = []
+    for sh in shards:
+        c = "var(--c%d)" % min(max(sh["de"], 2), 11)
+        extra = []
+        if sh["nrot"]:
+            extra.append("%d rotating frame" % sh["nrot"])
+        if sh["nrig"]:
+            extra.append("%d relative equilibri%s" % (sh["nrig"], "um" if sh["nrig"] == 1 else "a"))
+        cards.append(
+            '<a class="card2" href="%s">'
+            '<div class="k" style="color:%s">d = %d</div>'
+            '<div class="n">%d record%s</div>'
+            '<div class="m">N %s · ambient %s</div>'
+            '<div class="m">action %.4g – %.4g</div>'
+            '<div class="m">%s</div>'
+            '<div class="bar" style="background:%s"></div></a>'
+            % (sh["file"], c, sh["de"], sh["n"], "" if sh["n"] == 1 else "s",
+               sh["nvals"], sh["dvals"], sh["amin"], sh["amax"],
+               " · ".join(extra) or "all inertial", c))
+    return '<p class="lede">%s</p><div class="cards">%s</div>' % (lede, "\n".join(cards))
+
+
 # --------------------------------------------------------------------------
 # main
 # --------------------------------------------------------------------------
+
+def rng(vals):
+    """"6", "6–8" or "2/5/7" -- a range when the values are contiguous, else a list."""
+    if len(vals) == 1:
+        return str(vals[0])
+    if vals[-1] - vals[0] == len(vals) - 1:
+        return "%d–%d" % (vals[0], vals[-1])
+    return "/".join(map(str, vals))
+
 
 def find_binary(explicit):
     if explicit:
@@ -1549,6 +1815,14 @@ def main(argv=None):
     ap.add_argument("--jobs", type=int, default=4)
     ap.add_argument("--bin", default=None, help="path to ./hyperchoreography")
     ap.add_argument("--title", default="Hyperchoreography catalogue")
+    ap.add_argument("--heroes", type=int, default=40,
+                    help="front-page picks, ranked over the whole catalogue (0 for none)")
+    ap.add_argument("--hero", action="append", default=[], metavar="FILE#ID",
+                    help="force a record onto the front page; repeatable")
+    ap.add_argument("--no-hero", action="append", default=[], metavar="FILE#ID",
+                    help="keep a record off the front page; repeatable")
+    ap.add_argument("--split", action="store_true",
+                    help="an index plus one page per dimension, instead of one page with collapsible sections")
     ap.add_argument("--fragment", action="store_true",
                     help="emit without the <!doctype>/<html>/<head>/<body> shell, for hosts that supply one")
     a = ap.parse_args(argv)
@@ -1654,7 +1928,6 @@ def main(argv=None):
 
     recs = [r for p in paths for r in built.get(p, [])]
     skipped = [m for p in paths for m in skips.get(p, [])]
-    counts = [(labels[p], counts_by_path.get(p, 0)) for p in paths]
 
     if a.min_deff:
         recs = [r for r in recs if r["de"] >= a.min_deff]
@@ -1702,31 +1975,85 @@ def main(argv=None):
     dvals = sorted(set(r["d"] for r in recs))
     nvals = sorted(set(r["N"] for r in recs))
     evals = sorted(set(r["de"] for r in recs))
-    nrot = sum(1 for r in recs if r["rot"])
-    nrig = sum(1 for r in recs if r["rig"] < RIGID_TOL)
-    nfam = fam
-    sub = ("%d records · d %s · N %s · deff %s · %d rotating-frame · %d relative equilibria"
-           % (len(recs), "/".join(map(str, dvals)), "/".join(map(str, nvals)),
-              "%d–%d" % (evals[0], evals[-1]), nrot, nrig))
-    prov = ("sources: " + ", ".join("%s (%d)" % (n, c) for n, c in counts if c)
-            + " &nbsp;|&nbsp; %d samples/period, one curve + frame generator per record"
-            % a.samples
-            + (" &nbsp;|&nbsp; %d continuous famil%s" % (nfam, "y" if nfam == 1 else "ies") if nfam else "")
-            + (" &nbsp;|&nbsp; %d skipped" % len(skipped) if skipped else "")
-            + "<br>built by: python3 tools/gallery.py "
-            + " ".join(sys.argv[1:] if argv is None else argv))
-    meta = {"dmax": dmax, "rigtol": RIGID_TOL, "tile": a.tile, "sub": sub, "prov": prov,
+    sub = ("%d records · d %d–%d · N %d–%d"
+           % (len(recs), evals[0], evals[-1], nvals[0], nvals[-1]))
+    ars = sorted(r["ar"] for r in recs if r["ar"] > 0)
+    meta = {"dmax": dmax, "rigtol": RIGID_TOL, "tile": a.tile, "sub": sub,
+            "arref": ars[len(ars) // 2] if ars else 1.0,
             "paths": {labels[p]: p for p in paths}}
 
+    pinned, excluded = set(), set()
+    for flag, dest in (("--hero", pinned), ("--no-hero", excluded)):
+        for h in (a.hero if dest is pinned else a.no_hero):
+            if "#" not in h:
+                print("gallery: %s wants FILE#ID, got %s" % (flag, h), file=sys.stderr)
+                return 2
+            f, i = h.rsplit("#", 1)
+            dest.add((f, int(i)))
+
+    # A fragment is embedded in a host page, so it cannot be a set of files.
+    split = a.split and not a.fragment
+    outdir = os.path.dirname(os.path.abspath(a.out))
+    shards = []
+    for de in sorted(set(r["de"] for r in recs), reverse=True):
+        sub_recs = [r for r in recs if r["de"] == de]
+        acts = [r["A"] for r in sub_recs]
+        shards.append({"de": de, "n": len(sub_recs), "file": "dim-%d.html" % de,
+                       "recs": sub_recs,
+                       "nvals": rng(sorted(set(r["N"] for r in sub_recs))),
+                       "dvals": rng(sorted(set(r["d"] for r in sub_recs))),
+                       "amin": min(acts), "amax": max(acts),
+                       "nrig": sum(1 for r in sub_recs if r["rig"] < RIGID_TOL),
+                       "nrot": sum(1 for r in sub_recs if r["rot"])})
+
+    heroes = pick_heroes(recs, a.heroes, pinned, excluded)
+    for r in heroes:
+        r["hero"] = 1
+    if heroes:
+        print("gallery: front page selection (%d):" % len(heroes), file=sys.stderr)
+        for r in heroes:
+            print("   d=%-3d N=%-3d %-18s #%-4d A=%-14.9g K=%-4d sep=%.2f morse=%d"
+                  % (r["de"], r["N"], r["f"], r["i"], r["A"], r["K"], r["ms"], r["mo"]),
+                  file=sys.stderr)
+
+    lede = ("Throughout, <code>d</code> is the dimension the motion actually occupies. The ambient space a "
+            "record was found in is a search setting, not a property of the orbit, and only bounds it: a "
+            "search run in R<sup>7</sup> returns orbits of every <code>d</code> from 2 upwards. "
+            "The selection below is ranked over the whole catalogue; open a section for the rest.")
+    written = []
     try:
-        nbytes = emit_page(recs, meta, a.out, a.title, fragment=a.fragment)
+        if split:
+            back = '<a class="back" href="%s">← all dimensions</a>' % os.path.basename(a.out)
+            for sh in shards:
+                m = dict(meta)
+                m["dmax"] = max(r["d"] for r in sh["recs"])
+                m["back"] = back
+                m["sub"] = "d = %d · %d records · N %s" % (sh["de"], sh["n"], sh["nvals"])
+                written.append((os.path.join(outdir, sh["file"]), sh["n"],
+                                emit_page(sh["recs"], m, os.path.join(outdir, sh["file"]),
+                                          "%s — d = %d" % (a.title, sh["de"]))))
+            hm = dict(meta)
+            hm["cards"] = cards_html(shards, lede)
+            hm["group0"] = "none"
+            hm["sort0"] = "de"
+            hm["sub"] = "%d records · %d selected" % (len(recs), len(heroes))
+            written.append((a.out, len(heroes), emit_page(heroes, hm, a.out, a.title)))
+        else:
+            m = dict(meta)
+            m["cards"] = '<p class="lede">%s</p>' % lede
+            written.append((a.out, len(recs),
+                            emit_page(recs, m, a.out, a.title, fragment=a.fragment)))
     except CliError as e:
         print("gallery: %s" % e, file=sys.stderr)
         return 1
     dt = time.time() - t0
 
-    print("gallery: wrote %s -- %d records, %s bytes (%.2f MB), %.1f s"
-          % (a.out, len(recs), format(nbytes, ","), nbytes / 1048576.0, dt), file=sys.stderr)
+    nbytes = sum(w[2] for w in written)
+    for path, n, nb in written:
+        print("gallery: wrote %s -- %d records, %s bytes (%.2f MB)"
+              % (path, n, format(nb, ","), nb / 1048576.0), file=sys.stderr)
+    print("gallery: %d file(s), %.2f MB total, %.1f s" % (len(written), nbytes / 1048576.0, dt),
+          file=sys.stderr)
     if skipped:
         print("gallery: SKIPPED %d record(s):" % len(skipped), file=sys.stderr)
         for s in skipped:

@@ -338,7 +338,12 @@ Two cautions, both learned the hard way:
 * `src/` — `action.hpp` (basis, kernels, symmetry), `calib.hpp` (the ladder), `g2.hpp` (Fano frame and
   torus), `optim.hpp`, `taylor.hpp`, `invariants.hpp`, `catalog.hpp`, `search.hpp`, `continue.hpp`,
   `mpreal.hpp`, `linalg.hpp`, `main.cpp`, `tests.cpp`.
-* `tools/gallery.py` — the whole catalogue as one self-contained page, standard library only, ~2 s.
+* `tools/gallery.py` — the whole catalogue as one self-contained page, standard library only, ~20 s.
+  Organised by **effective dimension**, which the page calls `d` (the ambient space is a search setting, not
+  a property of the orbit). A selection sits at the top — `--heroes N`, `--hero`/`--no-hero FILE#ID` — and
+  the per-dimension sections below it start closed, so nothing else is built until it is asked for.
+  `--split` writes one page per dimension behind an index instead. Sampling, tile clock and the selection
+  rule are each derived where they are implemented.
   `make gallery` writes `docs/index.html`, which GitHub Pages serves at
   <https://lycium.github.io/hyperchoreography/>. A `deff = 9` orbit and a circle look identical in any two
   coordinates you pick, so each tile is drawn in the record's **own principal frame** and shows a 3-D

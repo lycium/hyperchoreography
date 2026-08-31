@@ -38,9 +38,11 @@ hyperchoreography: $(SRC) $(HDRS)
 test: src/tests.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -o hyperchoreography_test src/tests.cpp $(LDFLAGS) && ./hyperchoreography_test
 
-# docs/ is what GitHub Pages serves
+# docs/ is what GitHub Pages serves.  The eight is kept out of the selection deliberately: it is the one
+# orbit everybody has already seen.  The rest is the score's ranking overruled by eye.
 gallery: hyperchoreography
-	python3 tools/gallery.py --out docs/index.html
+	python3 tools/gallery.py --out docs/index.html \
+	  --no-hero 'd2-3_n3.bin#0' --no-hero 'd5-6_n7.bin#100' --hero 'd2-4_n4.bin#6'
 
 clean:
 	rm -f hyperchoreography hyperchoreography_test
