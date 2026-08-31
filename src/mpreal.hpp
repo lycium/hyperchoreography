@@ -85,9 +85,12 @@ struct mpreal {
 };
 inline double to_double(const mpreal& x) { return x.to_double(); }
 inline double log2abs(const mpreal& x) { return x.log2abs(); }
+inline long prec_bits(const mpreal& x) { return (long)mpfr_get_prec(x.v); }
 #endif
 inline double to_double(double x) { return x; }
 inline double log2abs(double x) { return x == 0 ? -1e300 : std::log2(std::fabs(x)); }
+inline double ldexp2(double x, long e) { return std::ldexp(x, (int)e); }
+inline long prec_bits(double) { return 53; }
 
 // in-place primitives: no temporaries, no allocation
 inline void set_zero(double& r) { r = 0.0; }

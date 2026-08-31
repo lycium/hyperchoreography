@@ -5,6 +5,9 @@
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
+#include <atomic>
+#include <thread>
+#include <chrono>
 #include "linalg.hpp"
 
 template <class T> T PI_T();
@@ -145,20 +148,44 @@ template <class T> struct ShootWork { std::vector<T> F, Fn, Fp, Fm, J, JtJ, A, r
 // μ·max diag(JᵀJ) from 2^mu_log2, raised ×8 and retried against the same Jacobian until ‖F‖ falls (fixed
 // damping abandoned 27 % of admissible candidates). Returns final max|F|, INFINITY on blow-up.
 template <class T>
-double shoot_newton(NBody<T>& nb, std::vector<T>& Z, double itol, int max_iter, double target, long hstep_log2, long mu_log2, ShootWork<T>& W, bool verbose = false, const std::vector<T>* G = nullptr) {
+double shoot_newton(NBody<T>& nb, std::vector<T>& Z, double itol, int max_iter, double target, long hstep_log2, long mu_log2, ShootWork<T>& W, bool verbose = false, const std::vector<T>* G = nullptr, int threads = 1, double stall = 0, int lm_retries = 8) {
   const int N = nb.N, d = nb.d, nd = N * d, n2 = 2 * nd;
   auto residual = [&](const std::vector<T>& Zc, std::vector<T>& F) { std::vector<T> p(Zc.begin(), Zc.begin() + nd), v(Zc.begin() + nd, Zc.end()); return chore_residual(nb, p, v, itol, G, &F); };
   auto remove_cm = [&](std::vector<T>& Zc) { for (int half = 0; half < 2; half++) for (int c = 0; c < d; c++) { T m(0); for (int k = 0; k < N; k++) m += Zc[half * nd + k * d + c]; m /= N; for (int k = 0; k < N; k++) Zc[half * nd + k * d + c] -= m; } };
   W.J.assign((size_t)n2 * n2, T(0)); W.JtJ.assign((size_t)n2 * n2, T(0)); W.rhs.assign(n2, T(0));
   remove_cm(Z);
+  auto t0 = std::chrono::steady_clock::now();
+  auto secs = [&] { return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(); };
   double maxF = residual(Z, W.F); if (!(maxF < INFINITY)) return INFINITY;
-  if (verbose) std::printf("  iter 0: residual %.3e\n", maxF);
+  if (verbose) { std::printf("  iter 0: residual %.3e  [%.1fs]\n", maxF, secs()); std::fflush(stdout); }
   T hstep = two_pow_T<T>(hstep_log2), mu = two_pow_T<T>(mu_log2), mu0 = two_pow_T<T>(mu_log2), tmp(0);
+  int flat = 0;                    // consecutive iterations that bought less than a factor `stall`
   for (int it = 1; it <= max_iter && maxF > target; it++) {
-    for (int c = 0; c < n2; c++) {
-      W.Zp = Z; W.Zp[c] += hstep; if (!(residual(W.Zp, W.Fp) < INFINITY)) return INFINITY;
-      W.Zm = Z; W.Zm[c] -= hstep; if (!(residual(W.Zm, W.Fm) < INFINITY)) return INFINITY;
-      for (int r = 0; r < n2; r++) { sub(tmp, W.Fp[r], W.Fm[r]); div(tmp, tmp, hstep); div_ui(W.J[(size_t)r * n2 + c], tmp, 2u); }
+    if (threads <= 1) {
+      for (int c = 0; c < n2; c++) {
+        W.Zp = Z; W.Zp[c] += hstep; if (!(residual(W.Zp, W.Fp) < INFINITY)) return INFINITY;
+        W.Zm = Z; W.Zm[c] -= hstep; if (!(residual(W.Zm, W.Fm) < INFINITY)) return INFINITY;
+        for (int r = 0; r < n2; r++) { sub(tmp, W.Fp[r], W.Fm[r]); div(tmp, tmp, hstep); div_ui(W.J[(size_t)r * n2 + c], tmp, 2u); }
+      }
+    } else {
+      // one column per task; W.J is preallocated at the working precision, so no element is resized
+      std::atomic<int> nextc{0}; std::atomic<bool> blew{false};
+      std::vector<std::thread> pool; pool.reserve(threads);
+      for (int t = 0; t < threads; t++) pool.emplace_back([&] {
+        NBody<T> nbl(nb.N, nb.d, nb.alpha, nb.order);
+        std::vector<T> Zc, p, v, Fp, Fm; T tl(0);
+        for (int c = nextc.fetch_add(1); c < n2 && !blew.load(); c = nextc.fetch_add(1)) {
+          for (int sgn = 0; sgn < 2; sgn++) {
+            Zc = Z; if (sgn) Zc[c] -= hstep; else Zc[c] += hstep;
+            p.assign(Zc.begin(), Zc.begin() + nd); v.assign(Zc.begin() + nd, Zc.end());
+            if (!(chore_residual(nbl, p, v, itol, G, sgn ? &Fm : &Fp) < INFINITY)) { blew = true; break; }
+          }
+          if (blew.load()) break;
+          for (int r = 0; r < n2; r++) { sub(tl, Fp[r], Fm[r]); div(tl, tl, hstep); div_ui(W.J[(size_t)r * n2 + c], tl, 2u); }
+        }
+      });
+      for (auto& t : pool) t.join();
+      if (blew.load()) return INFINITY;
     }
     T dmax(0);
     for (int i = 0; i < n2; i++) { for (int j = i; j < n2; j++) { T& acc = W.JtJ[(size_t)i * n2 + j]; set_zero(acc); for (int k = 0; k < n2; k++) fma_add(acc, W.J[(size_t)k * n2 + i], W.J[(size_t)k * n2 + j]); set(W.JtJ[(size_t)j * n2 + i], acc); }
@@ -166,16 +193,19 @@ double shoot_newton(NBody<T>& nb, std::vector<T>& Z, double itol, int max_iter, 
     W.rhs0.resize(n2);
     for (int i = 0; i < n2; i++) { T& r = W.rhs0[i]; set_zero(r); for (int k = 0; k < n2; k++) fma_sub(r, W.J[(size_t)k * n2 + i], W.F[k]); }
     W.Z0 = Z; bool ok = false; double newF = INFINITY, dn = 0;
-    for (int t = 0; t < 8 && !ok; t++) {                               // LM retries reuse the Jacobian
+    for (int t = 0; t < lm_retries && !ok; t++) {                      // LM retries reuse the Jacobian
       W.A = W.JtJ; mul(tmp, mu, dmax); for (int i = 0; i < n2; i++) add_inplace(W.A[(size_t)i * n2 + i], tmp);
       W.rhs = W.rhs0; if (!la::lu_solve(n2, W.A, W.rhs)) break;
       Z = W.Z0; dn = 0; for (int i = 0; i < n2; i++) { Z[i] += W.rhs[i]; dn = std::max(dn, std::fabs(to_double(W.rhs[i]))); }
       remove_cm(Z); newF = residual(Z, W.Fn);
       if (newF < maxF) { ok = true; W.F.swap(W.Fn); if (mu > mu0) mul_d(mu, mu, 0.2); } else mul_d(mu, mu, 8.0);
     }
-    if (verbose) { std::printf("  iter %d: residual %.3e  step %.3e\n", it, newF, dn); std::fflush(stdout); }
+    if (verbose) { std::printf("  iter %d: residual %.3e  step %.3e  [%.1fs]\n", it, newF, dn, secs()); std::fflush(stdout); }
     if (!ok) { if (newF < maxF) maxF = newF; else Z = W.Z0; break; }
+    // a residual that has stopped falling is at this problem's floor, not on its way down
+    flat = (stall > 0 && newF > stall * maxF) ? flat + 1 : 0;
     maxF = newF;
+    if (flat >= 2) { if (verbose) std::printf("  residual has stopped falling — stopping at %.3e\n", maxF); break; }
   }
   return maxF;
 }

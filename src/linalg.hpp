@@ -1,5 +1,6 @@
 // Dense linear algebra: symmetric eigensolver (tred2/tql2, LAPACK dsyevd when large), pivoted LU, RNG.
 #pragma once
+#include "mpreal.hpp"
 #include <vector>
 #include <cmath>
 #include <algorithm>
@@ -159,19 +160,22 @@ inline std::vector<double> singular_values(int d, const std::vector<double>& C) 
   return sv;
 }
 
-// exp of an n×n skew matrix by scaling and squaring
-inline void expm_skew(int n, const std::vector<double>& A, std::vector<double>& R) {
-  double nrm = 0; for (double v : A) nrm = std::max(nrm, std::fabs(v));
+// exp of an n×n skew matrix by scaling and squaring, at whatever precision Real carries
+template <class Real>
+void expm_skew(int n, const std::vector<Real>& A, std::vector<Real>& R) {
+  double nrm = 0; for (const Real& v : A) nrm = std::max(nrm, std::fabs(to_double(v)));
   int sq = 0; while (nrm > 0.25) { nrm *= 0.5; sq++; }
-  std::vector<double> S(A), P((size_t)n * n, 0.0), T((size_t)n * n);
-  for (double& v : S) v = std::ldexp(v, -sq);
-  R.assign((size_t)n * n, 0.0); for (int i = 0; i < n; i++) { R[(size_t)i * n + i] = 1; P[(size_t)i * n + i] = 1; }
-  for (int k = 1; k <= 14; k++) {
-    for (int i = 0; i < n; i++) for (int j = 0; j < n; j++) { double s = 0; for (int l = 0; l < n; l++) s += P[(size_t)i * n + l] * S[(size_t)l * n + j]; T[(size_t)i * n + j] = s / k; }
+  std::vector<Real> S(A), P((size_t)n * n, Real(0)), T((size_t)n * n, Real(0));
+  for (Real& v : S) v = ldexp2(v, -sq);
+  // ‖S‖ ≤ 1/4, so term k is under 4^{−k}/k!: stop below the working epsilon
+  int terms = 14; { double lg = 0; for (int k = 1; k <= 200 && terms == 14; k++) { lg += std::log2(0.25) - std::log2((double)k); if (lg < -(double)prec_bits(Real(0)) - 8) terms = k; } }
+  R.assign((size_t)n * n, Real(0)); for (int i = 0; i < n; i++) { R[(size_t)i * n + i] = Real(1); P[(size_t)i * n + i] = Real(1); }
+  for (int k = 1; k <= terms; k++) {
+    for (int i = 0; i < n; i++) for (int j = 0; j < n; j++) { Real s(0); for (int l = 0; l < n; l++) s += P[(size_t)i * n + l] * S[(size_t)l * n + j]; T[(size_t)i * n + j] = s / k; }
     P.swap(T); for (size_t i = 0; i < R.size(); i++) R[i] += P[i];
   }
   for (int r = 0; r < sq; r++) {
-    for (int i = 0; i < n; i++) for (int j = 0; j < n; j++) { double s = 0; for (int l = 0; l < n; l++) s += R[(size_t)i * n + l] * R[(size_t)l * n + j]; T[(size_t)i * n + j] = s; }
+    for (int i = 0; i < n; i++) for (int j = 0; j < n; j++) { Real s(0); for (int l = 0; l < n; l++) s += R[(size_t)i * n + l] * R[(size_t)l * n + j]; T[(size_t)i * n + j] = s; }
     R.swap(T);
   }
 }

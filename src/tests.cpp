@@ -337,6 +337,25 @@ int main() {
     same = same && cat.recs[1].omega() != nullptr && c2.recs[1].omega() != nullptr && cat.recs[0].omega() == nullptr;
     long dup = same ? c2.find_duplicate(cat.recs[1]) : -2;
     CHECK(same && err == 0 && dup == 1, "3 records written/read bit-exact (%zu coefficients, extra[] round trips), duplicate lookup -> %ld", cat.recs[0].coef.size(), dup); }
+  { // layout 1: the Ω block is always present, so an inertial record carries d² zeros and must still read
+    // as inertial, and the 2Nd certified state sits after it
+    Catalog cat; Problem P; P.init(3, 2, 8); la::Rng rng(11);
+    const int N = 3, d = 2, nst = 2 * N * d;
+    for (int k = 0; k < 2; k++) { Record r; std::vector<double> x; random_guess(P, rng, 3, 1.0, x); r.set_solution(P, x.data());
+      r.h.action = 4.0 + k; r.h.energy = -1; r.h.rms = 1; r.Lsv = {1, 0.5}; r.pca = {1, 1};
+      r.extra.assign(Record::NEX + (size_t)d * d + nst, 0.0); r.extra[5] = 1; r.extra[6] = 3.25e-12;
+      if (k) { r.extra[Record::NEX + 1] = 0.75; r.extra[Record::NEX + 2] = -0.75; }   // record 1 rotates
+      for (int i = 0; i < nst; i++) r.extra[Record::NEX + (size_t)d * d + i] = 0.5 + i;
+      cat.push(r); }
+    std::string path = "/tmp/hypchor_test2.cat"; cat.save(path); Catalog c2; bool ok = c2.load(path); std::remove(path.c_str());
+    bool same = ok && c2.recs.size() == 2 && c2.recs[0].extra == cat.recs[0].extra && c2.recs[1].extra == cat.recs[1].extra;
+    same = same && c2.recs[0].layout() == 1 && c2.recs[0].omega() == nullptr && c2.recs[1].omega() != nullptr;
+    const double* z = ok ? c2.recs[0].state() : nullptr;
+    same = same && z != nullptr && c2.recs[0].coef_err() == 3.25e-12;
+    if (z) for (int i = 0; i < nst; i++) same = same && z[i] == 0.5 + i;
+    // and the state block must not be mistaken for part of Ω
+    same = same && c2.recs[1].omega()[1] == 0.75 && c2.recs[1].state()[0] == 0.5;
+    CHECK(same, "layout 1 round trips: zeroed Omega block reads as inertial, %d-entry state and coef_err recovered", nst); }
   { Catalog cat; Problem P; P.init(3, 2, 8); la::Rng rng(9);        // two points of one continuous family
     Record a, b; std::vector<double> x, y;                          // different loops, identical action
     random_guess(P, rng, 3, 1.0, x); random_guess(P, rng, 3, 1.0, y);

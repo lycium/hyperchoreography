@@ -21,7 +21,7 @@ struct Config {
   int lbfgs_min = 20, lbfgs_max = 400, newton_iters = 60; double gtol = 1e-10, ret_tol = 1e-8, ret_reject = 1e-1;
   int K0min = 2, K0max = 6; double minsep = 2e-3; int min_deff = 1; double min_rigid = 1e-4;   // rigid clusters end at 4e-6, the first real orbit is at 1.7e-2
   const std::vector<Record>* seeds = nullptr; double kick_min = 0.02, kick_max = 0.5;
-  int Ms = 2048, Kout_max = 512; double shoot_tol = 1e-12, ret_double = 1e-4;
+  int Ms = 2048, Kout_max = 512, Kout_grow = 4096; double shoot_tol = 1e-12, ret_double = 1e-4, mpfr_gate = 1e-12;
   std::string starts = "random,torus,vertical";                                        // comma list; kick needs seeds
   int K_index = 48;                                                                    // modes for the Morse index
   std::vector<double> omega; std::string omega_text;                                   // rotating frame Ω ∈ so(d)
@@ -96,15 +96,19 @@ struct Ctx {                                  // per-thread state
   void tables(int Ms_) { if (Ms == Ms_) return; Ms = Ms_; cosT.resize(Ms); sinT.resize(Ms); for (int j = 0; j < Ms; j++) { cosT[j] = std::cos(2 * PI * j / Ms); sinT[j] = std::sin(2 * PI * j / Ms); } }
 };
 
-// state of body k at t = 0
+// state of body k at t = 0, from (modes, coefficients) — no Problem, whose tables are tens of MB at K = 512
+inline void initial_state(int N, int d, const std::vector<int>& modes, const double* coef, const double* Om,
+                          std::vector<double>& pos, std::vector<double>& vel) {
+  const int nm = (int)modes.size(); pos.assign((size_t)N * d, 0.0); vel.assign((size_t)N * d, 0.0);
+  for (int k = 0; k < N; k++) { const double t = 2.0 * PI * k / N;
+    for (int mu = 0; mu < nm; mu++) { const double m = modes[mu], c = std::cos(m * t), s = std::sin(m * t);
+      const double* cm = coef + (size_t)mu * 2 * d; const double* sm = cm + d;
+      for (int a = 0; a < d; a++) { pos[k * d + a] += c * cm[a] + s * sm[a]; vel[k * d + a] += m * (c * sm[a] - s * cm[a]); } } }
+  if (Om) for (int k = 0; k < N; k++) for (int a = 0; a < d; a++)                          // Q̇ = q̇ + Ωq
+    for (int b = 0; b < d; b++) vel[k * d + a] += Om[(size_t)a * d + b] * pos[k * d + b];
+}
 inline void initial_state(const Problem& P, const double* x, std::vector<double>& pos, std::vector<double>& vel) {
-  const int N = P.N, d = P.d; pos.assign((size_t)N * d, 0.0); vel.assign((size_t)N * d, 0.0);
-  std::vector<double> xd; deriv_coeffs(P, x, xd);
-  for (int k = 0; k < N; k++) { double t = 2.0 * PI * k / N;
-    for (int mu = 0; mu < P.nm; mu++) { double c = std::cos(P.modes[mu] * t), s = std::sin(P.modes[mu] * t);
-      for (int a = 0; a < d; a++) { pos[k * d + a] += c * x[(2 * mu) * d + a] + s * x[(2 * mu + 1) * d + a]; vel[k * d + a] += c * xd[(2 * mu) * d + a] + s * xd[(2 * mu + 1) * d + a]; } } }
-  if (!P.Om.empty()) for (int k = 0; k < N; k++) for (int a = 0; a < d; a++)              // Q̇ = q̇ + Ωq
-    for (int b = 0; b < d; b++) vel[k * d + a] += P.Om[(size_t)a * d + b] * pos[k * d + b];
+  initial_state(P.N, P.d, P.modes, x, P.Om.empty() ? nullptr : P.Om.data(), pos, vel);
 }
 // relative shift residual of the Fourier loop under the ODE
 inline double return_error(const Problem& P, const double* x, NBody<double>& nb) {
@@ -373,6 +377,91 @@ inline void record_extras(const Config& cfg, Record& rec, Ctx& ctx) {
     { Inertia I = inertia_gauge(P, x.data(), ctx.H); rec.h.morse = I.neg; rec.h.nullity = I.zero; }
 }
 
+// residual of the stored coefficients; h.ret_err is the state's, and the gap is the K-mode truncation
+inline double coef_residual(int N, int d, const std::vector<int>& modes, const double* coef, const double* om, NBody<double>& nb) {
+  std::vector<double> pos, vel; initial_state(N, d, modes, coef, om, pos, vel);
+  double sc = 1.0; for (double v : pos) sc = std::max(sc, std::fabs(v)); for (double v : vel) sc = std::max(sc, std::fabs(v));
+  std::vector<double> G; const std::vector<double>* Gp = nullptr;
+  if (om) { std::vector<double> A(om, om + (size_t)d * d); for (double& e : A) e *= 2 * PI / N; la::expm_skew(d, A, G); Gp = &G; }
+  return chore_residual(nb, pos, vel, 1e-16, Gp) / sc;
+}
+inline double coef_residual(const Record& rec, NBody<double>& nb) {
+  return coef_residual(rec.h.N, rec.h.d, rec.mode_list(), rec.coef.data(), rec.omega(), nb);
+}
+
+#ifdef HAVE_MPFR
+// exp(sΩ) at the working precision; Ω is antisymmetrised first, or exp is not orthogonal and G S Z is not
+// the symmetry the orbit satisfies
+inline void omega_exp(int d, const double* Om, const mpreal& s, std::vector<mpreal>& R) {
+  std::vector<mpreal> A((size_t)d * d);
+  for (int a = 0; a < d; a++) for (int b = 0; b < d; b++)
+    A[(size_t)a * d + b] = mpreal(0.5 * (Om[(size_t)a * d + b] - Om[(size_t)b * d + a])) * s;
+  la::expm_skew(d, A, R);
+}
+#endif
+inline constexpr int MP_DIGITS = 30;                  // the fallback precision; main() sets it once, globally
+
+// Certify a state in place: the double shooting Newton, then MPFR where the monodromy stalls it above
+// mp_gate. Rounding the MPFR answer back is amplified by that same monodromy, but lands where double cannot.
+// Returns the relative residual, and in mp_out the MPFR one (-1 if it was not needed).
+inline double certify_state(int N, int d, double alpha, std::vector<double>& Z, const double* Om,
+                            const std::vector<double>* G, NBody<double>& nb, ShootWork<double>& sw,
+                            double tol, int iters, double mp_gate, int threads,
+                            double* mp_out = nullptr, bool* mp_used = nullptr) {
+  const int nd = N * d;
+  double sc = 1.0; for (double v : Z) sc = std::max(sc, std::fabs(v));
+  double res = shoot_newton(nb, Z, 1e-16, iters, tol * sc, -18, -40, sw, false, G, 1, 0.9, 24) / sc;
+  if (mp_out) *mp_out = -1;
+  if (mp_used) *mp_used = false;
+#ifdef HAVE_MPFR
+  if (mp_gate > 0 && res > mp_gate) {
+    const int order = (int)(1.15 * MP_DIGITS) + 6; const double itol = std::pow(10.0, -(MP_DIGITS + 4));
+    const mpfr_prec_t bits = mpreal::default_prec();
+    std::vector<mpreal> Zm(2 * (size_t)nd); for (int c = 0; c < 2 * nd; c++) Zm[c] = Z[c];
+    std::vector<mpreal> Gm; const std::vector<mpreal>* Gmp = nullptr;
+    if (Om) { omega_exp(d, Om, mpreal::pi() * 2 / N, Gm); Gmp = &Gm; }
+    NBody<mpreal> nbm(N, d, alpha, order); ShootWork<mpreal> swm;
+    double mp = shoot_newton(nbm, Zm, itol, 8, std::pow(10.0, -MP_DIGITS), -(long)(bits / 3),
+                             -(long)std::min<mpfr_prec_t>(bits / 2, 96), swm, false, Gmp, threads, 0.9, 24) / sc;
+    if (mp_out) *mp_out = mp;
+    std::vector<double> zp(nd), zv(nd);
+    for (int c = 0; c < nd; c++) { zp[c] = to_double(Zm[c]); zv[c] = to_double(Zm[nd + c]); }
+    double s2 = 1.0; for (double v : zp) s2 = std::max(s2, std::fabs(v)); for (double v : zv) s2 = std::max(s2, std::fabs(v));
+    const double rr = chore_residual(nb, zp, zv, 1e-16, G) / s2;
+    if (rr < res) { res = rr; if (mp_used) *mp_used = true; for (int c = 0; c < nd; c++) { Z[c] = zp[c]; Z[nd + c] = zv[c]; } }
+  }
+#else
+  (void)alpha; (void)Om; (void)mp_gate; (void)threads; (void)nd; (void)mp_used;
+#endif
+  return res;
+}
+
+// The loop a certified state defines, with enough modes and samples to represent it: more modes when the
+// spectrum is still above threshold at the cap, and more samples because Ms = 2048 is four per mode at
+// K ≈ 500, where the tail aliases back down. Only large-K loops pay for either.
+inline bool fit_loop(int N, int d, double alpha, Orbit& O, Ctx& ctx, int Ms, int Kout_max, int Kgrow,
+                     const std::vector<double>* Om, NBody<double>& nb, double* coef_err = nullptr) {
+  int kmax = Kout_max, ms = Ms;
+  bool fit = orbit_fit(N, d, alpha, O, ctx, ms, kmax, Om);
+  auto cres = [&](const Orbit& q) { return coef_residual(N, d, q.modes, q.coef.data(), Om ? Om->data() : nullptr, nb); };
+  double best = fit ? cres(O) : INF;
+  for (int pass = 0; fit && pass < 4; pass++) {
+    const int want_k = (O.K >= kmax - 1 && kmax < Kgrow) ? std::min(Kgrow, kmax * 4) : kmax;
+    const int want_ms = std::max(ms, 16 * O.K);
+    if (want_k == kmax && want_ms <= ms) break;
+    Orbit keep = O; const int k0 = kmax, m0 = ms;
+    kmax = want_k; ms = want_ms;
+    fit = orbit_fit(N, d, alpha, O, ctx, ms, kmax, Om);
+    const double got = fit ? cres(O) : INF;
+    // a spectrum that will not decay, because the state is not quite a solution, would grow to the cap
+    if (!(got < 0.5 * best)) { O = keep; kmax = k0; ms = m0; fit = true; break; }
+    best = got;
+  }
+  if (coef_err) *coef_err = fit ? best : INF;
+  return fit;
+}
+
+
 // ODE validation, cover unwinding, shooting certification, Fourier re-extraction, canonical frame → record
 inline bool certify(const Config& cfg, const Problem*& P, std::vector<double>& x, const Symmetry& S, Ctx& ctx, Record& rec, std::string& why) {
   // at Ω = 0 deff can only be lost downstream, so gate before the ODE work; 1e-12 keeps the gate permissive
@@ -399,12 +488,13 @@ inline bool certify(const Config& cfg, const Problem*& P, std::vector<double>& x
     if (!(ret <= cfg.ret_reject)) { why = "spurious (return error)"; return false; }
   }
   Orbit O; initial_state(*P, x.data(), ctx.pos, ctx.vel); O.Z = ctx.pos; O.Z.insert(O.Z.end(), ctx.vel.begin(), ctx.vel.end());
-  double sc = 1.0; for (double v : O.Z) sc = std::max(sc, std::fabs(v));
-  double res = shoot_newton(nb, O.Z, 1e-16, 10, cfg.shoot_tol * sc, -18, -40, ctx.sw, false, P->gshift()) / sc;
+  double res = certify_state(P->N, P->d, 1.0, O.Z, P->Om.empty() ? nullptr : P->Om.data(), P->gshift(),
+                             nb, ctx.sw, cfg.shoot_tol, 10, cfg.mpfr_gate, 1);
   if (!(res <= cfg.shoot_tol * 100)) { why = "shooting did not certify"; return false; }
-  if (!orbit_fit(P->N, P->d, 1.0, O, ctx, cfg.Ms, cfg.Kout_max, P->Om.empty() ? nullptr : &P->Om)) { why = "orbit sampling failed"; return false; }
+  if (!fit_loop(P->N, P->d, 1.0, O, ctx, cfg.Ms, cfg.Kout_max, cfg.Kout_grow, P->Om.empty() ? nullptr : &P->Om, nb))
+    { why = "orbit sampling failed"; return false; }
   O.residual = res;
-  std::vector<double> sv, Rc; int deff = canonical_frame((int)O.modes.size() * 2, P->d, O.coef, sv, 1e-8, P->Om.empty() ? nullptr : &Rc);
+  std::vector<double> sv, Rc; int deff = canonical_frame((int)O.modes.size() * 2, P->d, O.coef, sv, 1e-8, &Rc);
   const int d = P->d; std::vector<double> Omc;
   if (!P->Om.empty()) { Omc.assign((size_t)d * d, 0.0);                                    // Ω → R Ω Rᵀ
     for (int a = 0; a < d; a++) for (int b = 0; b < d; b++) { double t = 0;
@@ -418,8 +508,16 @@ inline bool certify(const Config& cfg, const Problem*& P, std::vector<double>& x
   rec.h.N = P->N; rec.h.d = P->d; rec.h.K = O.K; rec.h.M = O.Ms; rec.h.alpha = 1.0; rec.modes.assign(O.modes.begin(), O.modes.end()); rec.coef = O.coef; rec.h.nm = (int32_t)O.modes.size();
   rec.h.deff = deff; rec.h.cover = cover; rec.h.action = O.action; rec.h.energy = O.energy; rec.h.energy_std = 0; rec.h.rms = O.rms; rec.h.maxr = O.maxr;
   rec.h.minsep = O.minsep; rec.h.Lnorm = O.Lnorm; rec.Lsv = O.Lsv; rec.pca = sv; rec.h.morse = -1; rec.h.nullity = -1; rec.h.grad_norm = -1; rec.h.ret_err = res;
-  rec.extra.assign(Record::NEX + Omc.size(), 0.0);
-  std::copy(Omc.begin(), Omc.end(), rec.extra.begin() + Record::NEX);
+  const size_t nom = (size_t)d * d, nst = 2 * (size_t)P->N * d; const int nd = P->N * d;
+  rec.extra.assign(Record::NEX + nom + nst, 0.0);
+  rec.extra[5] = 1;                                          // layout 1: Ω block always present, then the state
+  if (!Omc.empty()) std::copy(Omc.begin(), Omc.end(), rec.extra.begin() + Record::NEX);
+  // the certified state, rotated into the coefficients' canonical axes; h.ret_err describes this, not them
+  double* Zc = &rec.extra[Record::NEX + nom];
+  for (int half = 0; half < 2; half++) for (int k = 0; k < P->N; k++) for (int a = 0; a < d; a++) {
+    double t = 0; for (int b = 0; b < d; b++) t += Rc[(size_t)a * d + b] * O.Z[half * nd + k * d + b];
+    Zc[half * nd + k * d + a] = t; }
+  rec.extra[6] = coef_residual(rec, nb);
   return true;
 }
 

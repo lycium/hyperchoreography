@@ -18,15 +18,27 @@ struct RecHdr {                     // fixed-size record header, 152 bytes
 static_assert(sizeof(RecHdr) == 8 + 24 + 48 + 88, "RecHdr layout");
 
 // extra[]: 0 = calibration twist χ*, 1 = χ* / jet scale, 2 = the rung's jet order k, 3 = ‖A_k‖ / jet scale,
-// 4 = rigidity defect, 5..7 reserved, then d² entries of Ω for a rotating frame.
-// Legacy files have nextra = 0 and read back unchanged.
+// 4 = rigidity defect, 5 = layout, 6 = residual of the coefficients, 7 reserved, then the frame and state.
+// Layout 0: d² of Ω, only when the frame rotates. Layout 1: d² of Ω always (all-zero = inertial), then the
+// 2Nd state that h.ret_err measures. Legacy files read back unchanged.
 struct Record {
   RecHdr h;
   std::vector<int32_t> modes; std::vector<double> coef, Lsv, pca, extra; std::string sym;
   static constexpr int NEX = 8;
   double twist() const { return extra.empty() ? 0.0 : extra[0]; }
   double rigid() const { return extra.size() > 4 ? extra[4] : -1.0; }   // 0 = relative equilibrium, −1 = not computed
-  const double* omega() const { return extra.size() >= (size_t)(NEX + h.d * h.d) ? &extra[NEX] : nullptr; }
+  int layout() const { return extra.size() > 5 ? (int)extra[5] : 0; }
+  double coef_err() const { return layout() >= 1 && extra.size() > 6 ? extra[6] : -1.0; }
+  const double* omega() const {
+    const size_t nom = (size_t)h.d * h.d;
+    if (extra.size() < (size_t)NEX + nom) return nullptr;
+    const double* o = &extra[NEX];
+    if (layout() >= 1) { for (size_t i = 0; i < nom; i++) if (o[i] != 0.0) return o; return nullptr; }
+    return o; }
+  // certified state of every body at t = 0, canonical axes
+  const double* state() const {
+    const size_t off = (size_t)NEX + (size_t)h.d * h.d;
+    return layout() >= 1 && extra.size() >= off + 2 * (size_t)h.N * h.d ? &extra[off] : nullptr; }
   int64_t& id() { return h.id; }  int N() const { return h.N; }  int d() const { return h.d; }
 
   void set_solution(const Problem& P, const double* x) {
@@ -71,7 +83,9 @@ struct Record {
     o += ",\"cover\":" + std::to_string(h.cover) + ",\"alpha\":" + num(h.alpha) + ",\"action\":" + num(h.action) + ",\"energy\":" + num(h.energy) + ",\"energy_std\":" + num(h.energy_std) + ",\"rms\":" + num(h.rms) + ",\"maxr\":" + num(h.maxr);
     o += ",\"minsep\":" + num(h.minsep) + ",\"Lnorm\":" + num(h.Lnorm) + ",\"Lsv\":" + arr(Lsv) + ",\"pca\":" + arr(pca) + ",\"morse\":" + std::to_string(h.morse) + ",\"nullity\":" + std::to_string(h.nullity);
     if (!extra.empty()) { o += ",\"twist\":" + num(extra[0]) + ",\"twist_rel\":" + num(extra[1]) + ",\"calib_k\":" + num(extra[2]) + ",\"jet_rel\":" + num(extra[3]);
-      if (omega()) o += ",\"omega\":" + arr(std::vector<double>(extra.begin() + NEX, extra.end())); }
+      if (const double* om = omega()) o += ",\"omega\":" + arr(std::vector<double>(om, om + (size_t)h.d * h.d));
+      if (layout() >= 1) { o += ",\"coef_err\":" + num(extra[6]);
+        const double* z = state(); if (z) o += ",\"state\":" + arr(std::vector<double>(z, z + 2 * (size_t)h.N * h.d)); } }
     o += ",\"grad_norm\":" + num(h.grad_norm) + ",\"ret_err\":" + num(h.ret_err) + ",\"sym\":\"" + sym + "\",\"seed\":" + std::to_string(h.seed) + ",\"trial\":" + std::to_string(h.trial) + ",\"hits\":" + std::to_string(h.hits) + ",\"secs\":" + num(h.secs);
     o += ",\"modes\":["; for (size_t i = 0; i < modes.size(); i++) o += (i ? "," : "") + std::to_string(modes[i]); o += "]";
     if (with_coef) o += ",\"coef\":" + arr(coef);

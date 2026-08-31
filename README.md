@@ -12,7 +12,7 @@ make test             # self-checks of every kernel (derivatives, symmetry, inte
 ./hyperchoreography search   --d 3 --N 4 --K 24 --threads 16 --minutes 600 --out d3n4.bin   # Ctrl-C any time; rerun to resume
 ./hyperchoreography continue --root circle --d 3 --N 4 --K 32 --covers 9 --depth 2 --out d3n4.bin
 ./hyperchoreography list     d3n4.bin                 ./hyperchoreography show   d3n4.bin --id 7
-./hyperchoreography verify   d3n4.bin --id 7          ./hyperchoreography export d3n4.bin --id 7 --out orbit.csv
+./hyperchoreography verify   d3n4.bin [--id 7]        ./hyperchoreography export d3n4.bin --id 7 --out orbit.csv
 ./hyperchoreography refine   d3n4.bin --id 7 --digits 100 --out d3n4_7.txt
 ./hyperchoreography merge    all.bin d3n4.bin other.bin [--min-rigid r --min-deff k]
 ./hyperchoreography extras   d3n4.bin                 ./hyperchoreography symmetry d3n4.bin
@@ -32,6 +32,11 @@ Naming: **dimension first, then bodies** (`d3n4.bin`); `list` sorts by (deff, N,
 `deff` is the dimension the motion actually occupies; `d` is the ambient dimension it was found in. The
 budget of §5 caps `deff` at `2⌊N/2⌋`, and that ceiling has been reached exactly at `N = 10`.
 
+Every record stores the **certified initial state** as well as the Fourier series rendering it: `h.ret_err`
+is the state's residual (median 1.5e-15, worst 6.0e-11 over 993 records), `extra[6]` the series', which the
+`m²` weighting of the equations always makes looser. Most of these orbits are violently unstable — only 18
+of 992 are action minima, median Morse index 20 — which costs precision, not existence (§4).
+
 | `d` | `N` | max `deff` | file | notes |
 |---|---|---|---|---|
 | 2–4 | 3–6 | 4 | `d2-3_n3`, `d2-4_n4`, `d2-4_n5`, `d3-4_n6` | the classical planar and spatial families |
@@ -45,8 +50,8 @@ Everything above `d = 6` lives in a **rotating frame** (§6): with relative equi
 inertial search finds nothing at `d = 8` in 60 331 trials while a calibrated frame finds six in 8 799.
 No high-`deff` relative choreography found so far deforms back to an inertial one (§11, item 1).
 
-Arbitrary-precision refinement works in the inertial case: the figure eight goes from 1e-11 to **1e-71** in
-three Newton iterations. `refine` rejects rotating-frame records — the MPFR path has no `G`.
+Arbitrary-precision refinement works in **any** frame: the MPFR Newton carries `G = exp(2πΩ/N)` and threads
+its Jacobian one column per task. The figure eight reaches **1e-71**, `d11_n12_g2:106` 4.8e-4 → **1.4e-48**.
 
 ## 2. The variational formulation
 
@@ -88,6 +93,11 @@ Symmetry groups (§4) restrict the search to a fixed subspace `x = By`.
 ## 4. Certification, canonical form, de-duplication
 
 A Fourier critical point is never accepted on its own merits.
+
+`recertify` re-derives a whole file's states and loops in three minutes; `verify <file>` with no `--id`
+audits one. The Newton runs in double, but where an orbit's monodromy stalls it above `--mpfr-gate` (1e-12)
+the solve is repeated in MPFR and rounded back (`d7_n11_g2:127`, 4.7e-12 → 1.3e-15). Where rounding is
+amplified back up (`:142`, 9e-37 in MPFR, 3.7e-12 rounded) the double answer is kept.
 
 * **ODE validation** — initial conditions are read off the series and integrated with a 22nd-order Taylor
   method over `T/N`; the shift residual must be ≤ `--ret-reject`. Its default 1e-1 is deliberately loose:
@@ -350,7 +360,11 @@ Period 2π, unit masses, G = 1, action per body; `E_total = −N·A/(6π)` by th
   collision (which the code should recognise from the shrinking minimum separation and report as such), and
   switching problems where a degenerate *pair* of eigenvalues crosses — rotational symmetry makes the
   bifurcating set a circle of solutions, and the bordered system needs an explicit phase condition.
-* **`refine` rejects rotating-frame records**, so there is no arbitrary-precision path for `d ≥ 7`.
+* **Two records have a floor MPFR does not lift** — the same residual in double and at 30 digits, so there is
+  no solution near that state at that `Ω`: `d7_n12_g2:61` at 6.0e-11 and `d7_n10_g2_16:111` at 2.8e-12, the
+  only records above 3.7e-12. `:61`'s canonical frame has principal values 0.0984/0.0981, a relative gap of
+  9e-7, which leaves the stored `Ω = R Ω Rᵀ` wrong at ~1e-10 — the frame the record names is not the one its
+  orbit solves. Solving for `Ω` alongside `Z` would settle it.
 * **`--sym random` is wasteful and, in `d ≥ 5`, useless**: 60–75 % of draws are rejected and the survivors
   land on the circle. The named classes `cyc:p` and `fano:p` are the useful ones, but a curated table per
   `(d, N)` is still not wired in.

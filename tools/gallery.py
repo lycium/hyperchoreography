@@ -512,7 +512,7 @@ def build_record(binpath, path, rid, rigid, samples_max, tmpdir, warn, label=Non
         "rms": g6(rec["rms"]), "mxr": g6(rec["maxr"]), "ms": g6(rec["minsep"]),
         "Ln": g6(rec["Lnorm"]), "tw": g6(rec["twist"]), "twr": g6(rec["twist_rel"]),
         "ck": int(rec.get("calib_k", 0)), "jr": g6(rec.get("jet_rel", 0.0)),
-        "re": g6(rec["ret_err"]), "gn": g6(rec["grad_norm"]),
+        "re": g6(rec["ret_err"]), "ce": g6(rec.get("coef_err", -1.0)),
         "hits": int(rec.get("hits", 0)), "seed": int(rec.get("seed", 0)),
         "trial": int(rec.get("trial", 0)), "secs": g6(rec.get("secs", 0.0)),
         "sym": rec.get("sym", ""), "rig": g6(rigid),
@@ -928,7 +928,7 @@ function badges(r){
   if(!r.closed) h+='<span class="bd" style="color:var(--b-rig)">open r.p.o.</span>';
   if(r.cov>1) h+='<span class="bd" style="color:var(--b-cov)">cover '+r.cov+'</span>';
   if(r.fam>0) h+='<span class="bd" style="color:var(--b-fam)">family '+r.fam+'</span>';
-  if(r.gn>1e-2) h+='<span class="bd" style="color:var(--b-warn)">|grad| '+fmt(r.gn,2)+'</span>';
+  if(r.re>1e-9||r.ce>1e-6) h+='<span class="bd" style="color:var(--b-warn)">residual '+fmt(Math.max(r.re,r.ce),2)+'</span>';
   return h;
 }
 function metaHTML(r){
@@ -1215,7 +1215,7 @@ function openDetail(r){
     ['rigidity', r.rig+(isRigid(r)?' &nbsp;<b style="color:var(--b-rig)">relative equilibrium</b>':'')],
     ['K / M / cover', r.K+' / '+r.M+' / '+r.cov],
     ['calib k / jet rel', r.ck+' / '+fmt(r.jr,3)],
-    ['grad / ret err', fmt(r.gn,3)+' / '+fmt(r.re,3)],
+    ['state / coef residual', fmt(r.re,3)+' / '+fmt(r.ce,3)],
     ['frame', r.rotf?('rotating, rates {'+r.rates.join(', ')+'}'
         +(r.closed?'':' — inertial motion NOT 2&pi;-periodic, so the co-rotating frame is drawn')):'inertial'],
     ['sym', r.sym?('<span class="mono">'+esc(r.sym)+'</span>'):'—'],
@@ -1413,7 +1413,7 @@ PAGE = r"""<!doctype html>
         <option value="N">N</option><option value="d">d</option>
         <option value="ms">min separation</option><option value="E">energy</option>
         <option value="hits">hits</option><option value="rig">rigidity</option>
-        <option value="gn">|grad|</option><option value="i">id</option>
+        <option value="ce">coef residual</option><option value="i">id</option>
       </select></label>
     <button id="dir">▲ asc</button>
     <label>group
@@ -1461,7 +1461,8 @@ PAGE = r"""<!doctype html>
       (rigidity &lt; 1e-4, a clean gap in the data — trivial however high its deff); <span style="color:var(--b-rot)">frame {…}</span> rotating
       frame with its rotation-rate multiset; <span style="color:var(--b-cov)">cover</span> multiple
       cover; <span style="color:var(--b-fam)">family</span> a continuous family (same N, same d, same action);
-      <span style="color:var(--b-warn)">|grad|</span> a poorly converged record.
+      <span style="color:var(--b-warn)">residual</span> a record whose certified state exceeds 1e-9 or
+      whose stored coefficients exceed 1e-6.
       Click any tile for the full record.</div>
   </div></details>
 </header>

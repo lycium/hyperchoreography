@@ -34,17 +34,17 @@ static void usage() {
     "  hyperchoreography list    catalog.bin [--N n] [--deff k] [--min-deff k] [--sort action|id|hits|twist|rigid]\n"
     "  hyperchoreography show    catalog.bin --id i                (JSON dump of one record)\n"
     "  hyperchoreography export  catalog.bin --id i [--samples 720] [--out curve.csv]   (body positions over one period)\n"
-    "  hyperchoreography verify  catalog.bin --id i                (double-precision Taylor integration checks)\n"
-    "  hyperchoreography refine  catalog.bin --id i --digits 60 [--K 64] [--out refined.txt]   (MPFR shooting Newton)\n"
+    "  hyperchoreography verify  catalog.bin [--id i] [--gate 1e-9]  (Taylor checks; no --id sweeps the whole file)\n"
+    "  hyperchoreography refine  catalog.bin --id i --digits 60 [--K 64] [--threads T] [--out refined.txt]   (MPFR shooting Newton)\n"
     "  hyperchoreography merge   out.bin in1.bin in2.bin ... [--min-rigid r --min-deff k]   (union, de-duplicate, re-gate)\n"
     "  hyperchoreography extras  catalog.bin [--K-index 48]        (recompute Morse index, nullity, twist and rigidity)\n"
+
     "  hyperchoreography symmetry catalog.bin [--id i] [--tol 1e-6] (detect the symmetry group of each stored loop)\n"
     "  hyperchoreography continue catalog.bin [--id i | --root circle] --N n --d d [--K 24] [--covers 7] [--depth 2] [--out found.bin]\n"
     "                [--param alpha --alpha-lo 0.6 --alpha-hi 2.4 | --param omega --s-lo -0.25 --s-hi 1.5]   (Omega = s Omega_0, s = 0 is inertial)\n"
     "                                                  (bifurcation-tree exploration by continuation in the potential exponent)\n"
     "  hyperchoreography bench   [--N 3 --d 2 --K 16]              (kernel timings)");
 }
-
 
 static Catalog load_cat(const std::string& p) { Catalog c; if (!c.load(p)) throw std::runtime_error("cannot open catalog " + p); return c; }
 static const Record& rec_by_id(const Catalog& c, long id) { for (auto& r : c.recs) if (r.h.id == id) return r; throw std::runtime_error("no record with id " + std::to_string(id)); }
@@ -143,22 +143,68 @@ static int cmd_export(const Args& a) {
   std::fclose(f); std::printf("wrote %s (%d samples, %d bodies, %dD)\n", out.c_str(), S, N, d); return 0;
 }
 
+// the record's two residuals, state and coefficients, both relative to the state scale like h.ret_err
+static void record_residuals(const Record& r, double& state_res, double& coef_res, double* period_ret = nullptr) {
+  const int N = r.h.N, d = r.h.d, nd = N * d;
+  const double* om = r.omega();
+  NBody<double> nb(N, d, r.h.alpha, 22);
+  std::vector<double> A, G, GN; const std::vector<double>* Gp = nullptr;
+  if (om) { A.assign(om, om + (size_t)d * d); for (double& e : A) e *= 2 * PI / N; la::expm_skew(d, A, G); Gp = &G; }
+  std::vector<double> cp, cv; initial_state(N, d, r.mode_list(), r.coef.data(), om, cp, cv);
+  double sc = 1.0; for (double v : cp) sc = std::max(sc, std::fabs(v)); for (double v : cv) sc = std::max(sc, std::fabs(v));
+  coef_res = chore_residual(nb, cp, cv, 1e-16, Gp) / sc;
+  std::vector<double> sp = cp, sv = cv;
+  const double* z = r.state();
+  if (z) { sp.assign(z, z + nd); sv.assign(z + nd, z + 2 * nd); }
+  state_res = z ? chore_residual(nb, sp, sv, 1e-16, Gp) / sc : coef_res;
+  if (period_ret) {                                     // after one period a twisted orbit closes up to exp(2πΩ)
+    std::vector<double> p = sp, v = sv; nb.integrate(p, v, 2 * PI, 1e-16);
+    if (om) { A.assign(om, om + (size_t)d * d); for (double& e : A) e *= 2 * PI; la::expm_skew(d, A, GN); }
+    double ret = 0;
+    for (int k = 0; k < N; k++) for (int c = 0; c < d; c++) { double tp = sp[k * d + c], tv = sv[k * d + c];
+      if (!GN.empty()) { tp = tv = 0; for (int b = 0; b < d; b++) { tp += GN[(size_t)c * d + b] * sp[k * d + b]; tv += GN[(size_t)c * d + b] * sv[k * d + b]; } }
+      ret = std::max(ret, std::max(std::fabs(p[k * d + c] - tp), std::fabs(v[k * d + c] - tv))); }
+    *period_ret = ret / sc; }
+}
+
+// no --id: sweep the whole file
+static int cmd_verify_all(const Args& a) {
+  Catalog cat = load_cat(a.pos.at(0)); double gate = a.num("gate", 1e-9);
+  std::printf("%5s %2s/%-2s %2s %4s %10s %10s %10s %10s\n", "id", "de", "d", "N", "K", "ret_err", "state", "coef", "period");
+  int bad = 0, nolayout = 0; double worst = 0; long worst_id = -1;
+  std::vector<std::pair<double, long>> rank;
+  for (const Record& r : cat.recs) { double sres = 0, cres = 0, per = 0; record_residuals(r, sres, cres, &per);
+    if (r.layout() < 1) nolayout++;
+    rank.emplace_back(sres, (long)r.h.id);
+    std::printf("%5lld %2d/%-2d %2d %4d %10.1e %10.1e %10.1e %10.1e%s\n", (long long)r.h.id, r.h.deff, r.h.d, r.h.N, r.h.K, r.h.ret_err, sres, cres, per, sres > gate ? "  **" : "");
+    if (sres > gate) bad++;
+    if (sres > worst) { worst = sres; worst_id = (long)r.h.id; } }
+  std::printf("%zu records; %d above %.0e (marked **); worst is id %ld at %.2e\n", cat.recs.size(), bad, gate, worst_id, worst);
+  if (nolayout) std::printf("%d records predate the certified state and carry only coefficients\n", nolayout);
+  if (bad) { std::sort(rank.begin(), rank.end(), [](auto& x, auto& y) { return x.first > y.first; });
+    std::printf("worst ids:  "); for (size_t i = 0; i < rank.size() && i < 8 && rank[i].first > gate; i++) std::printf("%ld ", rank[i].second); std::printf("\n"); }
+  return 0;
+}
+
 static int cmd_verify(const Args& a) {
-  Catalog cat = load_cat(a.pos.at(0)); const Record& r = rec_by_id(cat, (long)a.num("id", 0)); Problem P; std::vector<double> x; r.to_problem(P, x);
-  std::vector<double> pos, vel; initial_state(P, x.data(), pos, vel); NBody<double> nb(P.N, P.d, P.alpha, 22);
-  double E0 = nbody_energy(P.N, P.d, P.alpha, pos.data(), vel.data());
-  double res = chore_residual(nb, pos, vel, 1e-16, P.gshift());
-  std::vector<double> p = pos, v = vel; int steps = nb.integrate(p, v, 2 * PI, 1e-16); double E1 = nbody_energy(P.N, P.d, P.alpha, p.data(), v.data()), ret = 0;
-  std::vector<double> GN;                                    // after one period a twisted orbit closes up to exp(2πΩ)
-  if (!P.Om.empty()) { std::vector<double> A(P.Om); for (double& e : A) e *= 2 * PI; la::expm_skew(P.d, A, GN); }
-  for (int k = 0; k < P.N; k++) for (int c = 0; c < P.d; c++) { double tp = pos[k * P.d + c], tv = vel[k * P.d + c];
-    if (!GN.empty()) { tp = tv = 0; for (int b = 0; b < P.d; b++) { tp += GN[(size_t)c * P.d + b] * pos[k * P.d + b]; tv += GN[(size_t)c * P.d + b] * vel[k * P.d + b]; } }
-    ret = std::max(ret, std::max(std::fabs(p[k * P.d + c] - tp), std::fabs(v[k * P.d + c] - tv))); }
+  if (!a.has("id")) return cmd_verify_all(a);
+  Catalog cat = load_cat(a.pos.at(0)); const Record& r = rec_by_id(cat, (long)a.num("id", 0));
+  const int N = r.h.N, d = r.h.d, nd = N * d; const double* om = r.omega();
+  double sres = 0, cres = 0, per = 0; record_residuals(r, sres, cres, &per);
+  std::vector<double> pos, vel; initial_state(N, d, r.mode_list(), r.coef.data(), om, pos, vel);
+  if (const double* z = r.state()) { pos.assign(z, z + nd); vel.assign(z + nd, z + 2 * nd); }
+  NBody<double> nb(N, d, r.h.alpha, 22);
+  double E0 = nbody_energy(N, d, r.h.alpha, pos.data(), vel.data());
+  std::vector<double> p = pos, v = vel; int steps = nb.integrate(p, v, 2 * PI, 1e-16);
+  double E1 = nbody_energy(N, d, r.h.alpha, p.data(), v.data());
   std::printf("record %lld: d=%d (deff=%d) N=%d K=%d action=%.12f energy=%.12f\n", (long long)r.h.id, r.h.d, r.h.deff, r.h.N, r.h.K, r.h.action, r.h.energy);
-  if (!P.Om.empty()) std::printf("  rotating frame: Omega stored with the record\n");
-  std::printf("  shift residual |Phi_{T/N}(Z) - G S Z|  = %.3e\n  full-period return |Phi_T(Z) - G^N Z| = %.3e  (%d Taylor steps)\n  energy drift over one period          = %.3e\n  energy from initial state             = %.12f\n", res, ret, steps, E1 - E0, E0);
+  if (om) std::printf("  rotating frame: Omega stored with the record\n");
+  if (!r.state()) std::printf("  ** no certified state stored (layout 0) — the numbers below are the coefficients' **\n");
+  std::printf("  certified state, shift residual        = %.3e   (stored ret_err %.1e)\n", sres, r.h.ret_err);
+  std::printf("  stored coefficients, shift residual    = %.3e   (stored extra[6] %.1e)\n", cres, r.coef_err());
+  std::printf("  full-period return |Phi_T(Z) - G^N Z|  = %.3e  (%d Taylor steps)\n  energy drift over one period          = %.3e\n  energy from initial state             = %.12f\n", per, steps, E1 - E0, E0);
   if (std::fabs(E0 - r.h.energy) > 1e-6 * std::max(1.0, std::fabs(r.h.energy))) std::printf("  ** stale record: reconstructed energy %.9g disagrees with stored %.9g **\n", E0, r.h.energy);
-  std::printf("  initial conditions (t=0):\n"); for (int k = 0; k < P.N; k++) { std::printf("   body %d  q =", k); for (int c = 0; c < P.d; c++) std::printf(" %+.15f", pos[k * P.d + c]); std::printf("   v ="); for (int c = 0; c < P.d; c++) std::printf(" %+.15f", vel[k * P.d + c]); std::printf("\n"); }
+  std::printf("  initial conditions (t=0):\n"); for (int k = 0; k < N; k++) { std::printf("   body %d  q =", k); for (int c = 0; c < d; c++) std::printf(" %+.15f", pos[k * d + c]); std::printf("   v ="); for (int c = 0; c < d; c++) std::printf(" %+.15f", vel[k * d + c]); std::printf("\n"); }
   return 0;
 }
 
@@ -287,40 +333,104 @@ static int cmd_bench(const Args& a) {
 #ifdef HAVE_MPFR
 static int cmd_refine(const Args& a) {
   Catalog cat = load_cat(a.pos.at(0)); const Record& r = rec_by_id(cat, (long)a.num("id", 0)); Problem P; std::vector<double> x; r.to_problem(P, x);
-  if (r.omega()) throw std::runtime_error("refine does not support rotating-frame records yet (record has Omega)");
   int digits = (int)a.num("digits", 50), Kout = (int)a.num("K", P.K); std::string outp = a.get("out", "");
-  mpfr_prec_t bits = (mpfr_prec_t)(digits * 3.3219280948873626 + 96); mpreal::set_default_prec(bits);
-  const int N = P.N, d = P.d, nd = N * d, n2 = 2 * nd; int order = (int)(1.15 * digits) + 6; double itol = std::pow(10.0, -(digits + 4));
+  int threads = (int)a.num("threads", (double)std::thread::hardware_concurrency()); if (threads < 1) threads = 1;
+  const int N = P.N, d = P.d, nd = N * d, n2 = 2 * nd; const double* om = r.omega();
+
   std::vector<double> pos0, vel0; initial_state(P, x.data(), pos0, vel0);
-  std::vector<mpreal> Z(n2); for (int i = 0; i < nd; i++) { Z[i] = pos0[i]; Z[nd + i] = vel0[i]; }
+  NBody<double> nbd(N, d, P.alpha, 22);
+  if (const double* z = r.state()) { pos0.assign(z, z + nd); vel0.assign(z + nd, z + 2 * nd); }   // certified, not rendered
+  double sc0 = 1.0; for (double v : pos0) sc0 = std::max(sc0, std::fabs(v)); for (double v : vel0) sc0 = std::max(sc0, std::fabs(v));
+  double stored = chore_residual(nbd, pos0, vel0, 1e-16, P.gshift());   // where the record starts
+
+  // a double Newton first: a thousandth of one MPFR iteration, and removes two or three of them
+  std::vector<double> Zd(pos0); Zd.insert(Zd.end(), vel0.begin(), vel0.end());
+  ShootWork<double> Wd;
+  double dres = shoot_newton(nbd, Zd, 1e-16, 20, 1e-13 * sc0, -18, -40, Wd, false, P.gshift(), threads);
+
+  mpfr_prec_t bits = (mpfr_prec_t)(digits * 3.3219280948873626 + 96); mpreal::set_default_prec(bits);
+  int order = (int)(1.15 * digits) + 6; double itol = std::pow(10.0, -(digits + 4));
+  mpreal twopi = mpreal::pi() * 2;
+  std::vector<mpreal> Z(n2); for (int i = 0; i < n2; i++) Z[i] = Zd[i];
+  std::vector<mpreal> G, GN; const std::vector<mpreal>* Gp = nullptr;
+  if (om) { omega_exp(d, om, twopi / N, G); omega_exp(d, om, twopi, GN); Gp = &G; }
   NBody<mpreal> nb(N, d, P.alpha, order);
-  std::printf("refine record %lld (N=%d d=%d) to %d digits: %ld bits, Taylor order %d\n", (long long)r.h.id, N, d, digits, (long)bits, order);
-  ShootWork<mpreal> W; double maxF = shoot_newton(nb, Z, itol, 25, std::pow(10.0, -digits), -(long)(bits / 3), -(long)(bits / 2), W, true);
-  (void)n2;
-  // diagnostics and Fourier coefficients from a dense-output period
+  std::printf("refine record %lld (N=%d d=%d%s) to %d digits: %ld bits, Taylor order %d, %d threads\n",
+              (long long)r.h.id, N, d, om ? ", rotating frame" : "", digits, (long)bits, order, threads);
+  std::printf("  stored state %.3e (record claims ret_err %.1e), coefficients %.1e\n  after the double Newton: %.3e\n", stored, r.h.ret_err, r.coef_err(), dres);
+  // mu must still swamp the gauge directions (time shift, rotations commuting with Ω); letting it track the
+  // working precision down stops damping them and the Newton crawls sideways
+  ShootWork<mpreal> W;
+  double maxF = shoot_newton(nb, Z, itol, 25, std::pow(10.0, -digits), -(long)(bits / 3),
+                             -(long)std::min<mpfr_prec_t>(bits / 2, 96), W, true, Gp, threads, 0.9, 24);
+
   mpreal E = nbody_energy(N, d, P.alpha, Z.data(), Z.data() + nd);
-  int Ms = std::max(64, 16 * Kout); std::vector<mpreal> ts(Ms), samp; mpreal twopi = mpreal::pi() * 2;
-  for (int j = 0; j < Ms; j++) ts[j] = twopi * j / Ms;
-  std::vector<mpreal> p(Z.begin(), Z.begin() + nd), v(Z.begin() + nd, Z.end()); nb.integrate(p, v, twopi, itol, &ts, &samp);
-  double fullret = 0; for (int i = 0; i < nd; i++) fullret = std::max(fullret, std::max(std::fabs(to_double(p[i] - Z[i])), std::fabs(to_double(v[i] - Z[nd + i]))));
-  std::vector<mpreal> cosj(Ms), sinj(Ms); for (int j = 0; j < Ms; j++) { cosj[j] = cos(ts[j]); sinj[j] = sin(ts[j]); }
+  // instability probe: the shift residual amplified through N shifts, so it measures the orbit, not Z
+  double fullret = 0;
+  { std::vector<mpreal> pf(Z.begin(), Z.begin() + nd), vf(Z.begin() + nd, Z.end()); nb.integrate(pf, vf, twopi, itol);
+    for (int k = 0; k < N; k++) for (int c = 0; c < d; c++) {
+      mpreal tp = Z[k * d + c], tv = Z[nd + k * d + c];
+      if (!GN.empty()) { tp = mpreal(0); tv = mpreal(0);
+        for (int b = 0; b < d; b++) { tp += GN[(size_t)c * d + b] * Z[k * d + b]; tv += GN[(size_t)c * d + b] * Z[nd + k * d + b]; } }
+      fullret = std::max(fullret, std::max(std::fabs(to_double(pf[k * d + c] - tp)), std::fabs(to_double(vf[k * d + c] - tv)))); } }
+
+  // one T/N segment assembled from all N bodies, q(t_i + 2πj/N) = exp(−Ω t_i) Q_j(t_i), as the catalogue
+  // builds it; a whole period folds the orbit's instability in — at N = 11 that put the action out by 1 %
+  const int Mseg = std::max(8, (std::max(64, 16 * Kout) + N - 1) / N), Ms = Mseg * N;
+  std::vector<mpreal> ts(Mseg); for (int i = 0; i < Mseg; i++) ts[i] = twopi * i / Ms;
+  std::vector<mpreal> ps(Z.begin(), Z.begin() + nd), vs(Z.begin() + nd, Z.end()), seg;
+  nb.integrate(ps, vs, twopi / N, itol, &ts, &seg);
+  mpreal A(0);                                    // action per body: summing all N bodies over the segment
+  for (int i = 0; i < Mseg; i++) { const mpreal* sp = &seg[(size_t)i * 2 * nd];
+    for (int b = 0; b < N; b++) { mpreal ke(0); for (int c = 0; c < d; c++) ke += sp[nd + b * d + c] * sp[nd + b * d + c]; A += ke * 0.5; }
+    for (int b = 0; b < N; b++) for (int l = b + 1; l < N; l++) { mpreal r2(0);
+      for (int c = 0; c < d; c++) { mpreal df = sp[b * d + c] - sp[l * d + c]; r2 += df * df; }
+      A += P.alpha == 1.0 ? 1 / sqrt(r2) : pow(r2, mpreal(-P.alpha / 2)); } }
+  A = A * twopi / Ms;
+  // N·A + 6π·E = 0 for a 1/r potential: an independent check on the re-extraction
+  double virial = P.alpha == 1.0 ? std::fabs(to_double(A) * N + 6 * PI * to_double(E)) : 0.0;
+  std::vector<mpreal> qs((size_t)Ms * d), Rj, Rs, Rn;
+  if (om) { omega_exp(d, om, -twopi / Ms, Rs); Rj.assign((size_t)d * d, mpreal(0)); Rn.assign((size_t)d * d, mpreal(0));
+            for (int i = 0; i < d; i++) Rj[(size_t)i * d + i] = mpreal(1); }
+  for (int i = 0; i < Mseg; i++) {
+    for (int j = 0; j < N; j++) { const mpreal* Q = &seg[(size_t)i * 2 * nd + j * d];
+      for (int c = 0; c < d; c++) { if (!om) { qs[((size_t)j * Mseg + i) * d + c] = Q[c]; continue; }
+        mpreal t(0); for (int b = 0; b < d; b++) t += Rj[(size_t)c * d + b] * Q[b]; qs[((size_t)j * Mseg + i) * d + c] = t; } }
+    if (om) { for (int u = 0; u < d; u++) for (int l = 0; l < d; l++) { mpreal t(0);
+                for (int b = 0; b < d; b++) t += Rj[(size_t)u * d + b] * Rs[(size_t)b * d + l]; Rn[(size_t)u * d + l] = t; }
+              Rj.swap(Rn); } }
+  seg.clear(); seg.shrink_to_fit();
+  std::vector<mpreal> cosj(Ms), sinj(Ms); for (int j = 0; j < Ms; j++) { mpreal th = twopi * j / Ms; cosj[j] = cos(th); sinj[j] = sin(th); }
   std::vector<mpreal> cm((size_t)(Kout + 1) * d), sm((size_t)(Kout + 1) * d);
   for (int m = 0; m <= Kout; m++) for (int c = 0; c < d; c++) { mpreal sc(0), ss(0);
-    for (int j = 0; j < Ms; j++) { int idx = (int)(((long)m * j) % Ms); sc += samp[(size_t)j * 2 * nd + c] * cosj[idx]; ss += samp[(size_t)j * 2 * nd + c] * sinj[idx]; }
+    for (int j = 0; j < Ms; j++) { int idx = (int)(((long)m * j) % Ms); sc += qs[(size_t)j * d + c] * cosj[idx]; ss += qs[(size_t)j * d + c] * sinj[idx]; }
     cm[(size_t)m * d + c] = sc * (m ? 2 : 1) / Ms; sm[(size_t)m * d + c] = ss * (m ? 2 : 1) / Ms; }
-  mpreal A(0);   // action per body
-  for (int j = 0; j < Ms; j++) { const mpreal* s = &samp[(size_t)j * 2 * nd]; mpreal ke(0); for (int c = 0; c < d; c++) ke += s[nd + c] * s[nd + c];
-    mpreal pe(0); for (int k = 1; k < N; k++) { mpreal r2(0); for (int c = 0; c < d; c++) { mpreal df = s[c] - s[k * d + c]; r2 += df * df; } pe += P.alpha == 1.0 ? 1 / sqrt(r2) : pow(r2, mpreal(-P.alpha / 2)); }
-    A += (ke + pe) * 0.5; }
-  A = A * twopi / Ms;
+  // how much of the loop K modes actually hold: the tail of the spectrum, and the residual a K-mode
+  // Fourier record rebuilt from these coefficients would have — the quantity the catalogue should store
+  double amax = 0, atail = 0;
+  for (int m = 1; m <= Kout; m++) { double mg = 0;
+    for (int c = 0; c < d; c++) mg = std::max(mg, std::max(std::fabs(to_double(cm[(size_t)m * d + c])), std::fabs(to_double(sm[(size_t)m * d + c]))));
+    amax = std::max(amax, mg); if (m > Kout - 8) atail = std::max(atail, mg); }
+  Problem Pt; Pt.init(N, d, Kout, 0, P.alpha); if (om) Pt.set_omega(std::vector<double>(om, om + (size_t)d * d));
+  std::vector<double> xt(Pt.n, 0.0);
+  for (int mu = 0; mu < Pt.nm; mu++) { int m = Pt.modes[mu]; if (m > Kout) break;
+    for (int c = 0; c < d; c++) { xt[(2 * mu) * d + c] = to_double(cm[(size_t)m * d + c]); xt[(2 * mu + 1) * d + c] = to_double(sm[(size_t)m * d + c]); } }
+  std::vector<double> pt, vt; initial_state(Pt, xt.data(), pt, vt);
+  double trunc = chore_residual(nbd, pt, vt, 1e-16, Pt.gshift());
+
   FILE* fo = outp.empty() ? stdout : std::fopen(outp.c_str(), "w"); if (!fo) throw std::runtime_error("cannot write " + outp);
-  std::fprintf(fo, "# hyperchoreography refined record %lld: N=%d d=%d period=2*pi alpha=%g digits=%d\n", (long long)r.h.id, N, d, P.alpha, digits);
-  std::fprintf(fo, "shift_residual %.3e\nfull_period_return %.3e\nenergy %s\naction_per_body %s\n", maxF, fullret, E.str(digits).c_str(), A.str(digits).c_str());
+  std::fprintf(fo, "# hyperchoreography refined record %lld: N=%d d=%d period=2*pi alpha=%g digits=%d%s\n", (long long)r.h.id, N, d, P.alpha, digits, om ? " rotating_frame=1" : "");
+  std::fprintf(fo, "stored_shift_residual %.3e\nshift_residual %.3e\nfull_period_return %.3e\nvirial_defect %.3e\nfourier_tail %.3e\nfourier_truncation_residual %.3e\nenergy %s\naction_per_body %s\n",
+               stored, maxF, fullret, virial, amax > 0 ? atail / amax : 0.0, trunc, E.str(digits).c_str(), A.str(digits).c_str());
+  if (om) { std::fprintf(fo, "# Omega (rotating frame, canonical axes), row-major %dx%d\n", d, d);
+    for (int i = 0; i < d; i++) { std::fprintf(fo, "omega"); for (int j = 0; j < d; j++) std::fprintf(fo, " %+.17g", om[(size_t)i * d + j]); std::fprintf(fo, "\n"); }
+    std::fprintf(fo, "# q_j(t) = exp(Omega t) q(t + 2 pi j/N); the states below are inertial (Q, Q-dot) at t = 0\n"); }
   for (int k = 0; k < N; k++) { std::fprintf(fo, "body %d q", k); for (int c = 0; c < d; c++) std::fprintf(fo, " %s", Z[k * d + c].str(digits).c_str()); std::fprintf(fo, "\nbody %d v", k); for (int c = 0; c < d; c++) std::fprintf(fo, " %s", Z[nd + k * d + c].str(digits).c_str()); std::fprintf(fo, "\n"); }
-  std::fprintf(fo, "# Fourier coefficients of body 0: mode m, c_m[0..d-1], s_m[0..d-1]   (from %d dense samples)\n", Ms);
+  std::fprintf(fo, "# Fourier coefficients of %s: mode m, c_m[0..d-1], s_m[0..d-1]   (from %d dense samples)\n", om ? "the rotating-frame loop q(t) = exp(-Omega t) Q_0(t)" : "body 0", Ms);
   for (int m = 0; m <= Kout; m++) { double mag = 0; for (int c = 0; c < d; c++) mag = std::max(mag, std::max(std::fabs(to_double(cm[(size_t)m * d + c])), std::fabs(to_double(sm[(size_t)m * d + c]))));
     if (m && mag < 1e-300) continue; std::fprintf(fo, "mode %d", m); for (int c = 0; c < d; c++) std::fprintf(fo, " %s", cm[(size_t)m * d + c].str(digits).c_str()); for (int c = 0; c < d; c++) std::fprintf(fo, " %s", sm[(size_t)m * d + c].str(digits).c_str()); std::fprintf(fo, "\n"); }
-  if (fo != stdout) { std::fclose(fo); std::printf("residual %.3e, full-period return %.3e, energy %s\nwrote %s\n", maxF, fullret, E.str(20).c_str(), outp.c_str()); }
+  if (fo != stdout) { std::fclose(fo); std::printf("  residual %.3e (was %.3e), full-period %.3e, virial %.1e, K=%d tail %.1e, truncation %.1e\n  energy %s\n  wrote %s\n",
+                                                   maxF, stored, fullret, virial, Kout, amax > 0 ? atail / amax : 0.0, trunc, E.str(20).c_str(), outp.c_str()); }
   return 0;
 }
 #endif
@@ -328,6 +438,9 @@ static int cmd_refine(const Args& a) {
 int main(int argc, char** argv) {
   if (argc < 2) { usage(); return 1; }
   std::string cmd = argv[1]; Args a(argc, argv);
+#ifdef HAVE_MPFR
+  mpreal::set_default_prec((mpfr_prec_t)(MP_DIGITS * 3.3219280948873626 + 96));   // static: set before threads
+#endif
   try {
     if (cmd == "search") return cmd_search(a);
     if (cmd == "list") return cmd_list(a);
