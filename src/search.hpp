@@ -219,6 +219,52 @@ inline double ngon_vertical_freq(int N, int k) {
   for (int l = 1; l < N; l++) { double dl = 2 * R * std::sin(PI * l / N); w2 += (1 - std::cos(2 * PI * k * l / N)) / (dl * dl * dl); }
   return std::sqrt(w2);
 }
+// N-gon sums C_k = Σ_{p≠0} g_p cos(2πkp/N), g_p = α/d_p^{α+2}; C_0 − C_1 = 1 *is* the radius equation.
+inline void ngon_C(int N, double alpha, double* C) {
+  double S = 0; for (int p = 1; p < N; p++) S += alpha * std::sin(PI * p / N) / std::pow(2 * std::sin(PI * p / N), alpha + 1);
+  const double R = std::pow(S, 1.0 / (alpha + 2));
+  for (int k = 0; k < N; k++) { double c = 0;
+    for (int p = 1; p < N; p++) { const double dp = 2 * R * std::sin(PI * p / N); c += alpha * std::cos(2 * PI * k * p / N) / std::pow(dp, alpha + 2); }
+    C[k] = c; }
+}
+// real roots of t³ + p t + q, ascending
+inline int cubic_depressed(double p, double q, double* r) {
+  const double D = q * q / 4 + p * p * p / 27;
+  if (D >= 0) { const double s = std::sqrt(D); r[0] = std::cbrt(-q / 2 + s) + std::cbrt(-q / 2 - s); return 1; }
+  const double m = 2 * std::sqrt(-p / 3), th = std::acos(std::clamp(3 * q / (p * m), -1.0, 1.0)) / 3;
+  for (int i = 0; i < 3; i++) r[i] = m * std::cos(th - 2 * PI * i / 3);
+  std::sort(r, r + 3); return 3;
+}
+// real roots of ν⁴ + a ν² + b ν + c, bracketed between the critical points (the cubic 4ν³ + 2aν + b)
+inline int quartic_real(double a, double b, double c, double* r) {
+  auto f = [&](double v) { return ((v * v + a) * v + b) * v + c; };
+  double cr[3]; const int nc = cubic_depressed(a / 2, b / 4, cr);
+  const double M = 1 + std::fabs(a) + std::fabs(b) + std::fabs(c);
+  double xs[5]; int nx = 0; xs[nx++] = -M;
+  for (int i = 0; i < nc; i++) if (cr[i] > -M && cr[i] < M) xs[nx++] = cr[i];
+  xs[nx++] = M; int n = 0;
+  for (int i = 0; i + 1 < nx; i++) { double lo = xs[i], hi = xs[i + 1]; const double fl = f(lo);
+    if (fl * f(hi) > 0) continue;
+    for (int it = 0; it < 100; it++) { const double mid = 0.5 * (lo + hi); if ((f(mid) < 0) == (fl < 0)) lo = mid; else hi = mid; }
+    r[n++] = 0.5 * (lo + hi); }
+  return n;
+}
+// In-plane block of the rotating N-gon (Maxwell's ring): bodies in their own radial/tangential frames,
+// η_j = v e^{2πikj/N}. Real roots give the resonances m2/m1 = 1 ± ν, pattern k ≡ m2·m1⁻¹ − 1 (mod N).
+inline int ngon_inplane_freq(int N, int k, double alpha, double* nu) {
+  double C[128]; if (N > 128) return 0;
+  ngon_C(N, alpha, C);
+  auto Cj = [&](int j) { return C[((j % N) + N) % N]; };
+  const double ck = Cj(k), cs = Cj(k + 1) + Cj(k - 1);
+  const double Pk = 0.5 * ((alpha + 2) * ck - 0.5 * alpha * cs - 2 * C[0] + alpha + 4);
+  const double Qk = 0.5 * (-(alpha + 2) * ck - 0.5 * alpha * cs + (2 * alpha + 2) * C[0] - alpha);
+  const double bk = 0.25 * alpha * (Cj(k - 1) - Cj(k + 1));
+  return quartic_real(Pk + Qk - 4, -4 * bk, Pk * Qk - bk * bk, nu);
+}
+inline void set_mode(const Problem& P, std::vector<double>& x, int m, int c, double cc, double ss) {
+  auto it = std::lower_bound(P.modes.begin(), P.modes.end(), m); if (it == P.modes.end() || *it != m) return;
+  const size_t mu = (size_t)(it - P.modes.begin()); x[2 * mu * P.d + c] = cc; x[(2 * mu + 1) * P.d + c] = ss;
+}
 // vertical start: circle (mode m1) + one transverse mode m2, biased to resonances m2/m1 ≈ ω_k/ω_N, k ≡ m2·m1⁻¹ (mod N)
 inline void vertical_guess(const Problem& P, la::Rng& rng, std::vector<double>& x) {
   x.assign(P.n, 0.0); const int N = P.N, d = P.d; int m1 = 1, m2 = 2;
@@ -229,36 +275,63 @@ inline void vertical_guess(const Problem& P, la::Rng& rng, std::vector<double>& 
     if (rng.uniform() < 0.7) { double target = ngon_vertical_freq(N, (b * ainv) % N); if (std::fabs((double)b / a - target) > 0.2 * target) continue; }
     m1 = a; m2 = b; break;
   }
-  auto set_mode = [&](int m, int c, double cc, double ss) { auto it = std::lower_bound(P.modes.begin(), P.modes.end(), m); if (it == P.modes.end() || *it != m) return; int mu = (int)(it - P.modes.begin()); x[(2 * mu) * d + c] = cc; x[(2 * mu + 1) * d + c] = ss; };
   double sgn = rng.uniform() < 0.5 ? 1 : -1, amp = 0.08 * std::pow(15.0, rng.uniform());
-  set_mode(m1, 0, 1.0, 0.0); set_mode(m1, 1, 0.0, sgn);
-  double ph = 2 * PI * rng.uniform(); set_mode(m2, 2, amp * std::cos(ph), amp * std::sin(ph));
-  for (int c = 3; c < d; c++) if (rng.uniform() < 0.5) { int m3 = 1 + rng.below(std::min(P.K, 8)); if (m3 % N) set_mode(m3, c, 0.3 * amp * rng.normal(), 0.3 * amp * rng.normal()); }
+  set_mode(P, x, m1, 0, 1.0, 0.0); set_mode(P, x, m1, 1, 0.0, sgn);
+  double ph = 2 * PI * rng.uniform(); set_mode(P, x, m2, 2, amp * std::cos(ph), amp * std::sin(ph));
+  for (int c = 3; c < d; c++) if (rng.uniform() < 0.5) { int m3 = 1 + rng.below(std::min(P.K, 8)); if (m3 % N) set_mode(P, x, m3, c, 0.3 * amp * rng.normal(), 0.3 * amp * rng.normal()); }
 }
 
-// Resonant hyper-start: m1-fold circle in plane (0,1) plus transverse modes at the vertical resonances
-// m ≈ m1·ω_k with m ≡ k·m1 (mod N), distinct patterns k drawn without replacement. The transverse block is
-// (d−2)-fold degenerate, so each circularly polarised pair adds 2 to deff: deff ≤ 2 + 2(⌊N/2⌋−1) caps the
-// reachable dimension, which is why d = 7 needs N ≥ 8.
-inline void hyper_guess(const Problem& P, la::Rng& rng, std::vector<double>& x) {
-  x.assign(P.n, 0.0); const int N = P.N, d = P.d, nk = N / 2 - 1;
-  auto set_mode = [&](int m, int c, double cc, double ss) {
-    auto it = std::lower_bound(P.modes.begin(), P.modes.end(), m); if (it == P.modes.end() || *it != m) return;
-    int mu = (int)(it - P.modes.begin()); x[(2 * mu) * d + c] = cc; x[(2 * mu + 1) * d + c] = ss; };
-  int m1 = 1; for (int t = 0; t < 64; t++) { int a = 1 + rng.below(std::max(1, P.K / 2)); if (la::gcd(a, N) == 1) { m1 = a; break; } }
-  set_mode(m1, 0, 1.0, 0.0); set_mode(m1, 1, 0.0, rng.uniform() < 0.5 ? 1 : -1);
-  if (nk <= 0) return;
+// transverse resonances m ≈ m1·ω_k, m ≡ k·m1 (mod N), distinct patterns k, circularly polarised in pairs
+// on axes c0…d−1. Each pair adds 2 to deff, so deff ≤ 2 + 2(⌊N/2⌋−1).
+inline void add_vertical_modes(const Problem& P, la::Rng& rng, std::vector<double>& x, int m1, int c0) {
+  const int N = P.N, d = P.d, nk = N / 2 - 1; if (nk <= 0) return;
   std::vector<int> ks(nk); for (int i = 0; i < nk; i++) ks[i] = i + 2;
   for (int i = nk - 1; i > 0; i--) std::swap(ks[i], ks[rng.below(i + 1)]);
-  for (int c = 2, i = 0; c < d && i < 4 * nk; i++) {
-    int k = ks[i % nk]; double tgt = m1 * ngon_vertical_freq(N, k);
-    int base = (k * m1) % N, m = base + N * (int)std::lround((tgt - base) / N);
+  for (int c = c0, i = 0; c < d && i < 4 * nk; i++) {
+    const int k = ks[i % nk]; const double tgt = m1 * ngon_vertical_freq(N, k);
+    const int base = (k * m1) % N, m = base + N * (int)std::lround((tgt - base) / N);
     if (m < 1 || m % N == 0 || m > P.K || std::fabs(m - tgt) > 0.25 * tgt) continue;
-    double amp = 0.03 * std::pow(20.0, rng.uniform()), ph = 2 * PI * rng.uniform();
-    set_mode(m, c, amp * std::cos(ph), amp * std::sin(ph));
-    if (c + 1 < d) { double s2 = rng.uniform() < 0.5 ? 1 : -1;
-      set_mode(m, c + 1, -s2 * amp * std::sin(ph), s2 * amp * std::cos(ph)); c += 2; } else c++;
+    const double amp = 0.03 * std::pow(20.0, rng.uniform()), ph = 2 * PI * rng.uniform();
+    set_mode(P, x, m, c, amp * std::cos(ph), amp * std::sin(ph));
+    if (c + 1 < d) { const double s2 = rng.uniform() < 0.5 ? 1 : -1;
+      set_mode(P, x, m, c + 1, -s2 * amp * std::sin(ph), s2 * amp * std::cos(ph)); c += 2; } else c++;
   }
+}
+// m1-fold circle in plane (0,1) plus the transverse resonances
+inline void hyper_guess(const Problem& P, la::Rng& rng, std::vector<double>& x) {
+  x.assign(P.n, 0.0);
+  int m1 = 1; for (int t = 0; t < 64; t++) { const int a = 1 + rng.below(std::max(1, P.K / 2)); if (la::gcd(a, P.N) == 1) { m1 = a; break; } }
+  set_mode(P, x, m1, 0, 1.0, 0.0); set_mode(P, x, m1, 1, 0.0, rng.uniform() < 0.5 ? 1 : -1);
+  add_vertical_modes(P, rng, x, m1, 2);
+}
+
+// in-plane start: m1-fold circle plus a resonance m2 ≈ m1(1 ± ν_k), m2 ≡ (k+1)·m1 (mod N). The in-plane
+// Hessian couples m2 only to |2m1 − m2|; transverse modes go on top, else the loop stays planar.
+inline bool inplane_guess(const Problem& P, la::Rng& rng, std::vector<double>& x) {
+  x.assign(P.n, 0.0); const int N = P.N, K = P.K; if (N < 4) return false;
+  int m1 = 1; for (int t = 0; t < 64; t++) { const int a = 1 + rng.below(std::max(1, std::min(K / 2, 12))); if (la::gcd(a, N) == 1) { m1 = a; break; } }
+  int cand[32], nc = 0; double nu[4];
+  for (int k = 2; k <= N / 2 && nc < 32; k++) {
+    const int nr = ngon_inplane_freq(N, k, P.alpha, nu);
+    for (int i = 0; i < nr && nc < 32; i++) for (int s = 0; s < 2; s++) {
+      const double ratio = 1 + (s ? -nu[i] : nu[i]); if (ratio < 0.1) continue;
+      const double tgt = ratio * m1; const int base = ((k + 1) * m1) % N;
+      const int m = base + N * (int)std::lround((tgt - base) / N);
+      if (m < 1 || m > K || m % N == 0 || m == m1 || std::fabs(m - tgt) > 0.25 * tgt) continue;
+      cand[nc++] = m;
+    }
+  }
+  if (!nc) return false;
+  const int m2 = cand[rng.below(nc)], m3 = std::abs(2 * m1 - m2);
+  const double sgn = rng.uniform() < 0.5 ? 1 : -1, amp = 0.05 * std::pow(10.0, rng.uniform()), ph = 2 * PI * rng.uniform();
+  set_mode(P, x, m1, 0, 1.0, 0.0); set_mode(P, x, m1, 1, 0.0, sgn);
+  set_mode(P, x, m2, 0, amp * std::cos(ph), amp * std::sin(ph));
+  set_mode(P, x, m2, 1, -sgn * amp * std::sin(ph), sgn * amp * std::cos(ph));
+  if (m3 % N) { const double a3 = 0.4 * amp;
+    set_mode(P, x, m3, 0, a3 * std::sin(ph), -a3 * std::cos(ph));
+    set_mode(P, x, m3, 1, sgn * a3 * std::cos(ph), sgn * a3 * std::sin(ph)); }
+  if (P.d > 2 && rng.uniform() < 0.75) add_vertical_modes(P, rng, x, m1, 2);
+  return true;
 }
 
 // d = 7 start adapted to q(t + 2πp/7) = σ q(t): mode m sits entirely in the σ-eigenplane k = mp mod 7, so the
@@ -548,6 +621,7 @@ inline TrialOut run_trial(const Config& cfg, uint64_t trial, Ctx& ctx) {
   for (int attempt = 0; attempt < 8 && !started; attempt++) {
     int K0 = cfg.K0min + rng.below(cfg.K0max - cfg.K0min + 1); double gamma = 0.7 + 1.3 * rng.uniform();
     if (family == "hyper" && P->d >= 3) hyper_guess(*P, rng, x);
+    else if (family == "inplane") { if (!inplane_guess(*P, rng, x)) random_guess(*P, rng, K0, gamma, x); }
     else if (family == "fano" && P->d == 7) { if (!fano_guess(*P, rng, 1 + rng.below(6), x)) random_guess(*P, rng, K0, gamma, x); }
     else if (family == "torus" && P->d >= 4) torus_guess(*P, rng, x); else if (family == "vertical" && P->d >= 3) vertical_guess(*P, rng, x); else random_guess(*P, rng, K0, gamma, x);
     R.reduce(x.data(), y.data());

@@ -126,6 +126,23 @@ int main() {
     double rb = rigid_defect(P, x.data(), w);
     CHECK(rg < 1e-14 && rb > 1e-2, "N-gon %.1e vs N-gon + one transverse mode %.4f", rg, rb); }
 
+  std::printf("[N-gon spectrum]\n");
+  { double e1 = 0, e2 = 0;
+    for (int N = 3; N <= 12; N++) for (double al : {1.0, 1.5}) { double C[128]; ngon_C(N, al, C); e1 = std::max(e1, std::fabs(C[0] - C[1] - 1)); }
+    for (int N = 4; N <= 10; N++) { double C[128]; ngon_C(N, 1.0, C);
+      for (int k = 0; k < N; k++) e2 = std::max(e2, std::fabs(std::sqrt(std::max(0.0, C[0] - C[k])) - ngon_vertical_freq(N, k))); }
+    CHECK(e1 < 1e-13 && e2 < 1e-13, "radius equation C_0 - C_1 = 1 to %.1e, omega_k^2 = C_0 - C_k to %.1e", e1, e2); }
+  { double a[4], b[4], c[4]; const int na = ngon_inplane_freq(7, 2, 1.0, a), nb = ngon_inplane_freq(6, 3, 1.0, b), nc = ngon_inplane_freq(8, 0, 1.0, c);
+    CHECK(na == 2 && std::fabs(a[0] - 0.501584) < 1e-6 && std::fabs(a[1] - 1.014133) < 1e-6 &&
+          nb == 2 && std::fabs(b[1] - 0.468728) < 1e-6 &&
+          nc == 2 && std::fabs(c[0] + 1) < 1e-12 && std::fabs(c[1] - 1) < 1e-12,     // k=0 is nu^2 (nu^2 + alpha - 2)
+          "in-plane roots N=7 k=2 (%.6f, %.6f), N=6 k=3 (%.6f), Kepler pair at k=0 (%.3f, %.3f)", a[0], a[1], b[1], c[0], c[1]); }
+  { Problem P; P.init(8, 3, 24); la::Rng rng(3); std::vector<double> x; int got = 0, least = 99;
+    for (int t = 0; t < 32; t++) if (inplane_guess(P, rng, x)) { got++; int nmod = 0;
+      for (int mu = 0; mu < P.nm; mu++) for (int c = 0; c < 2; c++) if (std::fabs(x[2 * mu * 3 + c]) + std::fabs(x[(2 * mu + 1) * 3 + c]) > 1e-12) { nmod++; break; }
+      least = std::min(least, nmod); }
+    CHECK(got >= 28 && least >= 2, "inplane start: %d/32 resonant, at least %d in-plane modes each", got, least); }
+
   std::printf("[inertial effective dimension]\n");
   { const int N = 4, d = 4; std::vector<int> md = {1};                          // a planar circle, rank 2
     std::vector<double> c(2 * d, 0.0); c[0] = 1.0; c[d + 1] = 1.0;

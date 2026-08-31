@@ -149,14 +149,21 @@ Random low-mode starts collapse onto the Lagrange circle in `d ≥ 3` (58 000 tr
 eight, nothing else). The structured starts (`--starts`) and `continue` are what produce spatial solutions:
 **torus** (rotations in ⌊d/2⌋ orthogonal planes), **vertical** (a rotating circle plus one transverse
 oscillation — the unchained-polygon ansatz), **hyper** (one near-resonant transverse mode per pattern
-`k = 2…⌊N/2⌋`, circularly polarised in pairs; this produced every `deff ≥ 5` record), **fano** (`d = 7`),
-and **kick** (`--seed-from`, a catalogued solution embedded and pushed along its softest Hessian directions).
+`k = 2…⌊N/2⌋`, circularly polarised in pairs; this produced every `deff ≥ 5` record), **inplane** (the
+in-plane resonances below), **fano** (`d = 7`), and **kick** (`--seed-from`, a catalogued solution embedded and pushed along its softest Hessian directions).
 
 Linearising the rotating N-gon gives the transverse frequencies in closed form,
 `ω_k² = Σ_{l≠0} (1 − cos 2πkl/N)/d_l³`, `d_l = 2R sin(πl/N)`, so inertial choreographies of vertical type sit
 at rational resonances `m₂/m₁ ≈ ω_k/ω_N` with pattern `k ≡ m₂·m₁⁻¹ (mod N)`. N=4, k=2 gives 1.2156 → the
 (5,6) solution; N=5, k=2 gives 1.3277 → the (7,9) solution. For N=3 every transverse mode is a tilt, which is
 why nothing spatial exists there.
+
+The **in-plane** block is the other half of the same linearisation (`ngon_inplane_freq`): a quartic in the
+same sums `C_k = Σ_{p≠0} g_p cos(2πkp/N)`, of which `C_0 − C_1 = 1` *is* the radius equation. Its real roots,
+which exist for every `k ≥ 2` at `N ≥ 7`, give a second resonance family `m₂/m₁ = 1 ± ν̂_k` with
+`k ≡ m₂·m₁⁻¹ − 1 (mod N)`, seeded by `--starts inplane`. A/B against the `vertical,hyper,torus` mixture at 20
+min per arm: fewer records (21 against 25 at `d = 3, N = 9`) but roughly half of them ones the mixture never
+found, so it belongs **in** the mix, not in place of it.
 
 **Why `deff` saturates.** Two exact facts bound it.
 
@@ -404,10 +411,8 @@ Period 2π, unit masses, G = 1, action per body; `E_total = −N·A/(6π)` by th
 4. **Mine the symmetry classes instead of guessing them.** `symmetry` emits exactly the text `--sym`
    consumes, so the loop closes: detect the groups that occur, keep those with a small fixed subspace, and
    re-search inside them.
-5. **The in-plane half of the N-gon spectrum.** Only the out-of-plane frequencies are in the code; the
-   in-plane block is a quartic in `ν` whose real roots give a second family of resonances
-   `m₂/m₁ = 1 ± ν̂_k`. Real roots exist for every `k ≥ 2` at `N = 8…14`. It does not raise `deff`, but it
-   roughly doubles the resonance table and gives `continue` a deterministic bifurcation list.
+5. **The in-plane resonances in `continue`.** `ngon_inplane_freq` drives `--starts inplane` (§5), but the
+   deterministic bifurcation list it gives `continue` is still not wired in.
 6. **More cells.** `d = 13` needs `--omega g2:p,q,r₁,r₂,r₃` and `N ≥ 14`; `d = 12, N = 12` gave 0 records in
    8 537 trials at a quarter of the trial rate, which is the warning.
 7. Better branch switching for degenerate bifurcations; multi-threaded `continue`; FFT synthesis for

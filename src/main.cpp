@@ -28,7 +28,7 @@ static void usage() {
     "                [--trials n] [--minutes m] [--out catalog.bin] [--alpha-start 2 --alpha-steps 8] [--min-deff k --min-rigid 1e-4]\n"
     "                [--lbfgs-min 20 --lbfgs-max 400 --newton 60 --gtol 1e-10 --ret-tol 1e-8 --K0 2 --K0max 6 --minsep 2e-3]\n"
     "                [--phase1 action|gradnorm|mixed] [--seed-from other.bin --kick-min 0.02 --kick-max 0.5]\n"
-    "                [--starts random,torus,vertical,hyper,fano,kick] [--K-index 48] [--Ms 2048 --Kout-max 512 --shoot-tol 1e-12 --ret-double 1e-4]\n"
+    "                [--starts random,torus,vertical,hyper,inplane,fano,kick] [--K-index 48] [--Ms 2048 --Kout-max 512 --shoot-tol 1e-12 --ret-double 1e-4]\n"
     "                [--omega \"w1,w2,...\" | --omega su:w1,... | --omega g2:p,q[,r,...]]   rotating frame: q_j(t) = exp(Omega t) q(t + 2 pi j/N)\n"
     "                [--tol-inv 1e-4 --tol-dist 1e-3 --checkpoint 30 --ret-reject 1e-1]   (resumes if catalog/state exist)\n"
     "  hyperchoreography list    catalog.bin [--N n] [--deff k] [--min-deff k] [--sort action|id|hits|twist|rigid]\n"
