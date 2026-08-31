@@ -30,16 +30,18 @@ Naming: **dimension first, then bodies** (`d3n4.bin`); `list` sorts by (deff, N,
 ## 1. What is in the catalogue
 
 `deff` is the dimension the motion actually occupies; `d` is the ambient dimension it was found in. The
-budget of §5 caps `deff` at `2⌊N/2⌋`, and that ceiling has been reached exactly at `N = 10`.
+budget of §5 caps `deff` at `2⌊N/2⌋`, and that ceiling has been reached exactly at `N = 6`, `7` and `10`.
 
 Every record stores the **certified initial state** as well as the Fourier series rendering it: `h.ret_err`
-is the state's residual (median 1.5e-15, worst 6.0e-11 over 993 records), `extra[6]` the series', which the
-`m²` weighting of the equations always makes looser. Most of these orbits are violently unstable — only 18
-of 992 are action minima, median Morse index 20 — which costs precision, not existence (§4).
+is the state's residual (median 2.2e-15, worst 6.0e-11 over 1800 records), `extra[6]` the series', which the
+`m²` weighting of the equations always makes looser. Most of these orbits are violently unstable — only 76
+are action minima, median Morse index 20 — which costs precision, not existence (§4).
 
 | `d` | `N` | max `deff` | file | notes |
 |---|---|---|---|---|
 | 2–4 | 3–6 | 4 | `d2-3_n3`, `d2-4_n4`, `d2-4_n5`, `d3-4_n6` | the classical planar and spatial families |
+| 2–4 | 7–11 | 4 | `d2_n7`, `d3-4_n7`, `d3-4_n8`, `d3-4_n9`, `d3_n10`, `d3_n11` | 256 records, all inertial; `d = 3` is spatial up to `N = 11` |
+| 5–6 | 6–8 | 6 | `d5-6_n6`, `d5-6_n7`, `d5-6_n8` | 551 records, 128 at `deff = 6`; frames `su:1,2` (`N = 6, 7`) and `su:1,3` (`N = 8`) at `d = 6`, `"1,2"` at `d = 5` |
 | 7 | 8, 10 | 7 | `d7_n8`, `d7_n10` | first `deff = 7`, inertial |
 | 7 | 10 | 7 | `d7_n10_g2`, `d7_n10_g2_16` | 154 records, 76 at `deff = 7`, frame `g2:1,6` |
 | 7 | 11, 12 | 7 | `d7_n11_g2`, `d7_n12_g2` | 336 and 219 records, frame `g2:2,3` |
@@ -48,6 +50,8 @@ of 992 are action minima, median Morse index 20 — which costs precision, not e
 
 Everything above `d = 6` lives in a **rotating frame** (§6): with relative equilibria filtered out, the
 inertial search finds nothing at `d = 8` in 60 331 trials while a calibrated frame finds six in 8 799.
+`d = 6` is where that stops — **eight of the `deff = 6` records are inertial** (2, 1 and 5 at `N = 6, 7, 8`),
+as are 13 of the `deff = 5` ones, so genuine choreographies, not merely relative ones, reach `deff = 6`.
 No high-`deff` relative choreography found so far deforms back to an inertial one (§11, item 1).
 
 Arbitrary-precision refinement works in **any** frame: the MPFR Newton carries `G = exp(2πΩ/N)` and threads
@@ -222,8 +226,8 @@ every new cell needs its own sweep. It is stable in budget and seed *within* a c
 that destabilises it. Short sweeps overstate long-harvest rates: over 25–30 min the three `d = 7` cells land
 within 30 % of each other, though a 150 s sweep made `N = 11` look 1.3× better.
 
-Harvest frames: `g2:1,6` at `d = 7, N = 10`; `g2:2,3` at `N = 11, 12`; `g2:1,3,2` at `d = 9`;
-`g2:1,2,4,5` at `d = 11`.
+Harvest frames: `"1,2"` at `d = 5`; `su:1,2` at `d = 6, N = 6, 7` and `su:1,3` at `N = 8`; `g2:1,6` at
+`d = 7, N = 10`; `g2:2,3` at `N = 11, 12`; `g2:1,3,2` at `d = 9`; `g2:1,2,4,5` at `d = 11`.
 
 ### 6.2 The leftover rates buy the last dimension
 
@@ -383,10 +387,10 @@ Period 2π, unit masses, G = 1, action per body; `E_total = −N·A/(6π)` by th
   start. This is a sharp, falsifiable prediction for `N ≳ 12`.
 * **Close-approach loops** (minsep < 0.05) get 500+ modes; certification is fine but the Fourier
   representation is then a poor basis — parallel shooting would suit them better.
-* **One record's stored `deff` disagrees with the gallery's pooled PCA** (`d11_n12_g2#0`: 9 against 7),
-  which `make gallery` reports. It is a 184-mode close-approach loop sitting on a continuous family
-  (`nullity = 7`); the orbit itself certifies to 1e-14. The two measures can differ only for rotating
-  records, and which one is authoritative there is unresolved.
+* **Six records' stored `deff` disagrees with the gallery's pooled PCA**, which `make gallery` reports —
+  five `d5-6_n6` members of one near-rigid family whose third principal value at 2e-4 falls inside
+  `inertial_deff`'s absolute cut and outside the gallery's relative one, plus `d11_n12_g2#0`. All certify to
+  1e-13 or better; the two measures differ only for rotating records, and neither is established as right.
 * Double precision suffices: the action matches 40-digit MPFR to 1–2 ulp, and re-shooting rejected
   candidates in MPFR recovers nothing. The ~1e-11 floor on the shift residual is Lyapunov amplification,
   not roundoff. Newton–Krylov was measured and dropped (0.88×–1.57×, no predictor).
