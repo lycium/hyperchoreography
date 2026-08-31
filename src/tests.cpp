@@ -256,6 +256,31 @@ int main() {
     ok = ok && g7 < 1e-12 && b7 > 0.1;
     CHECK(ok, "sum of rates zero preserves the calibration:%s, g2 torus %.0e/%.2f", line.c_str(), g7, b7); }
 
+  { bool ok = true; std::string line;                                             // the g2 frame extends past d = 7
+    for (int d : {7, 9, 11}) {
+      const Wedge& W = wedge_basis(d, 3); auto phi = calib_psi(W, CAL_G2);
+      std::vector<double> rest((d - 7) / 2); for (size_t i = 0; i < rest.size(); i++) rest[i] = 1.5 + (double)i;
+      double g = calib_defect(W, phi, g2_omega(1, 6, d, rest));
+      std::vector<double> sw(d / 2 - 1); for (size_t i = 0; i < sw.size(); i++) sw[i] = 1.0 + (double)i;
+      double su = calib_defect(W, phi, su_omega(d, sw));
+      int stab = calib_stab_dim(W, phi), want = 14 + (d - 7) * (d - 8) / 2;
+      ok = ok && g < 1e-12 && su > 0.1 && stab == want;
+      char b[96]; std::snprintf(b, sizeof b, " d=%d %.0e/%.2f dim %d", d, g, su, stab); line += b; }
+    CHECK(ok, "g2 frame is phi-calibrated in every d >= 7 where su: is not (defect g2/su, stab dim 14+so(d-7)):%s", line.c_str()); }
+
+  { const int N = 5, d = 3, K = 12; Problem P; P.init(N, d, K); Work w; w.resize(P);   // rigidity from coefficients
+    std::vector<double> x(P.n, 0.0); const double R = 0.9;                             // must match the Problem form
+    x[0 * d + 0] = R; x[1 * d + 1] = R;
+    std::vector<int> modes(P.modes.begin(), P.modes.end());
+    std::vector<double> coef(modes.size() * 2 * d, 0.0);
+    for (size_t mu = 0; mu < modes.size(); mu++) for (int a = 0; a < d; a++)
+      { coef[mu * 2 * d + a] = x[(2 * mu) * d + a]; coef[mu * 2 * d + d + a] = x[(2 * mu + 1) * d + a]; }
+    double c0 = rigid_defect_coef(N, d, modes, coef.data()), p0 = rigid_defect(P, x.data(), w);
+    x[2 * d + 2] = 0.35; coef[1 * 2 * d + 2] = 0.35;                                   // one transverse mode breaks it
+    double c1 = rigid_defect_coef(N, d, modes, coef.data()), p1 = rigid_defect(P, x.data(), w);
+    CHECK(c0 < 1e-12 && p0 < 1e-12 && c1 > 0.1 && std::fabs(c1 - p1) < 1e-2 * p1,   // sampled on two grids
+      "rigid_defect from coefficients matches the Problem form: N-gon %.0e/%.0e, tilted %.4f/%.4f", c0, p0, c1, p1); }
+
   { std::string t6 = named_sym("cyc:1", 6), t7 = named_sym("fano:1", 7);          // named twisted-choreography classes
     Problem P; P.init(5, 6, 16); Symmetry S = Symmetry::parse(t6, 6); int r = 0; auto B = S.basis(P, r);
     CHECK(t6 == "t+1/3 s[3,4,5,6,1,2]" && t7 == "t+1/7 s[2,3,4,5,6,7,1]" && r > 0 && r * 3 <= P.n + 6,

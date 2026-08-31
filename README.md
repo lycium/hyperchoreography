@@ -60,6 +60,14 @@ Naming convention: **dimension first, then bodies** (`d3n4.bin`); `list` sorts b
   `A = 20.105976864`, `χ* = 253.7`) verifies at shift residual 4e-12, full-period return 1e-11 and energy
   drift 7e-15. Six records carry `nullity > 4` and are therefore continuous families rather than isolated
   orbits (§4).
+* **The first nine-dimensional choreographies.** `d = 9` was empty; the `φ` of the `G₂` rung is not a
+  `d = 7` object (its stabiliser is `g₂ ⊕ so(d−7)`, dimension 15 at `d = 9`), so the calibrated frames there
+  are the `g₂` torus plus a free rate on the leftover plane — `--omega g2:p,q,r` (§13.2). Thirty minutes in
+  the frame the sweep picked out gives **31 records, 13 of them `deff = 9` and all 13 distinct families**,
+  no re-sampling, every one with `nullity = 5` — exactly the gauge dimension (4-torus + time shift), so all
+  thirteen are **isolated** orbits rather than points on a continuous family. Certified: return errors
+  6e-16 to 1e-12, minimum separations up to 1.96, `χ*` up to 44.2 (`tw_rel` 0.49).
+
 * **A ten-dimensional relative choreography.** `d = 10, N = 10` in a rotating frame on the calibrated line
   `Σw = 0` (§14): `deff = 10/10`, `A = 40.995282456`, shift residual 7e-13, full-period return 1e-12, energy
   drift 2e-14, all ten inertial principal values ≥ 0.64, rigidity defect 0.44 — and time-reversible,
@@ -68,6 +76,18 @@ Naming convention: **dimension first, then bodies** (`d3n4.bin`); `list` sorts b
   equilibria filtered out, the inertial search finds **none** at `d = 8` in 60 331 trials while `--omega
   su:1,2,3` finds six in 8 799, and `Σw = 0` beats an arbitrary rate vector (`1,2,3,4` gives one).
   `d = 12, N = 12` is not yet reachable: 0 records in 8 537 trials, at a quarter of the trial rate.
+* **The rigidity threshold was a decade too low, and 50 relative equilibria were in the catalogue.** The
+  stored defect is trimodal: 43 records at `≤ 2e-11`, a second cluster of 8 at `1.3e-6 … 4.0e-6`, then a
+  **4300× empty gap** to the first genuine choreography at `1.7e-2`. The `--min-rigid` default of `1e-6` sat
+  just *below* that second cluster. All 8 give themselves away — `tw_rel = 0`, `deff = d − 1`, and two pairs
+  share an action and a minimum separation to ten digits across `d = 7` **and** `d = 9`, which is what one
+  rigid configuration embedded in two ambient dimensions looks like. A ninth, at `1.29e-6`, was carrying
+  `χ* = 446.5` — larger than any genuine orbit in the catalogue — because a *resonant* relative equilibrium
+  maximises exactly the pairing `χ*` measures (§13.2), so **`χ*` ranks orbits only downstream of the
+  rigidity gate, never as a score on raw search output**. The default is now `1e-4`, in the
+  middle of the gap, and `merge --min-rigid r` re-applies a gate to catalogues already on disk so raising it
+  does not mean re-running the search. Catalogue: 366 records → **316**, with `d7_n9.bin` going 4 → 0.
+
 * **The calibration ladder** (§14): for the proper subgroup `G ⊂ SO(d)` stabilising a `k`-form `ψ`, the
   pairing of `ψ` with the loop's jet moment is an invariant no `O(d)` invariant of the loop can see. It is
   implemented for every dimension — `G₂` at `d = 7`, `Spin(7)` at `d = 8`, `SU(n)` at `d = 2n` — and the
@@ -326,6 +346,34 @@ action and the Fourier coefficients (DFT of a dense-output period) to the reques
   symmetry detection), `catalog.hpp`, `search.hpp` (starts, trial pipeline, certification), `continue.hpp`,
   `mpreal.hpp`, `linalg.hpp`, `main.cpp` (CLI), `tests.cpp`.
 
+### 9.1 `tools/gallery.py` — the catalogue as one page
+
+    python3 tools/gallery.py                       # every catalog/*.bin -> gallery.html
+    make gallery                                   # -> docs/index.html, which is what GitHub Pages serves
+    python3 tools/gallery.py catalog/d9_n10_g2.bin --samples 720 --out d9.html
+    python3 tools/gallery.py --fragment            # without the document shell, for a host that supplies one
+
+The live page is **<https://lycium.github.io/hyperchoreography/>**, served by GitHub Pages from `docs/` on
+`main`. After a harvest, `make gallery && git commit -am "…" && git push` updates it.
+
+Standard library only (no numpy), ~2 s for the whole catalogue, one self-contained file with no external
+reference of any kind. Re-run it after a harvest and the page is current.
+
+The problem it solves is that a `deff = 9` orbit and a circle look the same in any two coordinates you pick,
+because the action is `O(d)`-invariant and the stored basis is arbitrary. So each tile is drawn in the
+record's **own principal frame** — the eigenvectors of the second moment pooled over all `N` bodies and all
+samples, by a hand-written Jacobi sweep — and shows three things at once: a 3-D orthographic shadow of
+principal axes 1–3, a strip of one panel per principal plane in three states (curve, line, or grey rule, so
+that `deff = 2×curves + lines` is literally countable), and a bar meter of `√(λₖ/λ₁)`. A mutual-distance
+ribbon `|q₀ − qₖ|(t)` runs underneath, which is flat exactly for a relative equilibrium. Measured against
+the naive "plot the first two coordinates": **2 of 316 tiles** now read as a near-circle, against **80 of
+333** before.
+
+Only body 0's curve is stored. For a rotating-frame record the page rebuilds the other `N−1` from
+`body_j(f) = Gʲ · body_0((f + jS/N) mod S)` with `G = Vᵀ exp(−2πΩ/N) V` shipped once per record — 1.43 MB
+for 316 records instead of 11 MB. One `requestAnimationFrame` loop drives only the tiles an
+`IntersectionObserver` reports visible; trails, strip and ribbon are stroked once into cached canvases.
+
 ## 10. Reference values (period 2π, unit masses, G = 1, action per body; `E_total = −N·A/(6π)` by the virial theorem)
 
 | deff | N | solution | action | energy | Morse | modes | provenance |
@@ -552,6 +600,95 @@ Three weaker regularities, in decreasing order of confidence:
   clock — they die faster on the `deff` pre-filter — so per second the two only separate on the best rate
   sets ({1,6,7} and {1,5,6}, 3–4× for `g2`). With four matched pairs this is suggestive, not settled. What
   `g2` certainly buys is a frame preserving the associative 3-form, hence a meaningful conserved `χ*`.
+
+### 13.2 `d = 9` — the leftover plane is what opens it
+
+The associative 3-form is *not* a `d = 7` object. `calib_psi`'s `CAL_G2` rung builds `φ` on `span(e₀…e₆)` in
+every `d ≥ 7`, and any rotation of the remaining coordinates fixes it pointwise, so its stabiliser is
+`g₂ ⊕ so(d−7)` — dimension **14, 15, 20** at `d = 7, 9, 11`, computed by `calib_stab_dim` and pinned by
+`make test`, not looked up. The calibrated frames above `d = 7` are therefore the `g₂` torus (rates
+`p, q, p+q` on the Fano planes) **plus one free rate on each leftover coordinate plane**, and `--omega
+g2:p,q,r,…` now builds exactly that in any `d ≥ 7`. `su:` is not a substitute: its planes are coordinate
+planes rather than Fano planes, and `calib_defect` reads **3.0** at `d = 7` and **6.0** at `d = 9` against
+`1e-15` for the `g₂` frame — a frame off the calibration makes `χ*` meaningless.
+
+`d = 9` was empty. Swept exactly as §13.1 — `--d 9 --N 10 --K 24 --starts hyper --min-deff 8`, 18 threads,
+45 s per cell, one seed, scored by **distinct `deff = 9` families**:
+
+| rates | `deff` max | families | best `χ*` | trials/s |
+|---|---|---|---|---|
+| {1, 2, 5, 6} (`g2:1,5,2`) | 9 | **5** | 127.1 | 24.1 |
+| {2, 3, 4, 7} (`g2:3,4,2`) | 9 | **5** | 116.4 | 22.3 |
+| {1, 2, 3, 4} (`g2:1,3,2`) | 9 | 4 | 44.2 | 24.8 |
+| {2, 3, 4, 5} (`g2:2,3,4`) | 9 | 4 | 70.6 | 25.3 |
+| {1, 2, 4, 5} (`g2:1,4,2`) | 9 | 4 | 67.0 | 22.5 |
+| {1, 2, 6, 7} (`g2:1,6,2`) | 9 | 3 | 130.9 | 22.3 |
+| {2, 3, 6, 9} (`g2:3,6,2`) | 9 | 1 | 84.8 | 22.1 |
+| {2, 3, 5, 7} (`g2:2,5,3`) | 9 | 2 | 13.5 | 22.9 |
+| {1, 2, 2, 3} (`g2:1,2,2`), degenerate | **8** | 0 | — | 30.1 |
+| {1, 2, 7, 8} (`g2:1,7,2`) | — | **no records at all** | — | 21.1 |
+
+Eight of ten cells reach `deff = 9`, so the dimension is not hard once the frame is calibrated. Both
+regularities of §13.1 reproduce and sharpen: the one **degenerate** cell (a repeated rate) does not merely
+score low, it **caps at `deff = 8`**; and the cell carrying the two largest rates returns **zero** records.
+
+**The leftover rate buys the last dimension.** Setting `r = 0` leaves the `d = 7` frame sitting inside
+`R⁹` with a fixed 2-plane. Re-run at `--min-deff 5` to see where it stops, at two budgets:
+
+| frame | `deff` histogram, 45 s | 180 s (second seed) | top `deff` |
+|---|---|---|---|
+| `g2:1,5,0` | 5 : 8, 6 : 13, 7 : 5 | 5 : 21, 6 : 26, 7 : 9, 8 : 1 | 7 → **8** |
+| `g2:3,4,0` | 5 : 6, 6 : 5, 7 : 1 | — | 7 |
+| `g2:1,3,0` | — | 5 : 21, 6 : 31, 7 : 8, 8 : 7 | **8** |
+| `g2:1,5,2` | 5 : 10, 6 : 10, 7 : 8, 8 : 3, **9 : 4** | — | **9** |
+
+Read the two columns together, because the first alone is misleading. At 45 s the `r = 0` frames top out at
+seven — exactly the dimension of the `φ` block, which invites the tidy conclusion that the frame must rotate
+every direction the loop is to occupy. **That conclusion is wrong**, and two controls kill it. Given four
+times the budget the same `r = 0` frames reach `deff = 8` (seven records and one); and at `d = 8`, where
+`so(d−7) = so(1) = 0` and a `g₂` frame therefore has *no* leftover rate at all, `--omega g2:1,3` and
+`g2:1,5` still reach `deff = 8` in 45 s (three records and one) — as does `su:1,2,3`, at 178.6 trials/s
+against the `g₂` frames' 21–33.
+
+What survives is narrower and still worth having: **no `r = 0` run has ever reached `deff = 9`** — not in
+45 s, not in 180 s, not at either rate set — while `r = 2` reaches it in 45 s from four different `(p, q)`.
+The leftover rate is what gets the loop into the *last* dimension, and it gets it into the earlier ones far
+faster; it is not a structural gate on dimensions 8 and 9. The likely mechanism is still §13.1's second
+regularity: the frame zeroes the kinetic eigenvalue `π(m − w)²` of the mode `m = w` in its plane, so a rate
+pays only if it names a mode that *exists*, and at `N = 10` the modes are `m ≢ 0 (mod 10)`, so `r = 0` names
+nothing. But the `d = 8` control shows that a direction the frame does not rotate can still be occupied, so
+this is a statement about *rate*, not about a hard cap.
+
+
+Sweeping `r` itself (45 s, same seed), `r = 2` dominates and the falloff is fast:
+
+| `(p, q)` | `r = 0` | `r = 1` | `r = 2` | `r = 3` | `r = 4` |
+|---|---|---|---|---|---|
+| `(1, 5)` | 0 | — | **5** | 3 | 1 |
+| `(3, 4)` | 0 | 1 | **5** | — | — |
+| `(3, 6)` | — | 1 | 1 | — | 0 (caps at `deff = 8`) |
+
+The mod-`N` argument explains `r = 0` but *not* why 2 beats 1 — both name a legal mode — so what separates
+them is unmeasured. Re-scored on a second seed at 150 s, the ranking moves the way it did at `d = 7`, and
+the cell with the four smallest distinct rates wins:
+
+| rates | families @45 s | @150 s, seed 2 | best `χ*` |
+|---|---|---|---|
+| {1, 2, 3, 4} (`g2:1,3,2`) | 4 | **8** | 44.2 |
+| {2, 3, 4, 7} (`g2:3,4,2`) | 5 | 6 | 94.1 |
+| {1, 2, 5, 6} (`g2:1,5,2`) | 5 | 5 | 123.3 |
+| {2, 3, 6, 9} (`g2:3,6,2`) | 1 | 2 | 125.8 |
+
+so `g2:1,3,2` is the frame to harvest `d = 9` in.
+
+**Every `χ*` above is taken after the rigidity gate, and that matters.** Scored before it, `g2:3,6,2` looked
+like the twist champion of the whole project at `χ* = 446.5` — against the `d = 7` catalogue's 253.7. That
+record has `rigid = 1.29e-6`: it is a **relative equilibrium**, and the §14 test already says why it scores
+so high — a *resonant* rigid configuration has large twist (20.0 there against 4e-14 for the non-resonant
+one), because the calibration pairing is exactly what resonance maximises. So a rigid orbit can out-twist
+every genuine one in the catalogue, and `χ*` is only a quality score **downstream** of the rigidity gate,
+never as a way to rank raw search output. Re-scored gated, the frame gives 1 family at `χ* = 84.8`, and the
+project's twist champion is unchanged: `d7_n10_g2_16` id 13, `χ* = 253.7`, `deff = 7/7`, rigidity 0.52.
 
 ## 14. The calibration ladder
 

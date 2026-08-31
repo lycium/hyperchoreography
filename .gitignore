@@ -3,3 +3,6 @@ hyperchoreography_test
 *.tmp
 *.state
 .DS_Store
+gallery.html
+gallery_*.html
+__pycache__/

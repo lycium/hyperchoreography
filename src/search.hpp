@@ -9,6 +9,7 @@
 #include <climits>
 #include <memory>
 #include <sstream>
+#include <algorithm>
 
 struct Config {
   int N = 3, d = 2, K = 16, Kmax = 64;
@@ -18,7 +19,7 @@ struct Config {
   int threads = 0; uint64_t seed = 1; long trials = LONG_MAX; double minutes = 1e30;
   std::string out = "catalog.bin";
   int lbfgs_min = 20, lbfgs_max = 400, newton_iters = 60; double gtol = 1e-10, ret_tol = 1e-8, ret_reject = 1e-1;
-  int K0min = 2, K0max = 6; double minsep = 2e-3; int min_deff = 1; double min_rigid = 1e-6;
+  int K0min = 2, K0max = 6; double minsep = 2e-3; int min_deff = 1; double min_rigid = 1e-4;   // rigid clusters end at 4e-6, the first real orbit is at 1.7e-2
   const std::vector<Record>* seeds = nullptr; double kick_min = 0.02, kick_max = 0.5;
   int Ms = 2048, Kout_max = 512; double shoot_tol = 1e-12, ret_double = 1e-4;
   std::string starts = "random,torus,vertical";                                        // comma list; kick needs seeds
@@ -39,9 +40,11 @@ inline std::vector<double> parse_omega(const std::string& t, int d) {
     return su_omega(d, w);
   }
   if (t.rfind("g2:", 0) == 0) {
-    if (d != 7) throw std::runtime_error("--omega g2: needs d = 7");
-    std::stringstream ss(t.substr(3)); std::string a, b; std::getline(ss, a, ','); std::getline(ss, b, ',');
-    return g2_omega(std::stod(a), b.empty() ? 0.0 : std::stod(b));
+    if (d < 7) throw std::runtime_error("--omega g2: needs d >= 7");
+    std::vector<double> w; std::stringstream ss(t.substr(3)); std::string e;
+    while (std::getline(ss, e, ',')) w.push_back(e.empty() ? 0.0 : std::stod(e));
+    w.resize(std::max<size_t>(w.size(), 2), 0.0);            // "g2:p" is (p, 0, p)
+    return g2_omega(w[0], w[1], d, std::vector<double>(w.begin() + 2, w.end()));
   }
   std::vector<double> Om((size_t)d * d, 0.0); std::stringstream ss(t); std::string e;
   for (int p = 0; std::getline(ss, e, ','); p++) {
@@ -410,6 +413,8 @@ inline bool certify(const Config& cfg, const Problem*& P, std::vector<double>& x
     std::vector<double> isv; deff = inertial_deff(P->N, O.modes, d, O.coef.data(), Omc.data(), isv);   // the dimension actually occupied
   }
   if (deff < cfg.min_deff) { why = "effective dimension below filter"; return false; }
+  // the gate above ran before shooting; a trial can still land on a relative equilibrium in between
+  if (rigid_defect_coef(P->N, d, O.modes, O.coef.data()) < cfg.min_rigid) { why = "relative equilibrium"; return false; }
   rec.h.N = P->N; rec.h.d = P->d; rec.h.K = O.K; rec.h.M = O.Ms; rec.h.alpha = 1.0; rec.modes.assign(O.modes.begin(), O.modes.end()); rec.coef = O.coef; rec.h.nm = (int32_t)O.modes.size();
   rec.h.deff = deff; rec.h.cover = cover; rec.h.action = O.action; rec.h.energy = O.energy; rec.h.energy_std = 0; rec.h.rms = O.rms; rec.h.maxr = O.maxr;
   rec.h.minsep = O.minsep; rec.h.Lnorm = O.Lnorm; rec.Lsv = O.Lsv; rec.pca = sv; rec.h.morse = -1; rec.h.nullity = -1; rec.h.grad_norm = -1; rec.h.ret_err = res;

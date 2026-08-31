@@ -4,17 +4,26 @@
 #include <vector>
 #include <string>
 #include <cmath>
+#include <stdexcept>
 #include "linalg.hpp"
 
 // Ω in the maximal torus of g2: rates (w1, w2, w1+w2) on the Fourier planes of the Fano 7-cycle
 // (u_k[j] = √(2/7) cos 2πkj/7, v_k[j] = √(2/7) sin 2πkj/7, k = 1,2,3; the axis (1,…,1)/√7 is fixed).
 // The relation w3 = w1 + w2 is exactly the condition that exp(Ωt) preserves the associative 3-form.
-inline std::vector<double> g2_omega(double w1, double w2) {
+// For d > 7 the same φ lives on span(e_0…e_6) and stab(φ) grows to g2 ⊕ so(d−7), so `rest` carries free
+// rates on the leftover planes (7,8), (9,10), …. su_omega is not an alternative: its planes are not Fano.
+inline std::vector<double> g2_omega(double w1, double w2, int d = 7, const std::vector<double>& rest = {}) {
+  if (d < 7) throw std::runtime_error("g2 frame needs d >= 7");
+  if ((int)rest.size() > (d - 7) / 2) throw std::runtime_error("g2 frame: more extra rates than leftover planes");
   const double PI7 = 6.283185307179586 / 7, w[4] = {0, w1, w2, w1 + w2};
-  std::vector<double> Om(49, 0.0), u(7), v(7);
+  std::vector<double> Om((size_t)d * d, 0.0), u(7), v(7);
   for (int k = 1; k <= 3; k++) {
     for (int j = 0; j < 7; j++) { u[j] = std::sqrt(2.0 / 7) * std::cos(PI7 * k * j); v[j] = std::sqrt(2.0 / 7) * std::sin(PI7 * k * j); }
-    for (int i = 0; i < 7; i++) for (int j = 0; j < 7; j++) Om[i * 7 + j] += w[k] * (v[i] * u[j] - u[i] * v[j]);
+    for (int i = 0; i < 7; i++) for (int j = 0; j < 7; j++) Om[(size_t)i * d + j] += w[k] * (v[i] * u[j] - u[i] * v[j]);
+  }
+  for (size_t p = 0; p < rest.size(); p++) {                 // these planes act trivially on φ
+    const int a = 7 + 2 * (int)p, b = a + 1;
+    Om[(size_t)a * d + b] = -rest[p]; Om[(size_t)b * d + a] = rest[p];
   }
   return Om;
 }

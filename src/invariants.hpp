@@ -55,6 +55,23 @@ inline double rigid_defect(const Problem& P, const double* x, Work& w) {
   return worst;
 }
 
+// The same test on a record's own (modes, coef): the final series after shooting, not the pre-certification iterate.
+inline double rigid_defect_coef(int N, int d, const std::vector<int>& modes, const double* coef) {
+  const int mmax = modes.empty() ? 1 : modes.back();                 // ascending
+  const int M = N * std::max(8, 4 * mmax / N + 2), MN = M / N;       // above Nyquist
+  std::vector<double> Q((size_t)M * d, 0.0);
+  for (int j = 0; j < M; j++) { const double t = 2 * PI * j / M; double* q = &Q[(size_t)j * d];
+    for (size_t mu = 0; mu < modes.size(); mu++) { const double c = std::cos(modes[mu] * t), sn = std::sin(modes[mu] * t);
+      for (int a = 0; a < d; a++) q[a] += c * coef[mu * 2 * d + a] + sn * coef[mu * 2 * d + d + a]; } }
+  double worst = 0;
+  for (int p = 1; p <= N / 2; p++) { double lo = INF, hi = 0;
+    for (int j = 0; j < M; j++) { double r2 = 0; const double* a0 = &Q[(size_t)j * d]; const double* a1 = &Q[(size_t)((j + p * MN) % M) * d];
+      for (int a = 0; a < d; a++) { const double e = a1[a] - a0[a]; r2 += e * e; }
+      lo = std::min(lo, r2); hi = std::max(hi, r2); }
+    if (hi > 0) worst = std::max(worst, 1.0 - std::sqrt(lo / hi)); }
+  return worst;
+}
+
 // per-mode power P_m = |c_m|² + |s_m|²
 inline std::vector<double> mode_power(const Problem& P, const double* x) {
   std::vector<double> pw(P.nm, 0.0);

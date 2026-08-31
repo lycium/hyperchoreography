@@ -38,6 +38,10 @@ hyperchoreography: $(SRC) $(HDRS)
 test: src/tests.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -o hyperchoreography_test src/tests.cpp $(LDFLAGS) && ./hyperchoreography_test
 
+# docs/ is what GitHub Pages serves
+gallery: hyperchoreography
+	python3 tools/gallery.py --out docs/index.html
+
 clean:
 	rm -f hyperchoreography hyperchoreography_test
-.PHONY: clean test
+.PHONY: clean test gallery

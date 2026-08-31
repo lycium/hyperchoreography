@@ -29,14 +29,14 @@ static void usage() {
     "                [--lbfgs-min 20 --lbfgs-max 400 --newton 60 --gtol 1e-10 --ret-tol 1e-8 --K0 2 --K0max 6 --minsep 2e-3]\n"
     "                [--phase1 action|gradnorm|mixed] [--seed-from other.bin --kick-min 0.02 --kick-max 0.5]\n"
     "                [--starts random,torus,vertical,hyper,fano,kick] [--K-index 48] [--Ms 2048 --Kout-max 512 --shoot-tol 1e-12 --ret-double 1e-4]\n"
-    "                [--omega \"w1,w2,...\" | --omega su:w1,... | --omega g2:p,q]   rotating frame: q_j(t) = exp(Omega t) q(t + 2 pi j/N)\n"
+    "                [--omega \"w1,w2,...\" | --omega su:w1,... | --omega g2:p,q[,r,...]]   rotating frame: q_j(t) = exp(Omega t) q(t + 2 pi j/N)\n"
     "                [--tol-inv 1e-4 --tol-dist 1e-3 --checkpoint 30 --ret-reject 1e-1]   (resumes if catalog/state exist)\n"
     "  hyperchoreography list    catalog.bin [--N n] [--deff k] [--min-deff k] [--sort action|id|hits|twist|rigid]\n"
     "  hyperchoreography show    catalog.bin --id i                (JSON dump of one record)\n"
     "  hyperchoreography export  catalog.bin --id i [--samples 720] [--out curve.csv]   (body positions over one period)\n"
     "  hyperchoreography verify  catalog.bin --id i                (double-precision Taylor integration checks)\n"
     "  hyperchoreography refine  catalog.bin --id i --digits 60 [--K 64] [--out refined.txt]   (MPFR shooting Newton)\n"
-    "  hyperchoreography merge   out.bin in1.bin in2.bin ...       (union with de-duplication)\n"
+    "  hyperchoreography merge   out.bin in1.bin in2.bin ... [--min-rigid r --min-deff k]   (union, de-duplicate, re-gate)\n"
     "  hyperchoreography extras  catalog.bin [--K-index 48]        (recompute Morse index, nullity, twist and rigidity)\n"
     "  hyperchoreography symmetry catalog.bin [--id i] [--tol 1e-6] (detect the symmetry group of each stored loop)\n"
     "  hyperchoreography continue catalog.bin [--id i | --root circle] --N n --d d [--K 24] [--covers 7] [--depth 2] [--out found.bin]\n"
@@ -128,7 +128,8 @@ static int cmd_export(const Args& a) {
   Catalog cat = load_cat(a.pos.at(0)); const Record& r = rec_by_id(cat, (long)a.num("id", 0)); int S = (int)a.num("samples", 720);
   std::string out = a.get("out", "curve_" + std::to_string(r.h.id) + ".csv"); FILE* f = std::fopen(out.c_str(), "w"); if (!f) throw std::runtime_error("cannot write " + out);
   const int N = r.h.N, d = r.h.d; std::fprintf(f, "t");
-  for (int k = 0; k < N; k++) for (int c = 0; c < d; c++) std::fprintf(f, ",q%d_%c", k, "xyzwuv"[c]);
+  for (int k = 0; k < N; k++) for (int c = 0; c < d; c++)                       // x,y,z,w then x4…
+    if (c < 4) std::fprintf(f, ",q%d_%c", k, "xyzw"[c]); else std::fprintf(f, ",q%d_x%d", k, c);
   std::fprintf(f, "\n");
   const double* om = r.omega(); std::vector<double> Rt, Ai;
   for (int j = 0; j < S; j++) { double t = 2 * PI * j / S; std::fprintf(f, "%.10f", t);
@@ -161,13 +162,25 @@ static int cmd_verify(const Args& a) {
   return 0;
 }
 
+// --min-rigid/--min-deff re-apply a gate to catalogues already on disk; extra[4] is the stored defect.
 static int cmd_merge(const Args& a) {
   if (a.pos.size() < 2) { usage(); return 1; }
   Catalog out; try { out.load(a.pos[0]); } catch (...) {}
-  double tol_inv = a.num("tol-inv", 1e-4), tol_dist = a.num("tol-dist", 1e-3); long added = 0, merged = 0;
+  double tol_inv = a.num("tol-inv", 1e-4), tol_dist = a.num("tol-dist", 1e-3);
+  double min_rigid = a.num("min-rigid", 0.0); int min_deff = (int)a.num("min-deff", 0);
+  long added = 0, merged = 0, dropped = 0;
+  auto keep = [&](const Record& r) {
+    if (r.h.deff < min_deff) return false;
+    if (min_rigid > 0 && (int)r.extra.size() > 4 && r.extra[4] < min_rigid) return false;
+    return true; };
+  if (min_rigid > 0 || min_deff > 0) {                       // re-gate what is already in the destination
+    std::vector<Record> kept; for (auto& r : out.recs) { if (keep(r)) kept.push_back(r); else dropped++; }
+    if (dropped) { Catalog re; for (auto& r : kept) { Record c = r; c.h.id = -1; re.push(c); } out = std::move(re); } }
   for (size_t i = 1; i < a.pos.size(); i++) { Catalog in = load_cat(a.pos[i]);
-    for (auto& r : in.recs) { long dup = out.find_duplicate(r, tol_inv, tol_dist); if (dup >= 0) { out.absorb((size_t)dup, r, r.h.hits); merged++; } else { Record c = r; c.h.id = -1; out.push(c); added++; } } }
-  out.save(a.pos[0]); std::printf("merged: %ld added, %ld duplicates folded; %s has %zu records\n", added, merged, a.pos[0].c_str(), out.recs.size()); return 0;
+    for (auto& r : in.recs) { if (!keep(r)) { dropped++; continue; }
+      long dup = out.find_duplicate(r, tol_inv, tol_dist); if (dup >= 0) { out.absorb((size_t)dup, r, r.h.hits); merged++; } else { Record c = r; c.h.id = -1; out.push(c); added++; } } }
+  out.save(a.pos[0]);
+  std::printf("merged: %ld added, %ld duplicates folded, %ld dropped by gate; %s has %zu records\n", added, merged, dropped, a.pos[0].c_str(), out.recs.size()); return 0;
 }
 
 static int cmd_extras(const Args& a) {
