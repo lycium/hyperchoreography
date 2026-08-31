@@ -2,114 +2,51 @@
 
 A search engine for **N-body choreographies in arbitrary dimension**: N equal masses chasing each other along
 one closed curve, `q_k(t) = q(t + kT/N)`, under the Newtonian (or any homogeneous `1/r^α`) potential.
-Built to run for weeks on many cores, to be resumable and reproducible, to never double-count, and to certify
-every catalogued orbit against the true equations of motion — in double, and in MPFR to any number of digits.
+Built to run for weeks on many cores, to be resumable, to never double-count, and to certify every
+catalogued orbit against the true equations of motion — in double, and in MPFR to any number of digits.
 
 ```
-make                  # native-optimised build (clang/gcc, -march=native; 512-bit vectors preferred on x86-64)
-make test             # numerical self-checks of every kernel (derivatives, symmetry, integrator, dedup, I/O)
+make                  # native build (clang/gcc; -mcpu=native on arm64, -march=native elsewhere)
+make test             # self-checks of every kernel (derivatives, symmetry, integrator, dedup, I/O)
 
-./hyperchoreography search   --d 3 --N 4 --K 24 --threads 16 --minutes 600 --out d3n4.bin     # Ctrl-C any time; rerun to resume
-./hyperchoreography continue --root circle --d 3 --N 4 --K 32 --covers 9 --depth 2 --out d3n4.bin   # bifurcation-tree enumeration
-./hyperchoreography list     d3n4.bin                      ./hyperchoreography show d3n4.bin --id 7          # table / JSON dump
-./hyperchoreography verify   d3n4.bin --id 7               ./hyperchoreography export d3n4.bin --id 7 --out orbit.csv
-./hyperchoreography refine   d3n4.bin --id 7 --digits 100 --out d3n4_7.txt                     # MPFR shooting Newton
-./hyperchoreography merge    all.bin d3n4.bin d3n4_machine2.bin                                # union of catalogues
-./hyperchoreography bench    --d 4 --N 5 --K 24
+./hyperchoreography search   --d 3 --N 4 --K 24 --threads 16 --minutes 600 --out d3n4.bin   # Ctrl-C any time; rerun to resume
+./hyperchoreography continue --root circle --d 3 --N 4 --K 32 --covers 9 --depth 2 --out d3n4.bin
+./hyperchoreography list     d3n4.bin                 ./hyperchoreography show   d3n4.bin --id 7
+./hyperchoreography verify   d3n4.bin --id 7          ./hyperchoreography export d3n4.bin --id 7 --out orbit.csv
+./hyperchoreography refine   d3n4.bin --id 7 --digits 100 --out d3n4_7.txt
+./hyperchoreography merge    all.bin d3n4.bin other.bin [--min-rigid r --min-deff k]
+./hyperchoreography extras   d3n4.bin                 ./hyperchoreography symmetry d3n4.bin
+make gallery                                          # docs/index.html, served at lycium.github.io/hyperchoreography
 ```
+
 Dependencies: a C++20 compiler; MPFR + GMP for `refine` (`make NOMPFR=1` drops them); on macOS, Accelerate
-for LAPACK `dsyevd` above n = 64 (`make NOACCEL=1` drops it). No other libraries — the linear algebra
-(symmetric eigensolver, pivoted LU), the optimisers, the Taylor integrator and the MPFR wrapper are all in
-`src/` (~2 500 lines).
+for LAPACK `dsyevd` above n = 64 (`make NOACCEL=1` drops it). Everything else — symmetric eigensolver,
+pivoted LU, optimisers, Taylor integrator, MPFR wrapper — is in `src/`.
 
-Naming convention: **dimension first, then bodies** (`d3n4.bin`); `list` sorts by (deff, N, action).
+Naming: **dimension first, then bodies** (`d3n4.bin`); `list` sorts by (deff, N, action).
 
----------------------------------------------------------------------------------------------------------
+---
 
-## 1. Status — what has been achieved
+## 1. What is in the catalogue
 
-* A complete, tested pipeline: random or structured starts → L-BFGS → exact-Hessian Newton–LM (critical
-  points of *any* Morse index) → ODE certification by shooting Newton → Fourier re-extraction → canonical
-  form → symmetry-invariant de-duplication → binary catalogue. ~200–650 trials/s/8 threads for N=3–5,
-  d=2–6 on an Apple M5 Pro. Resumable per `(seed, trial)`; multi-machine via `merge`.
-* Arbitrary-precision refinement: the eight goes from 1e-11 to **1e-71** in three Newton iterations (1.5 s
-  each at 295 bits); 400-bit integration costs 7 ms per `T/N` (allocation-free MPFR kernels).
-* Genuinely high-dimensional choreographies, found within seconds and all ODE-certified to ~1e-13:
-  the N=4 Clifford-torus relative equilibrium in **d=4** (modes (2,3)), the N=5 one (modes (6,7)),
-  the N=4 "hip-hop resonance" spatial choreography in **d=3** (modes (5,6)), a second spatial N=4 solution
-  with reflection–reversal symmetry, and the N=5 (7,9) spatial choreography. The linear analysis of the
-  rotating N-gon predicts these resonances in closed form (§5) — and the α-continuation tree finds them
-  systematically from the k-fold covers of the circle (§6).
-* **Rotating-frame ("twisted") formulation**: `q_j(t) = exp(Ωt) q(t + 2πj/N)` for any `Ω ∈ so(d)` (§6).
-  Only the kinetic term changes; the potential machinery is untouched. Validated exactly — at `Ω = −1`
-  the Lagrange circle reappears as the mode-2 curve with an identical action to 10 digits.
-* **The first `d = 6` and `d = 8` choreographies.** Both dimensions were empty simply because nobody had run
-  them: 30 s per `N` at `d = 6` gives 43 records (up to `deff = 5`), and 20 minutes at `d = 8` gives 13, all
-  `deff = 6` and all carrying non-zero Spin(7) Cayley twist. These runs predate the rigidity defect of §4
-  and were not kept, so what fraction of them was rigid is unknown.
-* **Genuinely seven-dimensional choreographies.** Two `deff = 7` orbits at `d = 7, N = 10`, certified to
-  2e-15 and 6e-15, against a previous catalogue maximum of `deff = 4`. The `deff` budget of §5.1 predicted
-  exactly which `N` would work, and their principal values come out as `1 + 2 + 2 + 2`, the polarisation
-  structure the budget calls for. Eight of the twenty records in `catalog/d7_n{8,9,10}.bin` are genuine
-  orbits; the other twelve are *relative equilibria* — rigid configurations, trivial however high their
-  `deff`, which the rigidity defect of §4 now separates and rejects.
-* **154 seven-dimensional relative choreographies, 76 of them `deff = 7`**, in 30 minutes on 18 cores in
-  the frame the sweep of §13.1 picked out (`--omega g2:1,6`), against a catalogue that held **two**
-  `deff = 7` orbits before session 5 and nine before session 6 — `catalog/d7_n10_g2_16.bin`. All certified:
-  no missing Morse data, no near-collision, every return error below 1e-9; the `χ*` champion (id 18,
-  `A = 20.105976864`, `χ* = 253.7`) verifies at shift residual 4e-12, full-period return 1e-11 and energy
-  drift 7e-15. Six records carry `nullity > 4` and are therefore continuous families rather than isolated
-  orbits (§4).
-* **The first nine-dimensional choreographies.** `d = 9` was empty; the `φ` of the `G₂` rung is not a
-  `d = 7` object (its stabiliser is `g₂ ⊕ so(d−7)`, dimension 15 at `d = 9`), so the calibrated frames there
-  are the `g₂` torus plus a free rate on the leftover plane — `--omega g2:p,q,r` (§13.2). Thirty minutes in
-  the frame the sweep picked out gives **31 records, 13 of them `deff = 9` and all 13 distinct families**,
-  no re-sampling, every one with `nullity = 5` — exactly the gauge dimension (4-torus + time shift), so all
-  thirteen are **isolated** orbits rather than points on a continuous family. Certified: return errors
-  6e-16 to 1e-12, minimum separations up to 1.96, `χ*` up to 44.2 (`tw_rel` 0.49).
+`deff` is the dimension the motion actually occupies; `d` is the ambient dimension it was found in. The
+budget of §5 caps `deff` at `2⌊N/2⌋`, and that ceiling has been reached exactly at `N = 10`.
 
-* **A ten-dimensional relative choreography.** `d = 10, N = 10` in a rotating frame on the calibrated line
-  `Σw = 0` (§14): `deff = 10/10`, `A = 40.995282456`, shift residual 7e-13, full-period return 1e-12, energy
-  drift 2e-14, all ten inertial principal values ≥ 0.64, rigidity defect 0.44 — and time-reversible,
-  `q(−t) = R q(t)` with `R` negating five axes. This is the `deff` budget's ceiling `2⌊N/2⌋`, reached
-  exactly. `d = 8, N = 10` gives six more at `deff = 8`. The frame is what opens them: with relative
-  equilibria filtered out, the inertial search finds **none** at `d = 8` in 60 331 trials while `--omega
-  su:1,2,3` finds six in 8 799, and `Σw = 0` beats an arbitrary rate vector (`1,2,3,4` gives one).
-  `d = 12, N = 12` is not yet reachable: 0 records in 8 537 trials, at a quarter of the trial rate.
-* **`d = 7` at `N = 11` and `N = 12`**, the two remaining cheap cells: 336 and 219 records, **149 and 125
-  distinct `deff = 7` families**, all validating clean. The frame ranking turns out **not** to transfer
-  between `N` — `{2, 3, 5}` is seventh of eight at `N = 10` and first at both 11 and 12, while `N = 10`'s
-  winner `{1, 6, 7}` drops to 7 and 3 families — so every new cell needs its own 45 s sweep (§13.3). Over a
-  full harvest the three cells are within 30 % of each other (2.5 / 2.7 / 2.1 families per minute), even
-  though the short sweep made `N = 11` look 1.3× better.
-* **`χ*` is not invariant under the rotating-frame gauge** (§13.4). Merging turned up two records agreeing
-  on every stored scalar — action to 14 digits, energy, `rms`, `Lnorm`, all seven `Lsv`, `morse`, `nullity`,
-  `pca` — whose twists differ **21×** (342.8 against 16.26). They are one physical motion in two frames,
-  `g2:1,7` and `g2:1,4`, whose rates pair as `w ↔ N − w`; `exp(Ωt) q(t)` is unchanged when a rate moves by
-  `N` and the modes compensate. `χ*` reads the stored loop, so it moves with that choice. It remains an
-  invariant of a record and a valid discriminator within one frame; cross-frame twist comparisons in
-  §13.1–§13.3 are not meaningful, and no canonical frame is defined yet.
+| `d` | `N` | max `deff` | file | notes |
+|---|---|---|---|---|
+| 2–4 | 3–6 | 4 | `d2-3_n3`, `d2-4_n4`, `d2-4_n5`, `d3-4_n6` | the classical planar and spatial families |
+| 7 | 8, 10 | 7 | `d7_n8`, `d7_n10` | first `deff = 7`, inertial |
+| 7 | 10 | 7 | `d7_n10_g2`, `d7_n10_g2_16` | 154 records, 76 at `deff = 7`, frame `g2:1,6` |
+| 7 | 11, 12 | 7 | `d7_n11_g2`, `d7_n12_g2` | 336 and 219 records, frame `g2:2,3` |
+| 9 | 10 | 9 | `d9_n10_g2` | 31 records, 13 at `deff = 9`, all isolated |
+| 11 | 12 | **11** | `d11_n12_g2` | 122 records, 38 at `deff = 11`, all isolated; frame `g2:1,2,4,5` (§6.3) |
 
-* **The rigidity threshold was a decade too low, and 50 relative equilibria were in the catalogue.** The
-  stored defect is trimodal: 43 records at `≤ 2e-11`, a second cluster of 8 at `1.3e-6 … 4.0e-6`, then a
-  **4300× empty gap** to the first genuine choreography at `1.7e-2`. The `--min-rigid` default of `1e-6` sat
-  just *below* that second cluster. All 8 give themselves away — `tw_rel = 0`, `deff = d − 1`, and two pairs
-  share an action and a minimum separation to ten digits across `d = 7` **and** `d = 9`, which is what one
-  rigid configuration embedded in two ambient dimensions looks like. A ninth, at `1.29e-6`, was carrying
-  `χ* = 446.5` — larger than any genuine orbit in the catalogue — because a *resonant* relative equilibrium
-  maximises exactly the pairing `χ*` measures (§13.2), so **`χ*` ranks orbits only downstream of the
-  rigidity gate, never as a score on raw search output**. The default is now `1e-4`, in the
-  middle of the gap, and `merge --min-rigid r` re-applies a gate to catalogues already on disk so raising it
-  does not mean re-running the search. Catalogue: 366 records → **316**, with `d7_n9.bin` going 4 → 0.
+Everything above `d = 6` lives in a **rotating frame** (§6): with relative equilibria filtered out, the
+inertial search finds nothing at `d = 8` in 60 331 trials while a calibrated frame finds six in 8 799.
+No high-`deff` relative choreography found so far deforms back to an inertial one (§11, item 1).
 
-* **The calibration ladder** (§14): for the proper subgroup `G ⊂ SO(d)` stabilising a `k`-form `ψ`, the
-  pairing of `ψ` with the loop's jet moment is an invariant no `O(d)` invariant of the loop can see. It is
-  implemented for every dimension — `G₂` at `d = 7`, `Spin(7)` at `d = 8`, `SU(n)` at `d = 2n` — and the
-  stored *twist* `χ*` now discriminates records in every dimension the catalogue reaches, not only `d = 7`.
-* **Automatic symmetry detection** (§4, §7): every stored loop's group `q(εt + θ) = R q(t)` is recovered from
-  the series, including continuous ones. It reproduces the figure eight's `Z₂ × Z₂` exactly, and it found a
-  documentation error in this file that had stood since the first commit.
-* Symmetry groups in any dimension via a small DSL.
+Arbitrary-precision refinement works in the inertial case: the figure eight goes from 1e-11 to **1e-71** in
+three Newton iterations. `refine` rejects rotating-frame records — the MPFR path has no `G`.
 
 ## 2. The variational formulation
 
@@ -117,786 +54,356 @@ The loop is a real Fourier series with period 2π (fixed by the Kepler scaling `
 
     q(t) = Σ_m  c_m cos(mt) + s_m sin(mt),      c_m, s_m ∈ R^d,   1 ≤ m ≤ K,   m ≢ 0 (mod N).
 
-Modes `m ≡ 0 (mod N)` only move the centre of mass (the potential is blind to them and the kinetic term forces
-them to zero at a critical point), so they are excluded. Using the Z_N symmetry the action of the whole
-configuration reduces to a functional of the single curve (overall factor N dropped):
+Modes `m ≡ 0 (mod N)` only move the centre of mass, so they are excluded. Using the `Z_N` symmetry the
+action of the whole configuration reduces to a functional of the single curve (overall factor N dropped):
 
     A[q] = ½ ∫ |q̇|² dt  +  ½ Σ_{k=1}^{N-1} ∫ |q(t) − q(t + 2πk/N)|^{−α} dt .
 
-In a frame rotating with `Ω ∈ so(d)` (§13) the ansatz becomes `q_j(t) = exp(Ωt) q(t + 2πj/N)`; the potential
-term is *unchanged* (rotations are orthogonal) and only the kinetic term becomes `½∫|q̇ + Ωq|²`, a per-mode
-`2d × 2d` block `π[[m²I − Ω², −2mΩ], [2mΩ, m²I − Ω²]]` in place of the scalar `π m²`.
-By Palais' symmetric criticality, critical points of `A` are choreographic solutions; the Euler–Lagrange
-equation is literally `q̈ = Σ_k (q_k − q)/|q_k − q|³`. The kinetic term is analytic in the coefficients
-(`½ Σ π m² (|c_m|²+|s_m|²)`); the potential is a uniform-sample trapezoid quadrature with `M` nodes (multiple
-of N and of 8), spectrally accurate for analytic (collision-free) loops. Only `⌊(N−1)/2⌋` shifts (plus `N/2`
-with weight ½) are needed. Sampled data are structure-of-arrays with a doubled, wrap-free layout so every inner
-loop is a contiguous, gather-free, vectorisable loop over the sample index (`#pragma omp simd`).
-Closed-form: value, gradient, Hessian–vector products (`O(M·N·d)`), full Hessian (§13 — assembled from two
-DFT bins per mode pair, 3.3× faster at `d = 2` up to 8.7× at `d = 7, N = 7, K = 32`) and
-`∂∇A/∂α` (for continuation). Kernel timings (N=3, d=2, K=16): action+gradient 1.0 µs, Hessian 6.2 µs,
-Hessian eigendecomposition 75 µs, ODE shift residual 112 µs; at (d, N, K) = (7, 7, 32) the Hessian is 355 µs
-against an eigendecomposition of 5.6 ms, which is now the dominant cost of a high-dimensional trial.
+By Palais' symmetric criticality, critical points are choreographic solutions. The kinetic term is analytic
+in the coefficients; the potential is a trapezoid quadrature with `M` nodes, spectrally accurate for
+collision-free loops, needing only `⌊(N−1)/2⌋` shifts. Sampled data are structure-of-arrays with a doubled,
+wrap-free layout, so every inner loop is contiguous and vectorisable. Value, gradient, Hessian–vector
+products, the full Hessian (assembled from two DFT bins per mode pair) and `∂∇A/∂α` are closed-form.
+
+In a frame rotating with `Ω ∈ so(d)` the ansatz is `q_j(t) = exp(Ωt) q(t + 2πj/N)`. The potential is
+**unchanged** (rotations are orthogonal); only the kinetic term becomes `½∫|q̇ + Ωq|²`, a per-mode `2d × 2d`
+block `π[[m²I − Ω², −2mΩ], [2mΩ, m²I − Ω²]]` in place of the scalar `π m²`.
+
+At `(d, N, K) = (7, 7, 32)` the Hessian costs 355 µs against 5.6 ms for its eigendecomposition, which is the
+dominant cost of a high-dimensional trial.
 
 ## 3. Finding critical points of any Morse index
 
-Most choreographies are saddles of the action, which plain minimisation cannot reach (Simó's survey notes that
-his gradient method "detects passages close to saddle points … this can be used in the future to try to locate
-these solutions"; Minton uses L-SR1 to tolerate indefinite Hessians). Each trial here runs
+Most choreographies are saddles of the action, which plain minimisation cannot reach. Each trial runs
 
 1. **a start** (§5), Kepler-rescaled to the optimal size `λ^{α+2} = αU/(2K)`;
-2. **phase 1**: a randomised-length L-BFGS descent on the action (→ minimisers) or on `½|∇A|²`
-   (→ any critical point; gradient `H∇A` is one Hessian–vector product) — `--phase1`;
+2. **phase 1**: randomised-length L-BFGS on the action (→ minimisers) or on `½|∇A|²` (→ any critical point);
 3. **phase 2**: Levenberg–Marquardt Newton on `∇A = 0` with the exact Hessian in its eigenbasis,
-   `δ = −Σ_k q_k λ_k/(λ_k²+μ)(q_kᵀ∇A)`: quadratic convergence to critical points of any index; the gauge null
-   space (time shift, rotations) is ignored automatically because `λ_k ≈ 0` directions receive no step;
-4. optional **α-continuation** from a strong-force exponent (`--alpha-start 2`) back to α = 1.
+   `δ = −Σ_k q_k λ_k/(λ_k²+μ)(q_kᵀ∇A)` — quadratic convergence to critical points of any index, with the
+   gauge null space ignored automatically because `λ_k ≈ 0` directions receive no step;
+4. optional **α-continuation** from a strong-force exponent back to α = 1.
 
-Symmetry groups (§4) restrict the search to a fixed subspace `x = By` (reduced gradient/Hessian `Bᵀ∇A`, `BᵀHB`).
+Symmetry groups (§4) restrict the search to a fixed subspace `x = By`.
 
 ## 4. Certification, canonical form, de-duplication
 
-A Fourier critical point is never accepted on its own merits:
+A Fourier critical point is never accepted on its own merits.
 
-* **ODE validation.** Initial conditions of all N bodies are read off the series and integrated with a
-  22nd-order Taylor method (automatic differentiation of the N-body recurrences, adaptive step) over `T/N`; the
-  shift residual `|Φ_{T/N}(Z) − SZ|` must be ≤ `--ret-reject` (one mode doubling is allowed if it is > 1e-4).
-  The default 1e-1 is deliberately loose: the shooting Newton below is the real gate, and tightening it to
-  1e-5 discards candidates that shooting would have corrected, costing 2.5–4.5x in unique orbits per second.
-* **Shooting Newton.** The shooting map — `Φ_{T/N}(Z) = G S Z` with `G = exp(2πΩ/N)`, the identity in the
-  inertial case — is solved to `1e-12` (finite-difference Jacobian, centre of mass removed, Levenberg
-  damping adapted on the residual and retried against the same Jacobian; fixed damping abandoned 27 % of
-  admissible candidates). Every catalogued orbit is a solution of the true
-  equations to machine precision regardless of the Fourier truncation.
-* **Fourier re-extraction.** The loop is re-sampled from the certified orbit — one `T/N` segment of all N
-  bodies assembled by the choreography symmetry (exact, N× cheaper, and immune to the error growth an unstable
-  orbit accumulates over a full period) — and its series taken by DFT down to an amplitude floor of `1e-13`.
-  Records store exactly the modes the orbit needs (3 for the torus, 66 for the hip-hop, ~60 for the eight).
-* **k-fold covers.** A loop traversed k times (gcd(k,N)=1) is the same choreography with period T/k; it is
-  detected from the gcd of the significant modes and unwound (mode km → m, amplitude × k^{2/(α+2)}).
-* **Canonical frame.** Coefficients are rotated into the principal axes of `XᵀX` with fixed column signs;
-  `deff` = number of non-negligible principal values. A planar loop found in a 4-D search is catalogued with
-  `deff = 2` and compares equal to its 2-D twin.
-* **Rigidity defect.** A relative equilibrium moves rigidly, so every mutual distance is constant. The
-  choreography shift sends the pair `(j,k)` to `(j−k,0)`, so `⌊N/2⌋` separations exhaust the test, and a
-  common rotation cancels, so the answer is independent of `Ω`. Zero means a rigid rotating configuration —
-  the high-dimensional analogue of the N-gon, and a *trivial* choreography however large its `deff`.
-  These dominate the high-`d` search: in a rotating frame at `d = 8, N = 10` they were 9 of the first 13
-  records, and 31 of the 170 records catalogued before this test existed are rigid (4 of 4 in
-  `d7_n9.bin`, 5 of 8 in `d7_n10.bin`). `search` rejects them by default (`--min-rigid`, default 1e-6);
-  the separation is clean, `1e-15…1e-13` against `0.1…0.7`.
-* **Effective dimension in a rotating frame.** `deff` is the dimension the motion actually occupies, which
-  is *not* the loop's own rank once `Ω ≠ 0`: `exp(Ωt)` raises it when a fixed point sweeps a circle, and
-  lowers it when a circularly polarised mode at rate `−w` becomes a linear oscillation. Body `k` traces
-  `exp(Ωt)q(t + 2πj/N) = exp(−2πΩk/N)·(`body 0's path`)`, so the occupied subspace is the sum of `N` rotated
-  copies, and a plane collapses only when `w_p ≡ 0 (mod N)`. At `Ω = 0` this is the loop's rank exactly, so
-  no inertial record changes. The cheap pre-filter still gates on the loop's own rank: measured over 49
-  records it discards a genuinely high-`deff` candidate 2 % of the time and buys 18 % more trials.
-* **Equivalence.** Two loops are the same choreography iff they agree up to time shift, time reversal,
-  O(d) (rotations *and* reflections) and body relabelling. Candidates are filtered on invariants (action,
-  energy, r.m.s. size; relative 1e-4) and then the Procrustes distance `min_{τ,ε,R} ‖A − R B(ε·+τ)‖` is
-  computed: for each discrete shift the optimal rotation is given by the nuclear norm of the d×d cross-
-  covariance, and the best shift is refined continuously. Below 1e-3 (relative) the loops are identified.
-  One case defeats that test on purpose: a *continuous family* of solutions. Its points are genuinely
-  different loops — the Procrustes distance is right to separate them, and `χ*` varies along the family —
-  but they are one object, and a rotating frame can park the search on one and have it resample the family
-  indefinitely (`--omega g2:3,4` at `d = 7, N = 10` returns 21 records in 45 s that are all one family; see
-  §13.1). The action is exactly constant along a family, so matching it to round-off (1e-9 relative,
-  together with `minsep`) folds them into a single record with a hit count. `nullity` above the gauge
-  dimension is the independent signature — that family reads `nullity = 6` against the frame's 4.
-* **Morse index / nullity** of the full Fourier Hessian, computed only for new records. The series is
-  re-polished to a genuine critical point of the truncation first (the index is undefined anywhere else) and
-  the exact gauge directions — the time shift and the rotations that commute with `Ω` — are lifted out of
-  the spectrum by `H + σGGᵀ` instead of being classified by magnitude. That centraliser is taken as the
-  kernel of `ad_Ω` on `so(d)`, not by testing the coordinate generators `E_ab` one at a time: when the
-  frame's planes are not coordinate planes — the `g2` torus is the case that matters — no single `E_ab`
-  commutes with `Ω`, so the per-generator test finds none of the three torus directions and leaves them in
-  the spectrum as numerical zeros. Of the 179 catalogued records this reaches exactly the nine `g2`-frame
-  ones (`--omega su:` puts its rates on coordinate planes, where the old test was already right); one of
-  them read `(morse, nullity) = (127, 2)` and is `(126, 4)` — `1 + 3` — once the torus is lifted properly. `(morse, nullity)` is then stable
-  across `K_index = 24…80`; before this it was not, and `nullity = 0` always meant this bug.
-  The nullity is 1 + the number of rotation generators acting non-trivially; a larger value flags a
-  degenerate (bifurcating) solution. A virial check `N·A + 6π·E = 0` guards every certified orbit.
-  `hyperchoreography extras` recomputes the index, nullity and twist over an existing catalogue; the values
-  are unchanged over a 4× larger index basis (`--K-index 48` against `200`).
-* **The calibration twist `χ*`** (§14), stored per record together with its scale-free form and the jet
-  order `k` of the rung used.
-* **The symmetry group of the loop**, detected rather than assumed (`hyperchoreography symmetry`). For a
-  fixed `(ε, θ)` the best `R` is the Procrustes fit, so the group is exactly the set of zeros of the loop's
-  *self*-distance over `(ε, θ)` — the same function `loop_distance` already minimises. The fit is done inside
-  the `deff`-dimensional span, where `R` is determined and commutes with the inertia tensor, so it comes out
-  as the signed permutation the `--sym` DSL wants whenever the principal values are simple. The relative
-  squared residual bottoms out near `1e-15` (the `‖A‖²+‖B‖²−2‖AᵀB‖_*` cancellation), which sets the default
-  tolerance at `1e-6` on the r.m.s.; a loop for which *every* shift works is reported as `S¹`.
+* **ODE validation** — initial conditions are read off the series and integrated with a 22nd-order Taylor
+  method over `T/N`; the shift residual must be ≤ `--ret-reject`. Its default 1e-1 is deliberately loose:
+  the shooting Newton is the real gate, and tightening it to 1e-5 costs 2.5–4.5× in unique orbits per second.
+* **Shooting Newton** — `Φ_{T/N}(Z) = G S Z` with `G = exp(2πΩ/N)`, solved to 1e-12 with Levenberg damping
+  adapted on the residual (fixed damping abandoned 27 % of admissible candidates).
+* **Fourier re-extraction** — the loop is re-sampled from the certified orbit over one `T/N` segment
+  (exact, N× cheaper, immune to the error an unstable orbit accumulates over a full period).
+* **k-fold covers** — a loop traversed k times is the same choreography, detected from the gcd of the
+  significant modes and unwound.
+* **Canonical frame** — coefficients rotated into the principal axes of `XᵀX`; `deff` is the number of
+  non-negligible principal values, so a planar loop found in a 4-D search compares equal to its 2-D twin.
+* **Rigidity defect** — a relative equilibrium moves rigidly, so every mutual distance is constant; `⌊N/2⌋`
+  separations exhaust the test, and a common rotation cancels, so the answer is independent of `Ω`. These
+  are trivial choreographies however large their `deff`, and they **dominate** the high-`d` search. The
+  stored defect is trimodal: a cluster at `≤ 2e-11`, a second at `1.3e-6 … 4.0e-6`, then a **4300× empty
+  gap** to the first genuine orbit at `1.7e-2`. `--min-rigid` defaults to **1e-4**, above the second
+  cluster; its members give themselves away with `tw_rel = 0` and `deff = d − 1`. `merge --min-rigid r
+  --min-deff k` re-gates a file on disk, so a threshold change costs seconds rather than a re-harvest.
+* **`deff` in a rotating frame** is not the loop's own rank: `exp(Ωt)` raises it when a fixed point sweeps a
+  circle and lowers it when a circularly polarised mode at rate `−w` becomes a linear oscillation. At
+  `Ω = 0` the two agree exactly, so no inertial record changes.
+* **Equivalence** — two loops are the same choreography iff they agree up to time shift, time reversal,
+  `O(d)` and relabelling. Candidates are filtered on invariants, then compared by Procrustes distance. One
+  case defeats that on purpose: a **continuous family**, whose points are genuinely different loops but one
+  object. The action is exactly constant along a family, so matching it to round-off folds them into a
+  single record with a hit count; `nullity` above the gauge dimension is the independent signature.
+* **Morse index / nullity** of the full Fourier Hessian. The exact gauge directions — the time shift and the
+  rotations commuting with `Ω` — are lifted out by `H + σGGᵀ` rather than classified by magnitude. That
+  centraliser is the kernel of `ad_Ω` on `so(d)`, **not** the coordinate generators `E_ab` tested one at a
+  time: when the frame's planes are not coordinate planes (the `g2` torus) no single `E_ab` commutes, and
+  the per-generator test leaves the torus directions in the spectrum as numerical zeros. A stored
+  `nullity = 0` is impossible — the time shift alone forces 1 — and always meant this bug.
+* **The calibration twist `χ*`** (§7) and **the symmetry group of the loop**, detected rather than assumed
+  (`symmetry`): for fixed `(ε, θ)` the best `R` is the Procrustes fit, so the group is the zero set of the
+  loop's *self*-distance. The relative squared residual bottoms out near 1e-15, which sets the default
+  tolerance at 1e-6 on the r.m.s.; a loop for which every shift works is reported as `S¹`.
+
+A generator of `--sym` is `(ε, θ = 2πp/q, R ∈ O(d))` imposing `q(εt + θ) = R q(t)`, written
+`t+p/q s[±i,±j,…]` (signed permutation) or `r(i,j,p/q)` (plane rotation). The figure-eight class is
+`"t+1/2 s[-1,2]; t-0 s[1,-2]"` — its half-period map is `diag(−1,+1)`, not `−I`; `s[-1,-2]` is the
+*circle's* class. Named classes: `cyc:p` cycles the `⌊d/2⌋` coordinate planes, `fano:p` is the `d = 7` Fano
+7-cycle. Both are cyclic with trivial core, so they do not cap `deff` (§5) — their value is cost, the fixed
+subspace of `cyc:1` at `d = 6, N = 5` having `r = 52` of `n = 156` parameters.
 
 ## 5. Where the high-dimensional choreographies come from
 
-Random low-mode starts collapse onto the Lagrange circle in d ≥ 3 (58 000 trials in 3-D gave circle + eight
-and nothing else). The structured start families (`--starts`) and `continue` are what produce spatial
-solutions:
+Random low-mode starts collapse onto the Lagrange circle in `d ≥ 3` (58 000 trials in 3-D gave circle and
+eight, nothing else). The structured starts (`--starts`) and `continue` are what produce spatial solutions:
+**torus** (rotations in ⌊d/2⌋ orthogonal planes), **vertical** (a rotating circle plus one transverse
+oscillation — the unchained-polygon ansatz), **hyper** (one near-resonant transverse mode per pattern
+`k = 2…⌊N/2⌋`, circularly polarised in pairs; this produced every `deff ≥ 5` record), **fano** (`d = 7`),
+and **kick** (`--seed-from`, a catalogued solution embedded and pushed along its softest Hessian directions).
 
-* **fano** (`d = 7`): a resonant triple `m₁ + m₂ = m₃` placed in three distinct σ-eigenplanes of the Fano
-  7-cycle, plus a mode `≡ 0 (mod 7)` on the fixed axis (§14).
-* **torus** (even d): rotations in ⌊d/2⌋ orthogonal planes with distinct modes coprime to N. Their relative
-  equilibria — N bodies on a Clifford torus — exist and are found within seconds.
-* **vertical** (d ≥ 3): a rotating circle (mode m₁) plus one transverse oscillation (mode m₂) — the
-  "unchained polygon" ansatz (Chenciner–Féjoz). Linearising the rotating N-gon gives its transverse mode
-  frequencies in closed form, `ω_k² = Σ_{l≠0} (1 − cos 2πkl/N)/d_l³`, `d_l = 2R sin(πl/N)` (k = ±1 is the
-  trivial tilt, ω = ω_N), so inertial choreographies of this type sit at rational resonances
-  `m₂/m₁ ≈ ω_k/ω_N` with phase pattern `k ≡ m₂·m₁⁻¹ (mod N)`; the draw is biased to those. N=4, k=2 has
-  ω₂/ω_N = 1.2156 → the (5,6) solution; N=5, k=2 has 1.3277 → the (7,9) solution. For N=3 all transverse modes
-  are tilts (ω = ω_N), so no such family exists — consistent with nothing spatial being found for N=3.
-* **hyper** (`d ≥ 3`, the family that produced every `deff ≥ 5` record): an `m₁`-fold circle plus one
-  near-resonant transverse mode per pattern `k = 2…⌊N/2⌋`, drawn without replacement and circularly
-  polarised in pairs while transverse directions remain. See §5.1 for why this, and not kicks, is the lever.
-* **kick** (`--seed-from`): a catalogued solution embedded in the current dimension and kicked along its
-  softest Hessian directions (or randomly), then Newton. The eight has Morse index 1 in 3-D (0 in 2-D):
-  such transverse negative directions are what a kick exploits.
-* **symmetry groups** (`--sym`): useful for *organising, re-finding and cheapening* a search — the reduced
-  dimension `r ≪ n` makes the Newton eigendecomposition ~100× cheaper at `d = 7` — but they cannot force
-  `deff = d`. A generator is `(ε, θ, R)`; forcing `deff = d` needs a trivial core `G ∩ ({+1}×{0}×O(d))`,
-  which makes `θ` injective on `{ε = +1}` and hence `G` cyclic or dihedral; real irreps of those have
-  dimension ≤ 2, so `Fix(G)` always contains loops in a plane — generically the N-gon itself. Measured:
-  500 `--sym random` draws at `d = 5, N = 4` and `d = 7, N = 6` produced **not one** loop with `deff > 2`.
-  Conversely an *irreducible* group has an **empty** fixed subspace (§14). The (5,6) solution was
-  re-found with `t+2/3 s[2,3,1]; t-0/2 s[1,3,2]`, which is what symmetry is good for.
+Linearising the rotating N-gon gives the transverse frequencies in closed form,
+`ω_k² = Σ_{l≠0} (1 − cos 2πkl/N)/d_l³`, `d_l = 2R sin(πl/N)`, so inertial choreographies of vertical type sit
+at rational resonances `m₂/m₁ ≈ ω_k/ω_N` with pattern `k ≡ m₂·m₁⁻¹ (mod N)`. N=4, k=2 gives 1.2156 → the
+(5,6) solution; N=5, k=2 gives 1.3277 → the (7,9) solution. For N=3 every transverse mode is a tilt, which is
+why nothing spatial exists there.
 
-### 5.1 Why `deff` saturates, and how far it can go
+**Why `deff` saturates.** Two exact facts bound it.
 
-The effective dimension is not limited by the method but by two exact facts.
+*The reflection stratum is attracting.* Let `σ_r ∈ O(d)` fix `e_1…e_r`. Since `A∘σ_r = A`, the set of loops
+in `R^r` is invariant under L-BFGS *and* under the Newton–LM step: a `deff = r` critical point can never be
+left, only entered. At such a point the Hessian is exactly block diagonal and `∇_⊥A` is odd in `ξ_⊥`, so
+Newton contracts transversally like `‖ξ_⊥‖³` **whatever the sign of `H_⊥`**. Measured: phase-1 L-BFGS keeps
+~50 % of `d`-dimensional starts `d`-dimensional and the Newton step destroys 99 % of those; kicking along
+the softest, softest-negative, or random directions raises `deff` in **0 of 816** trials. **Starts are
+everything**, and symmetry cannot substitute — forcing `deff = d` needs a trivial core, which makes the
+group cyclic or dihedral, whose real irreps have dimension ≤ 2, so `Fix(G)` always contains planar loops
+(500 `--sym random` draws at `d = 5, N = 4` and `d = 7, N = 6` produced not one loop with `deff > 2`).
 
-**The reflection stratum is attracting.** Let `σ_r ∈ O(d)` fix `e_1…e_r`. Since `A∘σ_r = A`, we have
-`∇A(σ_r x) = σ_r ∇A(x)` and `H(σ_r x) = σ_r H(x) σ_r`, so `S_r = {loops in R^r}` is invariant under L-BFGS
-*and* under the Newton–LM step: a `deff = r` critical point can never be left, only entered. At `x ∈ S_r`
-the Hessian is exactly block diagonal, `H = H_∥ ⊕ (I_{d−r} ⊗ H_⊥)` (measured bit-exact), and
-`∇_⊥A = H_⊥ξ_⊥ + O(‖ξ_⊥‖³)` is odd in `ξ_⊥`, so the Newton step contracts transversally like `‖ξ_⊥‖³`
-*whatever the sign of `H_⊥`*. Instrumented: phase-1 L-BFGS keeps ~50 % of `d`-dimensional starts
-`d`-dimensional and the Newton step destroys 99 % of those. Kicking along the softest, the softest
-*negative*, or random Hessian directions all raise `deff` in **0 of 816** trials. **Starts are everything.**
+*The budget.* A vertical-family loop has `deff = 2 + Σ_j rank[c_j, s_j]`: two directions oscillating at the
+same mode span only a plane, so extra *modes*, not extra directions, buy dimension. With `⌊N/2⌋ − 1` usable
+transverse patterns,
 
-**The `deff` budget.** A vertical-family loop has `deff = 2 + Σ_j rank[c_j, s_j]`: two directions
-oscillating at the *same* mode span only a plane, so extra directions buy nothing and only extra *modes*
-do. With `⌊N/2⌋ − 1` usable transverse patterns `k = 2…⌊N/2⌋`,
+    deff_max(N) = 2⌊N/2⌋ :   N=3→2, 4→4, 5→4, 6→6, 7→6, 8→8, 9→8, 10→10, 12→12 .
 
-    deff_max(N) = 2⌊N/2⌋ :   N=3→2, 4→4, 5→4, 6→6, 7→6, 8→8, 9→8, 10→10 .
+This reproduces the whole earlier catalogue and predicted the rest before the runs: `d = 7` with `N = 4` or
+`5` cannot exceed `deff = 4` however long it runs (measured over 3·10⁴ trials), while `N ≥ 8` admits
+`deff = 7`, and `deff = 11` needs `N ≥ 12`.
 
-This reproduces the whole previous catalogue (max `deff` 4 at N = 4 and 5) and predicted the rest before the
-runs: `d = 7` with `N = 4` or `5` cannot exceed `deff = 4` however long it runs (measured over 3·10⁴ trials),
-while `N ≥ 8` admits `deff = 7` — and `N = 10` delivered it.
-The `hyper` start family excites one near-resonant mode per pattern `k`, circularly polarised in pairs
-(`2+2+1` on the five transverse directions of `d = 7`); it produced every `deff = 6` record.
+## 6. The rotating frame (`--omega`)
 
-## 6. `continue` — bifurcation trees in the exponent α, or in the frame
+`--omega "w1,w2,…"` puts rates in the successive coordinate planes; `su:w1,…` closes the list with
+`w_n = −Σw`; `g2:p,q[,r,…]` is the maximal torus of `g₂` — rates `(p, q, p+q)` on the Fourier planes of the
+Fano 7-cycle, plus one free rate per leftover coordinate plane. Validated exactly: at `Ω = −1` the Lagrange
+circle reappears as the mode-2 curve with an identical action and `|∇A| = 1.3e-15`.
 
-Pseudo-arclength continuation of a branch of critical points in `(x, s)`, where `s` is either the potential
-exponent α (`--param alpha`, the default) or the scale of the rotating frame, `Ω = sΩ₀` (`--param omega`,
-`s = 0` inertial). Tangent predictor, corrector = Newton–LM on the bordered system
-`[H, ∂∇A/∂s; Gᵀ, 0; tᵀ]` (G = analytic gauge generators, so the corrector is gauge-fixed), folds are
-traversed. Only `∂(∇A)/∂s` distinguishes the two parameters, and because the kinetic operator is exactly
-quadratic in `Ω` the frame derivative is one kernel (`kin_omega_ds`) rather than a new solver: the `mΩ` term
-is linear in `s`, the `Ω²` term quadratic. In `Ω` mode the `Config` and the base problem stay inertial and
-`Ω₀` lives only in the continuation parameter, so the report at `s = 0` certifies against the real inertial
-problem. Roots must match the mode — `--param omega` takes only records that carry a frame, `--param alpha`
-only records that do not, rather than silently dropping or inventing one. Along a branch, a change of Morse index means a non-gauge eigenvalue crossed
-zero; the crossing is located by bisection, the new branch is entered with the crossing eigenvector as the
-arclength tangent (which keeps the corrector off the parent), and followed in both directions. Every crossing
-of α = 1 is polished, certified and catalogued. Roots: catalogue records and the k-fold covers of the circle
-(`--covers`), because the transverse Lyapunov resonances live on the covers (on the 5-fold circle the (5,6)
-hip-hop bifurcates at α ≈ 0.725 with Morse index 10→8; its own secondary bifurcation at α ≈ 1.369 leads back
-to the circle).
+The frame must be **calibrated** (§7) or the stored `χ*` is meaningless: `su:` puts its rates on coordinate
+planes rather than Fano planes, and its calibration defect reads 3.0 at `d = 7`, 6.0 at `d = 9` and 4.0 at
+`d = 11`, against 1e-15 for the `g₂` frame.
 
-## 7. Symmetry DSL (`--sym`)
+The associative 3-form is **not** a `d = 7` object. It lives on `span(e₀…e₆)` in every `d ≥ 7`, and any
+rotation of the remaining coordinates fixes it pointwise, so `stab(φ) = g₂ ⊕ so(d−7)` — dimension **14, 15,
+20** at `d = 7, 9, 11`, computed and pinned by `make test`. That is what makes `d ≥ 9` reachable.
 
-A generator `(ε, θ = 2πp/q, R ∈ O(d))` imposes `q(εt + θ) = R q(t)`; it acts linearly and orthogonally on
-each mode's `(c_m, s_m) ∈ R^{2d}`; the generated group is closed per mode (rejected if > 8192 elements),
-averaged into the projector onto the fixed subspace, whose eigenvectors are the search basis.
+`continue --param omega` walks `Ω = sΩ₀` under the same pseudo-arclength corrector as `α`, so folds are
+traversed and `s = 0` is certified against the genuine inertial problem. Because the kinetic operator is
+exactly quadratic in `Ω`, the frame derivative is one kernel rather than a new solver.
 
-    t+p/q | t-p/q   time map (sign = ε)      s[±i,±j,…]  signed permutation      r(i,j,p/q)  rotation by 2πp/q in plane (i,j)
+### 6.1 Choosing a frame
 
-Figure-eight class: `"t+1/2 s[-1,2]; t-0 s[1,-2]"` — the eight's half-period map is `diag(−1,+1)` (its `x`
-carries the odd harmonics and its `y` the even ones), not `−I`. This README used to say `s[-1,-2]`, which is
-the *circle's* class: 400 trials under it return `A = 6.534776057` every time, while `s[-1,2]` returns the
-eight `A = 8.123975492` in 296 of 300. The automatic detection below found the error.
+The search problem depends on `Ω` only through the **multiset of `|rates|`**, which collapses the parameter
+box; cells are indexed by that multiset. Sweep small distinct rates at ~45–90 s per cell, always including
+an all-`r = 0` control, score **distinct families** rather than raw records (a frame parked on a continuous
+family resamples it indefinitely — `g2:3,4` at `d = 7, N = 10` returns 21 records in 45 s that are all one
+family), then re-run the top few at 3–4× the budget on a second seed.
 
-Two named classes expand to generators: **`cyc:p`** cycles the `⌊d/2⌋` coordinate planes, `q(t + 2πp/n) =
-σ q(t)` with `σ` of order `n` (`cyc:1` at `d = 6` is `t+1/3 s[3,4,5,6,1,2]`), and **`fano:p`** is the `d = 7`
-Fano 7-cycle of §14. Both are cyclic with trivial core, so unlike a group containing a fixed rotation they do
-not cap `deff` (§5.1) — their value is cost. At `d = 6, N = 5, K = 16` the fixed subspace of `cyc:1` has
-`r = 52` of `n = 156` parameters, so the Hessian eigendecomposition is ~27× cheaper.
+Three regularities hold at every `d` tested: **degenerate** cells (a repeated rate) collapse and sometimes
+cap `deff` outright; the cell carrying the two largest rates returns few or no records; and the smallest
+distinct rates win. The ranking **does not transfer between `N`** — `{2,3,5}` is seventh of eight at
+`N = 10` and first at both `N = 11` and `N = 12`, while `N = 10`'s winner `{1,6,7}` drops to seventh — so
+every new cell needs its own sweep. It is stable in budget and seed *within* a cell, so it is the `N` axis
+that destabilises it. Short sweeps overstate long-harvest rates: over 25–30 min the three `d = 7` cells land
+within 30 % of each other, though a 150 s sweep made `N = 11` look 1.3× better.
 
-## 8. Arbitrary precision (`refine`)
+Harvest frames: `g2:1,6` at `d = 7, N = 10`; `g2:2,3` at `N = 11, 12`; `g2:1,3,2` at `d = 9`;
+`g2:1,2,4,5` at `d = 11`.
 
-The shooting Newton runs on the Taylor integrator instantiated with `mpreal` (minimal MPFR wrapper). All
-series arithmetic goes through in-place primitives (`fma_add`, `mul`, `div_ui`, …) on preallocated storage —
-no temporaries, no allocation inside the integrator. The Jacobian uses central differences with step
-`2^{−bits/3}`, so each iteration gains ≈ 2/3 of the working precision. Output: initial conditions, energy,
-action and the Fourier coefficients (DFT of a dense-output period) to the requested digits.
+### 6.2 The leftover rates buy the last dimension
 
-## 9. Files, resumability, scaling out
+Setting the leftover rate to zero leaves the `d = 7` frame sitting inside `R^d` with a fixed subspace. At
+`d = 9` that reaches `deff = 8` but **never 9** — at 45 s it appeared to cap at 7, which invited the tidy
+conclusion that the frame must rotate every direction the loop occupies, and 4× the budget refuted it (the
+same frames reach 8). At `d = 8`, where `so(1) = 0` and a `g₂` frame has no leftover rate at all, `deff = 8`
+is still reached. So a direction the frame does not rotate **can** be occupied.
 
-* `catalog.bin` — binary, little-endian, bit-exact doubles: `"HYPCHOR1"` then records (`RecHdr`, 152 bytes:
-  ids, N, d, deff, K, M, cover, Morse, nullity, hits, action, energy, r.m.s., minsep, |L|, gradient norm, ODE
-  residual, seed, trial, …; then `int32 modes[nm]`, `double coef[nm·2·d]` (per mode `c` then `s`),
-  `double Lsv[d]`, `double pca[d]`, `char sym[]`). `hyperchoreography show` dumps a record as JSON.
-* `catalog.bin.state` — seed and next trial index; trials are deterministic functions of `(seed, trial)`, so
-  a run resumed after Ctrl-C/kill continues exactly, whatever the thread scheduling. Checkpoints every 30 s
-  (atomic rename). Use a different `--seed` per machine and `merge` the results. When a duplicate is found
-  (in `search`, `continue` or `merge`) the better-resolved record is kept (smaller ODE residual, then fewer
-  modes) and the hit counts are added.
-* `catalog/` — consolidated results of the development runs (`d2-3_n3.bin`, `d2-4_n4.bin`, `d2-4_n5.bin`,
-  `d3-4_n6.bin`, and `d7_n8.bin`, `d7_n9.bin`, `d7_n10.bin` — twenty records, nineteen of them `deff ≥ 6`,
-  in seven dimensions) and `d2n3_eight_60digits.txt`, the figure eight refined
-  to 60 digits by `refine`. `list` shows deff, d, N, K, action, energy, Morse, nullity, minsep, residual,
-  twist and its scale-free form, hits, cover, symmetry/provenance (`--sort twist` orders by the last). A record's `d` is the dimension it was found in (its Morse index is taken there:
-  the eight has index 0 in 2-D but 1 in 3-D); `deff` is the dimension the loop actually spans.
-* Records carry a trailing `double extra[]` (`nextra` in the header, 0 in legacy files, so old catalogues
-  load unchanged): `[0]` the calibration twist `χ*` (§14), `[1]` `χ*` over the jet scale, `[2]` the rung's
-  jet order `k`, `[3]` `‖A_k‖` over the jet scale, `[4..7]` reserved, then `d²` entries of `Ω` when the record
-  came from a rotating frame (rotated into the record's canonical frame). `extras` recomputes all of these,
-  and the Morse index, over an existing catalogue.
-* `src/` — `action.hpp` (basis, kernels, symmetry), `calib.hpp` (the calibration ladder: `Λ^k`, jet moments,
-  the `SO(d)` ascent), `g2.hpp` (the `d = 7` Fano frame and torus), `optim.hpp` (L-BFGS, Newton–LM, inertia),
-  `taylor.hpp` (generic Taylor integrator, shooting Newton), `invariants.hpp` (canonical form, Procrustes,
-  symmetry detection), `catalog.hpp`, `search.hpp` (starts, trial pipeline, certification), `continue.hpp`,
-  `mpreal.hpp`, `linalg.hpp`, `main.cpp` (CLI), `tests.cpp`.
+What survives at both budgets and every rate set is narrower: **no `r = 0` run has ever reached the top
+dimension.** At `d = 11` the same control, at 4× the sweep budget:
 
-### 9.1 `tools/gallery.py` — the catalogue as one page
+| frame | `deff` 11 / 10 / 9 @ 90 s | @ 6 min (4×) |
+|---|---|---|
+| `g2:1,2,4,0`, one rate zeroed | 0 / 1 / 6 | 0 / 4 / 12 |
+| `g2:1,2,0,0`, both zeroed | 0 / 0 / 0 | no records at all |
 
-    python3 tools/gallery.py                       # every catalog/*.bin -> gallery.html
-    make gallery                                   # -> docs/index.html, which is what GitHub Pages serves
-    python3 tools/gallery.py catalog/d9_n10_g2.bin --samples 720 --out d9.html
-    python3 tools/gallery.py --fragment            # without the document shell, for a host that supplies one
+The extra budget lifts the histogram exactly as at `d = 9` and still produces no `deff = 11` orbit. With
+both rates zeroed the frame is the bare `d = 7` torus in `R¹¹` with a fixed 4-space, and it returns nothing
+while running at the **highest** trial rate of any cell — it dies cheaply on the `deff` pre-filter. The
+likely mechanism is mode-naming: the frame zeroes the kinetic eigenvalue `π(m − w)²` of the mode `m = w`, so
+a rate pays only by naming a mode that exists, and at `N = 10` the modes are `m ≢ 0 (mod 10)`, so `r = 0`
+names nothing. That is a statement about *rate*, not a proven structural gate.
 
-The live page is **<https://lycium.github.io/hyperchoreography/>**, served by GitHub Pages from `docs/` on
-`main`. After a harvest, `make gallery && git commit -am "…" && git push` updates it.
+### 6.3 `d = 11`
 
-Standard library only (no numpy), ~2 s for the whole catalogue, one self-contained file with no external
-reference of any kind. Re-run it after a harvest and the page is current.
+`--omega g2:p,q,r₁,r₂` with `N = 12`, the cheapest `N` the budget allows for `deff = 11`; `K = 24`,
+`--starts hyper`, ten cells at 90 s scored by distinct `deff = 11` records:
 
-The problem it solves is that a `deff = 9` orbit and a circle look the same in any two coordinates you pick,
-because the action is `O(d)`-invariant and the stored basis is arbitrary. So each tile is drawn in the
-record's **own principal frame** — the eigenvectors of the second moment pooled over all `N` bodies and all
-samples, by a hand-written Jacobi sweep — and shows three things at once: a 3-D orthographic shadow of
-principal axes 1–3, a strip of one panel per principal plane in three states (curve, line, or grey rule, so
-that `deff = 2×curves + lines` is literally countable), and a bar meter of `√(λₖ/λ₁)`. A mutual-distance
-ribbon `|q₀ − qₖ|(t)` runs underneath, which is flat exactly for a relative equilibrium. Measured against
-the naive "plot the first two coordinates": **2 of 316 tiles** now read as a near-circle, against **80 of
-333** before.
-
-Only body 0's curve is stored. For a rotating-frame record the page rebuilds the other `N−1` from
-`body_j(f) = Gʲ · body_0((f + jS/N) mod S)` with `G = Vᵀ exp(−2πΩ/N) V` shipped once per record — 1.43 MB
-for 316 records instead of 11 MB. One `requestAnimationFrame` loop drives only the tiles an
-`IntersectionObserver` reports visible; trails, strip and ribbon are stroked once into cached canvases.
-
-## 10. Reference values (period 2π, unit masses, G = 1, action per body; `E_total = −N·A/(6π)` by the virial theorem)
-
-| deff | N | solution | action | energy | Morse | modes | provenance |
-|---|---|----------|--------|--------|-------|-------|---|
-| 2 | 3 | Lagrange circle | 6.534776057 | −1.0400419 | 0 | 1 | any |
-| 2 | 3 | figure eight | 8.123975492 | −1.29297085712209404 | 0 | 59 | search |
-| 2 | 3 | third planar N=3 | 11.152080126 | −1.7749087 | 1 | 65 | search (rare, 0.7 % of trials) |
-| 2 | 4 | square RE | 9.153307580 | −1.9423922 | 0 | 1 | any |
-| 2 | 4 | planar N=4 | 11.109471463 | −2.3575030 | 0 | 98 | search |
-| 2 | 4 | planar N=4 | 15.047956193 / 17.447668440 | −3.193 / −3.703 | 3 / 6 (in 3-D) | ≥ 500 | search |
-| 4 | 4 | Clifford-torus RE, modes (2,3) | 16.579572165 | −3.5182940 | 6 | 3 | torus start |
-| 3 | 4 | reflection–reversal symmetric | 16.973317577 | −3.6018500 | 4 | ~130 | `--sym random` |
-| 3 | 4 | hip-hop resonance (5,6) | 26.761760441 | −5.6790220 | 8 | 66 | vertical start / continue |
-| 2 | 5 | pentagon RE | 11.661751074 | −3.0933760 | 0 | 1 | any |
-| 2 | 5 | planar N=5 (several) | 13.77 … 21.98 | | 0–2 | 64–512 | search |
-| 4 | 5 | Clifford-torus RE, modes (6,7) | 37.945568979 | −10.065375 | 18 | 7 | torus start |
-| 6 | 8 | eight, `d = 7` | 43.015354764 … 123.239443967 | −18.26 … −52.30 | 32–202 | 10–203 | `hyper` start |
-| 6 | 9 | four, `d = 7` | 82.775484633 … 153.710633495 | −39.52 … −73.39 | 88–260 | 13–68 | `hyper` start |
-| 6 | 10 | six, `d = 7` | 47.139791794 … 122.853934835 | −25.01 … −65.18 | 28–142 | 5–142 | `hyper` start |
-| **7** | 10 | **genuinely 7-dimensional**, twist 0.639413 | 61.724155215 | −32.7456814 | 48 | 248 | `hyper` start |
-| **7** | 10 | **genuinely 7-dimensional**, twist 0.646759 | 72.684195412 | −38.5601633 | 63 | 327 | `hyper` start |
-| 3 | 5 | hip-hop resonance (7,9) | 42.644345524 | −11.311764 | 12 | 99 | continue |
-
-## 11. Known issues and loose ends
-
-* **Some `continue` branches stall before reaching α = 1.** The transverse (vertical) families work end to
-  end. In-plane bifurcations of the circle covers (e.g. N=3: ×4 at α≈1.437, ×5 at 1.640 and 0.560; N=4 in 3-D:
-  ×7 at 1.674 and 0.694) are detected and switched, and the children travel a finite distance (×4: from 1.44
-  down to 1.19; ×7: 1.67 → 1.19) before the corrector fails with the step at `hmin` ("stuck"). Two things
-  are mixed here: branches that genuinely end in a collision before α = 1 (Simó reports strong-force
-  solutions that "seem not to exist for the Newtonian potential"), which the code should recognise by the
-  shrinking minimum separation and report as such; and switching/conditioning problems for branches that
-  stall immediately (×5 at 0.56, ×7 at 0.69), where a degenerate *pair* of eigenvalues crosses (rotational
-  symmetry makes the bifurcating set a circle of solutions) and the bordered system needs an explicit phase
-  condition or continuation in the symmetry-reduced subspace.
-* ~~**Morse index at truncation.**~~ Fixed (§4), and the catalogues have now been recomputed with
-  `hyperchoreography extras`. Many stored values predated the gauge fix — a stored `nullity = 0` is
-  impossible, the time shift alone forces 1 — and are now the gauge-consistent ones (`d=2 → 2`,
-  `d=3 → 4`, `d=4 → 6` or `7`), unchanged over a 4× larger index basis.
-* **Small-amplitude branches near a parent** are identified with the parent by the 1e-3 distance tolerance.
-  Lower `--tol-dist` (records are accurate to ~1e-13) when hunting near bifurcations.
-* **`--sym random` is wasteful and, in `d ≥ 5`, useless**: 60–75 % of draws are rejected outright and the
-  survivors land on the circle (§5). The named classes `cyc:p` and `fano:p` (§7) are the useful ones —
-  cyclic, trivial core, large cost saving — but a curated table per `(d, N)` is still not wired in.
-* **De-duplication had a false-negative** on many-mode loops: `d3-4_n6.bin` held three copies of one orbit
-  (identical mode-power spectra to 4.9e-15) that the Procrustes distance separated by 7e-3…1e-2. Now
-  guarded by a mode-power fingerprint, which is invariant under the whole equivalence group; `merge` folds
-  the extra copies. Raising `max_modes` from 64 to 256 does *not* help — the failure is in the Procrustes
-  alignment on many-mode loops, not the truncation.
-* **Trial cost in d ≥ 4 is dominated by the dense Fourier Hessian and its eigendecomposition** (n = 2·nm·d);
-  Accelerate's `dsyevd` covers the latter. A matrix-free Newton–Krylov step was measured and dropped: it only
-  breaks even near n ≈ 400 and is erratic beyond (0.88×–1.57×) once force evaluation dominates.
-* Double precision suffices: the action matches 40-digit MPFR to 1–2 ulp at 40 k quadrature nodes, and
-  re-shooting rejected candidates in MPFR recovers nothing that double misses. The ~1e-11 floor on the T/N
-  shift residual is Lyapunov amplification, not summation roundoff.
-* **Calibrated starts do not work below `N ≈ 12`, for a structural reason.** §14 says a twisted loop needs
-  modes in *arithmetic* resonance, `Σn = 0`; a start that converges needs the *dynamical* resonance
-  `m₂/m₁ ≈ ω_k` of §5. The two are incompatible at the `N` the search actually runs at — the closest
-  `1 + ω_j = ω_k` is off by 0.87 at `N=6`, **0.64 at `N=8`**, 0.37 at `N=10`, and only 0.087 at `N=12` and
-  0.021 at `N=14` (transverse-only triples `ω_i + ω_j = ω_k` are worse everywhere), and deep covers make it
-  *harder*, since the rounding slack is `N/(2m₁)`. Measured A/B at `d=7, N=8`, same seed, 90 s: forcing the
-  resonance gives **4 records against `hyper`'s 12**, and putting it on the leftover axis gives **2 against
-  14**, none of them twisted — while the trial *rate* rises, i.e. the starts fail earlier. So twist in the
-  found orbits comes from the nonlinear mode cascade, not from the start. The family was written, measured
-  and reverted; roadmap item 5 is the experiment that would change the verdict.
-* **The catalogue predates the rigidity test and is contaminated by relative equilibria** — 31 of 170
-  records, concentrated exactly where it hurts: 4 of 4 in `d7_n9.bin`, 5 of 8 in `d7_n10.bin`, 3 of 8 in
-  `d7_n8.bin`, against 6–34 % in `d ≤ 4`. They are not wrong (a rigid configuration whose bodies lie on one
-  curve *is* a choreography) but they are the trivial family, and they were being counted as high-`deff`
-  finds. `extras` now stores the defect on every record so they can be listed (`--sort rigid`) or dropped;
-  the files themselves are unchanged. The two `deff = 7` headline orbits are not among them.
-* Close-approach loops (minsep < 0.05) get 500+ modes; the shooting certification is fine, but the Fourier
-  representation is then a poor basis — parallel shooting (Simó) would suit them better.
-* The `hits` counter is only saved at checkpoints; a kill between checkpoints loses ≤ 30 s of counts.
-
-## 12. Roadmap — what remains to be explored
-
-1. ~~**Continuation in `Ω`.**~~ In — `continue --param omega` (§6) walks `Ω = sΩ₀` under the same
-   pseudo-arclength corrector as `α`, so a fold no longer ends a branch, and `s = 0` is certified against the
-   genuine inertial problem. **The verdict on `d = 7` is negative, and now it is quantitative.** Following
-   both directions from each of the nine `deff = 7` records of `catalog/d7_n10_g2.bin` (`K = 24`, 800
-   arclength steps, `s ∈ [−0.25, 1.5]`, no branch switching) gives 18 branches:
-
-   * **5 reach `s = 0`** (from records 2, 3, 5 twice, 7) — and **every one arrives on a relative
-     equilibrium**, rejected by the rigidity gate, then carries on to `s ≈ −0.28` where four of them share
-     the same Morse index 46, i.e. the same rigid family. This is the old natural-parameter result, but it
-     is no longer ambiguous: the folds *were* traversed and the branches still land on rigid motion.
-   * **1 is a closed isola** (record 0, the `χ* = 16.2` champion): from `s = 1` it passes several folds,
-     never leaves `s ∈ [0.98, 1.06]`, and returns to its own starting orbit. The opposite direction runs
-     3000 steps in the same window without escaping. Along it the tangent's `s`-component is 0.001–0.08, so
-     `dx/ds` is 10–1000× the loop scale, and the gauge-lifted condition number runs 3e3–3e5 — steep and
-     bounded, not stalled.
-   * The remaining 12 run out to the `s` bounds (mostly `s → 1.5`, away from the inertial problem) or stick.
-
-   So no high-`deff` relative choreography found so far deforms to an inertial choreography: they either
-   circle, run away from `s = 0`, or degenerate to a rigid body. The one route not yet tried is switching
-   branches off the isola — the Morse index genuinely crosses (6↔7) at `s ≈ 0.9829` and `s ≈ 0.9986`, which
-   is what `--depth` is for; the bifurcation bookkeeping now dedupes crossings so a closed branch cannot
-   re-spawn the same one forever.
-2. **Mine the symmetry classes instead of guessing them.** `hyperchoreography symmetry` emits exactly the
-   text `--sym` consumes, so the loop closes: detect the groups that actually occur in the catalogue, keep
-   the ones with a small fixed subspace, and re-search inside them. That is the curated table §11 wants, and
-   it is the one part of the stabiliser programme (§14) still done by hand — the continuous subgroups are in
-   (`--omega su:`), the invariant is in (`χ*`), the finite subgroups are not.
-3. **Linear stability** (Floquet multipliers from the reduced monodromy `S⁻¹ DΦ_{T/N}`, whose eigenvalues are
-   the N-th roots of the full multipliers): the shooting Jacobian is already computed, but the codebase has
-   no unsymmetric eigensolver — a Hessenberg + Francis QR (~130 lines) is the missing piece. **The largest
-   remaining gap**: the catalogue reports a Morse index, which is not linear stability. Measured on
-   `d2-3_n3 #2`: the reduced monodromy has symplectic defect 1.3e-07 against 9.4e+02 for `DΦ_T` taken
-   directly, which loses five digits on the largest multiplier and all of them on the small ones.
-4. ~~**The `d = 8` Spin(7) frontier.**~~ Opened — see §1. A rotating frame on the calibrated line `Σw = 0`
-   reaches `deff = 8` at `d = 8, N = 10` and `deff = 10` at `d = 10, N = 10`, where the inertial search finds
-   nothing, and **the frame is essential**: relaxing `Ω = sΩ₀` on five orbits, two branches reach `s = 0` on
-   the *rigid* family (`deff` 2 and 4) and three stall, one already rigid to 2e-15 with `deff` still reading
-   8. That was natural-parameter continuation, so a stall may have been a fold; the pseudo-arclength
-   version is now in (item 1), and on the one branch followed to closure the answer is "neither" — a closed
-   isola around `s = 1`. The original argument, still open, was:
-   at `k = 4` time reversal does not silence the twist, and every one of the first 13 records carries it,
-   against 24 of 98 at `k = 3`. A 20-minute run opened it (§1) and stopped at `deff = 6`; the budget of §5.1
-   says `deff = 8` is reachable at `N ≥ 8`. `d = 5` and `d = 6` are equally unexplored — 30 s per `N` at
-   `d = 6` produced 43 records where the catalogue had none. The same law says the `d = 7` twist is really a
-   *chirality* invariant: at `k = 3` it is non-zero only on orbits that are not reversible with an `R` fixing
-   `A₃`, so "maximise twist" there means "find the time-irreversible orbits".
-5. **Test the `N ≳ 12` prediction.** §11 shows the calibrated start fails because the N-gon's out-of-plane
-   frequencies are never arithmetically resonant at small `N` — but the gap closes as `N` grows (off by 0.64
-   at `N = 8`, 0.087 at `N = 12`, 0.021 at `N = 14`). If that is the real obstruction, twisted orbits should
-   become common there and a calibrated start should start paying. This is a sharp, falsifiable prediction.
-6. **The in-plane half of the N-gon spectrum.** Only the out-of-plane frequencies `ω_k² = C₀ − C_k` are in
-   the code (`ngon_vertical_freq`); the in-plane block is a quartic in `ν` whose real roots give a second,
-   entirely unexploited family of resonances `m₂/m₁ = 1 ± ν̂_k` with `k ≡ m₂m₁⁻¹ − 1 (mod N)`. ~30 lines for
-   `ngon_C(N,k,α)` plus a quartic solve; it generalises `ngon_vertical_freq` to any `α` for free.
-7. **Better branch switching for degenerate (rotational) bifurcations** — see §11 — and multi-threaded
-   `continue` (branches are independent).
-8. **FFT-based synthesis** for K ≳ 200.
-9. **Strong-force homotopy classes.** At α ≥ 2 minimisers exist in every homotopy class in the plane (Moore,
-   Montgomery); systematic enumeration by braid type followed by `--alpha-start` continuation.
-10. **Mountain-pass / string method** between catalogued minimisers to harvest index-1 saddles systematically.
-11. **Rigorous verification** (interval Newton–Kantorovich on the shooting map in MPFR) to turn certified
-    orbits into proofs, à la Kapela–Simó.
-12. **Visualisation**: an HTML/WebGL viewer of the catalogue (projections for d ≥ 4, animated bodies).
-13. Beyond equal masses and choreographies proper: relative choreographies with several curves
-    (Ferrario–Terracini core symmetries) reuse almost all of this machinery.
-
-## 13. The rotating frame (`--omega`)
-
-    q_j(t) = exp(Ωt) q(t + 2πj/N),   Ω ∈ so(d)   ⇔   q_j(t) = exp(−2πΩj/N) q_0(t + 2πj/N)
-
-— all bodies on one curve *up to a rotation*. Integer rotation rates give inertial choreographies;
-non-integer rates give relative periodic orbits, closing only up to `exp(2πΩ)`. The reduction is
-remarkably cheap: the potential term is bit-identically unchanged and only the kinetic term moves from
-`½∫|q̇|²` to `½∫|q̇ + Ωq|²`, i.e. from the scalar `kin[i] = π m²` to one `2d × 2d` block per mode,
-
-    K_m = π [ m²I − Ω²   −2mΩ ;   2mΩ   m²I − Ω² ] ,
-
-so the gradient gains a per-mode matrix–vector product and the Hessian a per-mode block, both `O(nm·d²)`
-— negligible against the potential. Certification changes by one rotation: the shift residual becomes
-`Φ_{T/N}(Z) − G S Z`, initial velocities pick up `Ωq`, and the re-extracted loop is un-rotated by
-`exp(−Ωt)` before the DFT. Gauge: the time shift survives; of the rotations, only the centraliser of `Ω`.
-
-Syntax: `--omega "w1,w2,…"` sets rates in the successive coordinate planes `(1,2), (3,4), …`;
-`--omega su:w1,…` closes the list with `w_n = −Σw` (the calibrated family of §14) and `--omega g2:p,q` is
-its `d = 7` octonionic form. `--sym` and `--omega` combine only when each
-generator satisfies `RᵀΩR = εΩ` (otherwise the twisted action is not invariant); trials that violate it are
-rejected with a named reason rather than silently minimising the wrong functional.
-
-Validated exactly: at `Ω = −1` the Lagrange circle must reappear as the **mode-2** curve with an unchanged
-action, and it does — `A = 6.534776057` against the inertial `6.534776057`, `|∇A| = 1.3e-15`, twisted shift
-residual `1.7e-15`.
-
-### 13.1 Which frame — the `(p, q)` sweep
-
-At `d = 7` the frame is the whole game (`--omega g2:1,2` finds nine `deff = 7` orbits in 90 s where 25 986
-inertial trials find none), so *which* frame matters more than anything else. The space of frames is smaller
-than it looks: the action is `O(d)`-equivariant, so `Ω` enters only through its `O(7)` conjugacy class — the
-unordered multiset of `|rates|` — and `g2:p,q` has rates `{|p|, |q|, |p+q|}`. The whole `(p, q)` plane
-therefore collapses to `0 ≤ p ≤ q`: 29 cells with every rate `≤ 9`, swept at 45 s each
-(`--d 7 --N 10 --K 24 --starts hyper --min-deff 6`, 18 threads, one seed).
-
-**Count families, not records.** The naive score — certified `deff = 7` records per cell — is badly
-misleading, because a frame can put the search on a *continuous family* of solutions, which it then samples
-over and over. `g2:3,4` is the extreme case: 21 records in 45 s, of which **all 21 are one family**, sharing
-`A = 19.827310867` and `E`, `rms`, `minsep`, `morse = 6`, `nullity = 6` to every printed digit. They are not
-a de-duplication failure — `loop_distance` is right that they are different loops, and `χ*` genuinely varies
-along the family (12.9 to 61.9) — they are 21 points on one 2-parameter family, and `nullity = 6` says so
-exactly: 4 gauge (time shift + the `g2` torus) plus 2. Scored by distinct action instead, `g2:3,4` yields
-**one** `deff = 7` family and is near the bottom of the table. `find_duplicate` now folds a family into a
-single record with a hit count (the action is exactly constant along it, so it is matched to round-off).
-
-Re-scored that way, over 45 s / seed 1 and again over 180 s / seed 2:
-
-| rates | `deff = 7` families @45 s | @180 s | records @180 s |
-|---|---|---|---|
-| **{1, 6, 7}** (`g2:1,6`) | **15** | **28** | 59 (largest family 2) |
-| {1, 3, 4} (`g2:1,3`) | 9 | 17 | 39 (largest family 1) |
-| {1, 5, 6} (`g2:1,5`) | 8 | 10 | 48 |
-| {3, 6, 9} (`g2:3,6`) | 8 | — | |
-| {1, 2, 3}, {1, 7, 8}, {4, 5, 9} | 7 | — | |
-| {2, 3, 5} (`g2:2,3`) | 3 | 7 | 41 |
-| {3, 4, 7} (`g2:3,4`) | 1 | 1 | 78 (largest family 65) |
-
-`g2:1,6` wins on both budgets and is clean — 55 families from 59 records, almost no re-sampling — so it is
-the frame to harvest in:
-
-    ./hyperchoreography search --d 7 --N 10 --K 24 --omega g2:1,6 --starts hyper \
-        --min-deff 6 --threads 18 --minutes 600 --out catalog/d7_n10_g2_16.bin
-
-Three weaker regularities, in decreasing order of confidence:
-
-* **Degenerate frames are poor.** A zero or repeated rate enlarges the centraliser of `Ω`, and the
-  centraliser is exactly the gauge group (§4), so such a frame breaks fewer directions than it appears to:
-  the nine `{0, q, q}` and four `{q, q, 2q}` cells average 2 `deff = 7` families against 5.3 for the
-  sixteen cells with three distinct non-zero rates. Five of the top seven are `{1, q, q+1}`.
-* **Rates must be small.** Seven probe cells with a rate `≥ 10` return **zero** `deff = 7` families between
-  them. The frame zeroes the kinetic eigenvalue `π(m − w)²` of the mode `m = w` in its plane, so a rate pays
-  only if it names a mode that exists and is cheap; at `N = 10` the modes are `m ≢ 0 (mod 10)`, so a rate of
-  10 names nothing. But the control `{2, 9, 11}`, whose rates are all legal modes, is empty too, so what
-  this measures is rate *magnitude* — high modes cost too much action — not the mod-`N` gap by itself.
-* **The `g2` relation buys nothing; the orientation buys some.** On coordinate planes (`--omega "3,4,7"`)
-  the five `g2`-form triples average 4.0 `deff = 7` families against 5.2 for the nine off-`g2` ones — no
-  advantage to `w₃ = w₁ + w₂`. What the `g2` *orientation* buys, on the same rates, is 2–13× **per trial**
-  ({1,6,7}: 8.8e-3 against 8.2e-4; {1,5,6}: 5.5e-3 against 4.1e-4; {1,2,3}: 2.2×; {3,4,7}: a wash), because
-  the structured starts are built in coordinate planes and a frame whose eigenplanes are *not* coordinate
-  planes puts the start in all three at once. Coordinate frames run ~3× more trials for the same wall
-  clock — they die faster on the `deff` pre-filter — so per second the two only separate on the best rate
-  sets ({1,6,7} and {1,5,6}, 3–4× for `g2`). With four matched pairs this is suggestive, not settled. What
-  `g2` certainly buys is a frame preserving the associative 3-form, hence a meaningful conserved `χ*`.
-
-### 13.2 `d = 9` — the leftover plane is what opens it
-
-The associative 3-form is *not* a `d = 7` object. `calib_psi`'s `CAL_G2` rung builds `φ` on `span(e₀…e₆)` in
-every `d ≥ 7`, and any rotation of the remaining coordinates fixes it pointwise, so its stabiliser is
-`g₂ ⊕ so(d−7)` — dimension **14, 15, 20** at `d = 7, 9, 11`, computed by `calib_stab_dim` and pinned by
-`make test`, not looked up. The calibrated frames above `d = 7` are therefore the `g₂` torus (rates
-`p, q, p+q` on the Fano planes) **plus one free rate on each leftover coordinate plane**, and `--omega
-g2:p,q,r,…` now builds exactly that in any `d ≥ 7`. `su:` is not a substitute: its planes are coordinate
-planes rather than Fano planes, and `calib_defect` reads **3.0** at `d = 7` and **6.0** at `d = 9` against
-`1e-15` for the `g₂` frame — a frame off the calibration makes `χ*` meaningless.
-
-`d = 9` was empty. Swept exactly as §13.1 — `--d 9 --N 10 --K 24 --starts hyper --min-deff 8`, 18 threads,
-45 s per cell, one seed, scored by **distinct `deff = 9` families**:
-
-| rates | `deff` max | families | best `χ*` | trials/s |
-|---|---|---|---|---|
-| {1, 2, 5, 6} (`g2:1,5,2`) | 9 | **5** | 127.1 | 24.1 |
-| {2, 3, 4, 7} (`g2:3,4,2`) | 9 | **5** | 116.4 | 22.3 |
-| {1, 2, 3, 4} (`g2:1,3,2`) | 9 | 4 | 44.2 | 24.8 |
-| {2, 3, 4, 5} (`g2:2,3,4`) | 9 | 4 | 70.6 | 25.3 |
-| {1, 2, 4, 5} (`g2:1,4,2`) | 9 | 4 | 67.0 | 22.5 |
-| {1, 2, 6, 7} (`g2:1,6,2`) | 9 | 3 | 130.9 | 22.3 |
-| {2, 3, 6, 9} (`g2:3,6,2`) | 9 | 1 | 84.8 | 22.1 |
-| {2, 3, 5, 7} (`g2:2,5,3`) | 9 | 2 | 13.5 | 22.9 |
-| {1, 2, 2, 3} (`g2:1,2,2`), degenerate | **8** | 0 | — | 30.1 |
-| {1, 2, 7, 8} (`g2:1,7,2`) | — | **no records at all** | — | 21.1 |
-
-Eight of ten cells reach `deff = 9`, so the dimension is not hard once the frame is calibrated. Both
-regularities of §13.1 reproduce and sharpen: the one **degenerate** cell (a repeated rate) does not merely
-score low, it **caps at `deff = 8`**; and the cell carrying the two largest rates returns **zero** records.
-
-**The leftover rate buys the last dimension.** Setting `r = 0` leaves the `d = 7` frame sitting inside
-`R⁹` with a fixed 2-plane. Re-run at `--min-deff 5` to see where it stops, at two budgets:
-
-| frame | `deff` histogram, 45 s | 180 s (second seed) | top `deff` |
-|---|---|---|---|
-| `g2:1,5,0` | 5 : 8, 6 : 13, 7 : 5 | 5 : 21, 6 : 26, 7 : 9, 8 : 1 | 7 → **8** |
-| `g2:3,4,0` | 5 : 6, 6 : 5, 7 : 1 | — | 7 |
-| `g2:1,3,0` | — | 5 : 21, 6 : 31, 7 : 8, 8 : 7 | **8** |
-| `g2:1,5,2` | 5 : 10, 6 : 10, 7 : 8, 8 : 3, **9 : 4** | — | **9** |
-
-Read the two columns together, because the first alone is misleading. At 45 s the `r = 0` frames top out at
-seven — exactly the dimension of the `φ` block, which invites the tidy conclusion that the frame must rotate
-every direction the loop is to occupy. **That conclusion is wrong**, and two controls kill it. Given four
-times the budget the same `r = 0` frames reach `deff = 8` (seven records and one); and at `d = 8`, where
-`so(d−7) = so(1) = 0` and a `g₂` frame therefore has *no* leftover rate at all, `--omega g2:1,3` and
-`g2:1,5` still reach `deff = 8` in 45 s (three records and one) — as does `su:1,2,3`, at 178.6 trials/s
-against the `g₂` frames' 21–33.
-
-What survives is narrower and still worth having: **no `r = 0` run has ever reached `deff = 9`** — not in
-45 s, not in 180 s, not at either rate set — while `r = 2` reaches it in 45 s from four different `(p, q)`.
-The leftover rate is what gets the loop into the *last* dimension, and it gets it into the earlier ones far
-faster; it is not a structural gate on dimensions 8 and 9. The likely mechanism is still §13.1's second
-regularity: the frame zeroes the kinetic eigenvalue `π(m − w)²` of the mode `m = w` in its plane, so a rate
-pays only if it names a mode that *exists*, and at `N = 10` the modes are `m ≢ 0 (mod 10)`, so `r = 0` names
-nothing. But the `d = 8` control shows that a direction the frame does not rotate can still be occupied, so
-this is a statement about *rate*, not about a hard cap.
-
-
-Sweeping `r` itself (45 s, same seed), `r = 2` dominates and the falloff is fast:
-
-| `(p, q)` | `r = 0` | `r = 1` | `r = 2` | `r = 3` | `r = 4` |
+| rates | `deff` 11 | 10 | 9 | best `χ*` | trials/s |
 |---|---|---|---|---|---|
-| `(1, 5)` | 0 | — | **5** | 3 | 1 |
-| `(3, 4)` | 0 | 1 | **5** | — | — |
-| `(3, 6)` | — | 1 | 1 | — | 0 (caps at `deff = 8`) |
+| {1,2,3,4,5} (`g2:1,2,4,5`) | **8** | 1 | 4 | 81.3 | 16.8 |
+| {1,2,3,5,6} (`g2:1,2,5,6`) | 2 | 2 | 3 | 133.0 | 16.5 |
+| {1,2,3,4,7} (`g2:3,4,1,2`) | 2 | 0 | 0 | 18.0 | 14.9 |
+| {1,2,3,6,7} (`g2:1,6,2,3`) | 1 | 0 | 3 | 45.3 | 13.9 |
+| {1,2,3,4,6} (`g2:1,2,4,6`) | 0 | 3 | 6 | — | 14.2 |
+| {1,2,3,5,7} (`g2:2,5,1,3`) | 0 | 0 | 1 | — | 12.9 |
+| {2,3,4,5,6} (`g2:2,3,4,6`) | 0 | 0 | 6 | — | 14.6 |
+| {1,2,3,3,4} (`g2:1,2,3,4`), degenerate | 0 | 0 | 1 | — | 14.0 |
 
-The mod-`N` argument explains `r = 0` but *not* why 2 beats 1 — both name a legal mode — so what separates
-them is unmeasured. Re-scored on a second seed at 150 s, the ranking moves the way it did at `d = 7`, and
-the cell with the four smallest distinct rates wins:
+Re-run on a second seed at 3.3× the budget the ranking holds — 11, 5 and 3 `deff = 11` records for the top
+three — so `g2:1,2,4,5` is the frame to harvest in.
 
-| rates | families @45 s | @150 s, seed 2 | best `χ*` |
-|---|---|---|---|
-| {1, 2, 3, 4} (`g2:1,3,2`) | 4 | **8** | 44.2 |
-| {2, 3, 4, 7} (`g2:3,4,2`) | 5 | 6 | 94.1 |
-| {1, 2, 5, 6} (`g2:1,5,2`) | 5 | 5 | 123.3 |
-| {2, 3, 6, 9} (`g2:3,6,2`) | 1 | 2 | 125.8 |
+One hour on 18 cores (57 327 trials, seeds 1, 2 and 11 merged) gives **122 records, 38 of them
+`deff = 11`**, every one isolated — `nullity = 6`, exactly the gauge dimension of the 5-torus plus the time
+shift — and validating clean: no missing Morse data, no near-collision, every return error below 1e-9, and
+nothing inside the rigidity gate. The `χ*` champion is id 13, `A = 22.745582770`, `χ* = 81.3`
+(`tw_rel = 0.32`), certified at shift residual 1.8e-12, full-period return 1.6e-12 and energy drift
+1.8e-15.
 
-so `g2:1,3,2` is the frame to harvest `d = 9` in.
-
-**Every `χ*` above is taken after the rigidity gate, and that matters.** Scored before it, `g2:3,6,2` looked
-like the twist champion of the whole project at `χ* = 446.5` — against the `d = 7` catalogue's 253.7. That
-record has `rigid = 1.29e-6`: it is a **relative equilibrium**, and the §14 test already says why it scores
-so high — a *resonant* rigid configuration has large twist (20.0 there against 4e-14 for the non-resonant
-one), because the calibration pairing is exactly what resonance maximises. So a rigid orbit can out-twist
-every genuine one in the catalogue, and `χ*` is only a quality score **downstream** of the rigidity gate,
-never as a way to rank raw search output. Re-scored gated, the frame gives 1 family at `χ* = 84.8`, and the
-project's twist champion is unchanged: `d7_n10_g2_16` id 13, `χ* = 253.7`, `deff = 7/7`, rigidity 0.52.
-
-### 13.3 `N = 11` and `N = 12`, and why the frame must be re-swept for each `N`
-
-Same recipe as §13.1, `--d 7 --K 24 --starts hyper --min-deff 6`, ten `g2:p,q` cells at 45 s and the top
-four re-run at 150 s on a second seed, scored by distinct `deff = 7` families:
-
-| rates | `N = 10` @45 s | `N = 11` @45 s | @150 s | `N = 12` @45 s | @150 s |
-|---|---|---|---|---|---|
-| {2, 3, 5} (`g2:2,3`) | 3 | **15** | **30** | 10 | **18** |
-| {1, 3, 4} (`g2:1,3`) | 9 | 12 | 20 | 7 | — |
-| {2, 5, 7} (`g2:2,5`) | — | 8 | 19 | 2 | — |
-| {1, 2, 3} (`g2:1,2`) | 7 | 12 | 11 | 8 | — |
-| {1, 4, 5} (`g2:1,4`) | — | 7 | — | 12 | 16 |
-| {1, 5, 6} (`g2:1,5`) | 8 | 2 | — | 9 | 16 |
-| {1, 6, 7} (`g2:1,6`) | **15** | 7 | — | 3 | — |
-| {3, 4, 7} (`g2:3,4`) | 1 | 4 | — | 9 | 14 |
-
-**The ranking does not transfer between `N`.** `{2, 3, 5}` is seventh of eight at `N = 10` (3 families) and
-first at both `N = 11` and `N = 12`; `{1, 6, 7}`, which wins `N = 10` outright, drops to 7 and then 3. A new
-cell needs its own 45 s sweep — assuming the previous `N`'s frame carries over would have cost a factor of
-five here. The continuation note that guessed the ranking would transfer was wrong.
-
-Harvested in `g2:2,3` at 25 minutes each, and for comparison the `N = 10` file after re-gating:
-
-| cell | records | `deff = 7` families | minutes | families/min |
-|---|---|---|---|---|
-| `d7_n10_g2_16` (`g2:1,6`) | 142 | 75 | 30 | 2.5 |
-| `d7_n11_g2` (`g2:2,3`) | 150 | 67 | 25 | **2.7** |
-| `d7_n12_g2` (`g2:2,3`) | 95 | 53 | 25 | 2.1 |
-
-So the three cells are within 30 % of each other over a long harvest, even though the 150 s sweep made
-`N = 11` look 1.3× better per second — the short-budget rate overstates the long-budget rate everywhere,
-because families run out and the duplicate fraction climbs (1309 duplicates in 74 806 trials at `N = 11`,
-2398 in 58 780 at `N = 12`). Folding in each cell's sweep records brings the files to 336 and 219 records,
-149 and 125 `deff = 7` families. All three cells validate clean: no record with `ret_err > 1e-9`, a
-near-collision, or a rigidity defect below the gate.
-
-### 13.4 `χ*` is a property of the loop, not of the physical motion
-
-Merging the `N = 12` sweep into its harvest folded two records that agree on *every* scalar the catalogue
-stores — action to 14 digits (22.885183324259), energy to 15, `rms`, `Lnorm`, all seven `Lsv` to 9 digits,
-`morse = 6`, `nullity = 4`, `pca` to 6 — and disagree on the twist by a factor of **21**: `χ* = 342.8`
-against `16.26`. Neither is an optimiser failure; `calib_max` returns each value unchanged from 1 restart to
-80. The jet moments genuinely differ, `‖A₃‖ = 203.3` against `8.59`.
-
-The cause is visible in the mode spectra. One record carries its power at modes 7, 8, 9, the other at
-5, 4, 3 — the mirror `m ↔ N − m` — and their frames are `g2:1,7` (rates 1, 7, 8) and `g2:1,4` (rates
-1, 4, 5), paired by the same mirror `w ↔ N − w`. **They are one physical motion written in two frames.**
-`exp(Ωt) q(t)` is unchanged if a rate is shifted by `N` and the corresponding mode shifts to compensate, so
-for a relative choreography the pair `(Ω, q)` is a gauge choice, and `find_duplicate` was right to fold them.
-
-`χ*` is computed from the stored loop `q` alone. It is invariant under everything §14 claims — `O(d)`, time
-shift, reversal, relabelling — but **not under that frame gauge**, so twist is comparable *within* a frame
-and not *across* frames. The `best χ*` columns in §13.1–§13.3 rank cells that each carry their own frame,
-and are only meaningful cell by cell; the same caveat applies to any claim that one frame "has more twist"
-than another. What a cross-frame comparison would need is either a canonical choice of frame per orbit
-(the smallest `Σ|w|` representative, say) or a twist evaluated on the physical motion, and neither exists
-here yet.
-
-## 14. The calibration ladder
+## 7. The calibration ladder and `χ*`
 
 Let `G ⊂ SO(d)` be a proper subgroup stabilising a `k`-form `ψ`. Then
 
-    A_k[q] = (1/2π) ∮ q ∧ q̇ ∧ … ∧ q^(k−1) dt ∈ Λ^k(R^d)        the **jet moment** of the loop
-    χ*_ψ[q] = max over R ∈ O(d) of ⟨A_k, R·ψ⟩                    the **twist**
+    A_k[q] = (1/2π) ∮ q ∧ q̇ ∧ … ∧ q^(k−1) dt ∈ Λ^k(R^d)        the jet moment
+    χ*_ψ[q] = max over R ∈ O(d) of ⟨A_k, R·ψ⟩                    the twist
 
-`A_k` is `O(d)`-equivariant, so `χ*` is invariant under the whole equivalence group of a *record* — `O(d)`,
-time shift, time reversal, relabelling — while *seeing* `G`: it is not a function of any `O(d)` invariant,
-because the `G`-orbit of `ψ` is a proper subvariety of its `O(d)` orbit. `src/calib.hpp` implements the
-whole ladder uniformly (`Λ^k` on increasing multi-indices, exact quadrature, Riemannian ascent on `SO(d)`).
+`A_k` is `O(d)`-equivariant, so `χ*` is invariant under the whole equivalence group of a record while still
+*seeing* `G`, because the `G`-orbit of `ψ` is a proper subvariety of its `O(d)` orbit. The rungs, with
+stabiliser dimensions computed rather than looked up and pinned by `make test`:
 
-**But a rotating-frame record is not determined by its loop.** `exp(Ωt) q(t)` is unchanged if a frame rate
-moves by `N` and the loop's modes shift to compensate, so `(Ω, q)` is a gauge choice and `χ*`, computed from
-`q` alone, moves with it — measured at a factor of 21 on one orbit (§13.4). Twist is comparable within a
-frame, not across frames.
-
-**The rungs, with their stabiliser dimensions computed, not looked up** (null space of `A ↦ A·ψ` on `so(d)`;
-these are pinned by `make test`):
-
-| `d` | `k` | `ψ` | `G` | `dim G` | `dim so(d)` |
-|-----|-----|-----|-----|---------|-------------|
-| 3   | 3   | volume form            | SO(3)    | 3  | 3  |
-| 4   | 2   | `Re(dz₁∧dz₂)`          | SU(2)·U(1)| 4 | 6  |
-| 6   | 3   | `Re(dz₁∧dz₂∧dz₃)`      | SU(3)    | 8  | 15 |
-| 7   | 3   | associative `φ`        | **G₂**   | 14 | 21 |
-| 8   | 4   | Cayley `dx₀∧φ + ⋆φ`    | **Spin(7)**| 21 | 28 |
-| 10  | 5   | `Re(dz₁∧…∧dz₅)`        | SU(5)    | 24 | 45 |
+| `d` | `k` | `ψ` | `G` | `dim G` |
+|-----|-----|-----|-----|---------|
+| 3   | 3   | volume form            | SO(3)    | 3  |
+| 4   | 2   | `Re(dz₁∧dz₂)`          | SU(2)·U(1)| 4 |
+| 6   | 3   | `Re(dz₁∧dz₂∧dz₃)`      | SU(3)    | 8  |
+| 7   | 3   | associative `φ`        | **G₂**   | 14 |
+| 8   | 4   | Cayley `dx₀∧φ + ⋆φ`    | **Spin(7)**| 21 |
+| 10  | 5   | `Re(dz₁∧…∧dz₅)`        | SU(5)    | 24 |
 
 `R³`'s cross product buys nothing — its 3-form is invariant under all of `SO(3)` — and **7 is the only odd
-dimension with any proper reduction**, since the subgroups acting transitively on `S^{n−1}` are `SO`, `U`,
-`SU`, `Sp`, `Sp·Sp(1)`, `Sp·U(1)`, `G₂ (n=7)`, `Spin(7) (n=8)`, `Spin(9) (n=16)`. The rung actually used per
-dimension is `Spin(7)` at `d = 8`, `G₂` at `d = 7` and `d ≥ 9` (`φ` on a 7-dimensional subspace, stabiliser
-`14 + dim so(d−7)` — measured 15 at `d = 9`), `SU(3)` at `d = 6`, and the simple form `e₁∧e₂∧e₃` below that,
-whose stabiliser `S(O(3)×O(d−3))` is still proper.
+dimension with a proper reduction**. In the complex Fourier basis the jet moment is exactly
 
-**Why the twist is a resonance invariant.** In the complex Fourier basis `q = Σ_{m≠0} z_m e^{imt}`,
-`z_{−m} = z̄_m`, the jet moment is exactly
-
-    A_k = i^{k(k−1)/2} · Σ over sets {n₁<…<n_k} ⊂ Z∖{0} with Σ n = 0  of  V(n) · z_{n₁} ∧ … ∧ z_{n_k},
+    A_k = i^{k(k−1)/2} · Σ over {n₁<…<n_k} ⊂ Z∖{0} with Σn = 0  of  V(n) · z_{n₁} ∧ … ∧ z_{n_k},
     V(n) = Π_{r<s} (n_s − n_r)   (Vandermonde)
 
-— verified against the quadrature to 1e-15 relative in `make test`. Three consequences, all of them
-observed in the catalogue before they were derived:
+— verified against the quadrature to 1e-15 in `make test`. So only **resonant** mode tuples contribute; the
+modes must be **distinct**, with spread-out sets dominating; and `χ* ≠ 0` certifies `deff ≥ k`.
 
-* only **resonant** tuples of modes summing to zero contribute, so a non-zero twist requires the loop to
-  carry a resonance `m₁ + m₂ = m₃` among its significant modes;
-* `V` vanishes on a repeat, so the `k` modes must be **distinct**, and the Vandermonde weight makes
-  *spread-out* mode sets dominate;
-* if `deff < k` every wedge vanishes, so `χ* ≠ 0` is a **certificate of effective dimension**: measured
-  exactly `0` on all 70 planar records in the catalogue, and `0` to 1e-12 for a loop placed in a
-  `(k−1)`-plane by construction.
+`χ*` is silenced by exactly two things. **No resonance** — a relative equilibrium sits at the rotation rates
+of `Λ`, generically non-resonant, so every tuple is empty. **Time reversal at the wrong parity of `k`** — if
+`q(−t + θ) = R q(t)` then `R·A_k = (−1)^{k(k−1)/2} A_k`, which at `k = 3` is `−1`, so a reversal whose `R`
+fixes `A₃` annihilates the twist however resonant the modes are, while at `k = 4` it costs nothing. The data
+agrees sharply: 13 of 13 records at `d = 8` carry twist, against 24 of 98 at `k = 3`.
 
-Measured properties of the implementation: `χ*` is unchanged to **3e-15 relative** under a random `O(d)`
-frame change for `d = 6…10` (the frame-dependent `⟨A_k, ψ⟩` moves by `O(1)` over the same change), and costs
-8 ms per record at `d = 7`, 155 ms at `d = 8`. Getting there needed two things — the ascent is restarted
-from signed permutations of the loop's *own* jet frame (every `ψ` in the ladder is `±1` on coordinate
-multi-indices, so the maximiser is a signed permutation of that frame plus a local rotation) and the
-direction is conjugate-gradient; plain gradient ascent from random frames plateaus at 1e-3 relative in
-`d ≥ 9` however many restarts it is given.
+Two cautions, both learned the hard way:
 
-**Distinguished rotating frames: the rates must sum to zero.** `exp(Ωt)` multiplies `Θ = (e₀+ie₁)∧…` by
-`exp(i Σw_j t)`, so it preserves `Re Θ` **iff `Σ w_j = 0`** — verified as an exact zero of the calibration
-defect for `SU(2), SU(3), SU(4), SU(5)`, against `0.30` for a perturbed `Ω`. `--omega su:w₁,…,w_{n−1}`
-closes the list with `w_n = −Σw`. The `d = 7` relation `w₃ = w₁ + w₂` of `g2_omega` is the *same* condition
-seen through `R⁷ = R ⊕ C³`: the `g₂` maximal torus **is** the `su(3)` maximal torus.
+* **`χ*` is not invariant under the rotating-frame gauge.** `exp(Ωt) q(t)` is unchanged when a rate moves by
+  `N` and the modes compensate, so `(Ω, q)` is a gauge choice and `χ*`, read off `q` alone, moves with it —
+  measured at a factor of **21** on one orbit whose two records agreed on every other stored scalar. Twist
+  is comparable *within* a frame, never across frames, and no canonical frame is defined yet.
+* **`χ*` ranks orbits only downstream of the rigidity gate.** A *resonant* relative equilibrium maximises
+  exactly the pairing `χ*` measures — 20.0 against 4e-14 for a non-resonant one — so a rigid record once
+  looked like the project's twist champion at 446.5. Across the gated catalogue there is no general
+  twist/rigidity correlation; this is one sharp trap, not a trend.
 
-**`d = 7` specifics.** The Fano convention (lines `{i, i+1, i+3} mod 7`) is fixed once, in `calib_psi`; the
-7-dimensional cross product used to have its own implementation and axiom test, and both are gone, because
-`χ*` depends on `ψ` only through its `O(d)` orbit and `dim stab φ = 14` pins that orbit far more sharply than
-the axioms do. `src/g2.hpp` keeps only what the *frame* structure needs: `g2_omega(w₁,w₂)` (the maximal
-torus — calibration defect `6e-16` on `w₃ = w₁+w₂`, `O(1)` off it) and `fano_sym(p)` — the twisted class
-`q(t + 2πp/7) = σ q(t)` with `σ` the Fano 7-cycle, reachable as `--sym fano:p`. Exactly **1344** of the
-645120 signed permutations preserve `φ` (the group `2³·PSL(3,2)`, absolutely irreducible on
-`R⁷`), but an irreducible group has an *empty* fixed subspace (§5.1), so the 7-cycle alone is the usable
-class: `r = 22…42` of `n = 154…294`. Under it mode `m` lives in the `σ`-eigenplane `k = mp mod 7`, so
-reaching `deff = 7` needs a mode `≡ 0 (mod 7)` on the fixed axis — impossible at `N = 7`.
+## 8. Files, resumability, tooling
 
-**What it separates.** Over the whole catalogue (`hyperchoreography list --sort twist`):
+* `catalog.bin` — little-endian, bit-exact doubles: `"HYPCHOR1"` then records (`RecHdr`, 152 bytes, then
+  `int32 modes[nm]`, `double coef[nm·2·d]`, `double Lsv[d]`, `double pca[d]`, `char sym[]`). Records carry a
+  trailing `double extra[]`: `[0]` `χ*`, `[1]` `χ*` over the jet scale, `[2]` the rung's jet order, `[3]`
+  `‖A_k‖` over the jet scale, `[4]` the rigidity defect, `[5..7]` reserved, then `d²` entries of `Ω`.
+  Legacy files load unchanged. Accessors must read `extra.size()`, not the header's `nextra`.
+* `catalog.bin.state` — seed and next trial index. Trials are deterministic functions of `(seed, trial)`, so
+  a run resumed after Ctrl-C continues exactly, whatever the thread scheduling. Checkpoints every 30 s.
+  Use a different `--seed` per machine and `merge` the results; the better-resolved record wins and hit
+  counts add.
+* `src/` — `action.hpp` (basis, kernels, symmetry), `calib.hpp` (the ladder), `g2.hpp` (Fano frame and
+  torus), `optim.hpp`, `taylor.hpp`, `invariants.hpp`, `catalog.hpp`, `search.hpp`, `continue.hpp`,
+  `mpreal.hpp`, `linalg.hpp`, `main.cpp`, `tests.cpp`.
+* `tools/gallery.py` — the whole catalogue as one self-contained page, standard library only, ~2 s.
+  `make gallery` writes `docs/index.html`, which GitHub Pages serves at
+  <https://lycium.github.io/hyperchoreography/>. A `deff = 9` orbit and a circle look identical in any two
+  coordinates you pick, so each tile is drawn in the record's **own principal frame** and shows a 3-D
+  orthographic shadow, one panel per principal plane in three states (curve, line, grey rule — so
+  `deff = 2×curves + lines` is countable), a bar meter of `√(λₖ/λ₁)`, and a mutual-distance ribbon that is
+  flat exactly for a relative equilibrium. Measured against plotting the first two coordinates: **2 of 316**
+  tiles read as a near-circle, against **80 of 333**. Only body 0 is stored; the rest are rebuilt from
+  `body_j(f) = Gʲ·body_0((f + jS/N) mod S)`.
 
-| `deff` | records | `χ* > 0` | max `χ*` |
-|--------|---------|----------|----------|
-| 2 | 70 | **0** | 0 |
-| 3 | 50 | 9 | **1.217** (`d=3 N=6`, `A = 24.238353047`) |
-| 4 | 28 | 8 | 1.216 |
-| 5 | 1 | 0 | 0 |
-| 6 | 17 | 5 | 0.913 (`d=7 N=8`) |
-| 7 | 2  | **2** | 0.647 |
+## 9. Reference values
 
-It is a genuine discriminator, not a restatement of `deff`: it cleanly separates the two `d = 7, N = 8`
-orbits whose actions agree to four digits (`75.973642` with `χ* = 0`, `75.979900` with `χ* = 0.913`), and
-both `deff = 7` orbits carry non-zero twist. The scale-free companion `χ*/Π_r ‖q^(r)‖_{L²}` (column
-`tw_rel`) makes records of different size comparable, and its maximum over the catalogue is the same
-`d = 3, N = 6` orbit — the most calibrated loop found so far is three-dimensional, not seven.
+Period 2π, unit masses, G = 1, action per body; `E_total = −N·A/(6π)` by the virial theorem.
 
-**What a zero twist means — the causes are now identified, and they are not the obvious one.** Classifying
-every record with `deff ≥ k` by whether its significant modes admit a resonant tuple at all:
+| deff | N | solution | action | energy | Morse | modes |
+|---|---|----------|--------|--------|-------|-------|
+| 2 | 3 | Lagrange circle | 6.534776057 | −1.0400419 | 0 | 1 |
+| 2 | 3 | figure eight | 8.123975492 | −1.29297085712209404 | 0 | 59 |
+| 2 | 4 | square RE | 9.153307580 | −1.9423922 | 0 | 1 |
+| 4 | 4 | Clifford-torus RE, modes (2,3) | 16.579572165 | −3.5182940 | 6 | 3 |
+| 3 | 4 | hip-hop resonance (5,6) | 26.761760441 | −5.6790220 | 8 | 66 |
+| 3 | 5 | hip-hop resonance (7,9) | 42.644345524 | −11.311764 | 12 | 99 |
+| 4 | 5 | Clifford-torus RE, modes (6,7) | 37.945568979 | −10.065375 | 18 | 7 |
+| 7 | 10 | genuinely 7-dimensional, inertial | 61.724155215 | −32.7456814 | 48 | 248 |
+| 10 | 10 | `d = 10`, frame `Σw = 0`, time-reversible | 40.995282456 | | | |
+| 11 | 12 | `d = 11`, frame `g2:1,2,4,5`, `χ* = 81.3` | 22.745582770 | −14.4802877 | 11 | 23 |
 
-| | records | continuous `S¹` | mean finite `\|G\|` |
-|---|---|---|---|
-| `χ* > 0`, resonant | 23 | 0 | 6.7 |
-| `χ* = 0`, **no** resonance | 48 | **30** | 21.4 |
-| `χ* = 0`, resonant | 26 | 0 | 3.8 |
-| `χ* > 0`, non-resonant | 1 | 0 | 2.0 |
+## 10. Known issues
 
-(the last row is an artefact of the 1e-3 power cut used to call a mode "significant" — its resonance runs
-through a weaker mode). The 48 are explained by the identity itself: a relative equilibrium sits at the
-rotation rates of `Λ`, which are generically non-resonant, so every tuple in the sum is empty — and 30 of
-them *are* relative equilibria. The 26 are not, and they are not more symmetric either (mean `|G|` 3.8
-against 6.7 for the twisted ones), so "heavier symmetry group" is the wrong explanation. Term by term,
-**21 of the 26 carry individual terms of size `1e-2` relative to the jet scale that cancel to `1e-16`**
-(the other 5 have individually degenerate wedges) — fourteen orders of magnitude, which is forced,
-not accidental. The forcing is time reversal. If `q(−t + θ) = R q(t)` then `z̄_n e^{−inθ} = R z_n`, so each
-resonant wedge obeys `R·W = e^{−iθΣn} W̄ = W̄`, and therefore
+* **Some `continue` branches stall before α = 1.** Two things are mixed: branches that genuinely end in a
+  collision (which the code should recognise from the shrinking minimum separation and report as such), and
+  switching problems where a degenerate *pair* of eigenvalues crosses — rotational symmetry makes the
+  bifurcating set a circle of solutions, and the bordered system needs an explicit phase condition.
+* **`refine` rejects rotating-frame records**, so there is no arbitrary-precision path for `d ≥ 7`.
+* **`--sym random` is wasteful and, in `d ≥ 5`, useless**: 60–75 % of draws are rejected and the survivors
+  land on the circle. The named classes `cyc:p` and `fano:p` are the useful ones, but a curated table per
+  `(d, N)` is still not wired in.
+* **Calibrated starts do not work below `N ≈ 12`, for a structural reason.** A twisted loop needs modes in
+  *arithmetic* resonance (`Σn = 0`); a start that converges needs the *dynamical* resonance `m₂/m₁ ≈ ω_k`.
+  The two are incompatible at small `N` — the closest `1 + ω_j = ω_k` is off by 0.64 at `N = 8`, 0.37 at
+  `N = 10`, and only 0.087 at `N = 12`. Measured A/B at `d = 7, N = 8`: forcing the resonance gives 4
+  records against `hyper`'s 12. Twist in the found orbits comes from the nonlinear mode cascade, not the
+  start. This is a sharp, falsifiable prediction for `N ≳ 12`.
+* **Close-approach loops** (minsep < 0.05) get 500+ modes; certification is fine but the Fourier
+  representation is then a poor basis — parallel shooting would suit them better.
+* **One record's stored `deff` disagrees with the gallery's pooled PCA** (`d11_n12_g2#0`: 9 against 7),
+  which `make gallery` reports. It is a 184-mode close-approach loop sitting on a continuous family
+  (`nullity = 7`); the orbit itself certifies to 1e-14. The two measures can differ only for rotating
+  records, and which one is authoritative there is unresolved.
+* Double precision suffices: the action matches 40-digit MPFR to 1–2 ulp, and re-shooting rejected
+  candidates in MPFR recovers nothing. The ~1e-11 floor on the shift residual is Lyapunov amplification,
+  not roundoff. Newton–Krylov was measured and dropped (0.88×–1.57×, no predictor).
+* The `hits` counter is only saved at checkpoints; a kill between them loses ≤ 30 s of counts.
 
-    R · A_k = (−1)^{k(k−1)/2} A_k .
+## 11. Roadmap
 
-At `k = 3` that sign is **−1**: a reversal whose `R` fixes `A₃` — a palindromic loop being the extreme case —
-annihilates the twist outright, however resonant the modes are. At `k = 4` the sign is **+1** and the same
-reversal costs nothing. Since essentially every catalogued orbit is reversible, this predicts that the
-Spin(7) rung should be far less often silenced than the G₂ one, and the data agrees sharply: **13 of 13**
-records at `d = 8` carry twist, against **24 of 98** at `k = 3`. `make test` pins the law directly — a
-cosine-only loop on the modes `{1,2,3,4,7}` (which carry both `1+2=3` and `1+2+4=7`) has `‖A₃‖ = 7e-17`
-against `0.042` for the same modes with the sines restored, while `‖A₄‖ = 0.0022` is untouched.
+1. **Branch-switch off the `Ω` isola.** Following both directions from each `deff = 7` record of
+   `d7_n10_g2.bin` gives 18 branches: 5 reach `s = 0` and **every one arrives on a relative equilibrium**;
+   1 is a **closed isola** (the `χ* = 16.2` champion) that never leaves `s ∈ [0.98, 1.06]` and returns to
+   its own starting orbit; the rest run to the `s` bounds or stick. So no high-`deff` relative choreography
+   deforms to an inertial one. The Morse index genuinely crosses (6↔7) at `s ≈ 0.9829` and `s ≈ 0.9986`,
+   which is what `--depth` is for — the one untried escape.
+2. **Linear stability (Floquet).** The largest remaining gap: the catalogue reports a Morse index, which is
+   not linear stability. Multipliers come from the reduced monodromy `S⁻¹ DΦ_{T/N}`, whose symplectic defect
+   is 1.3e-07 against 9.4e+02 for `DΦ_T` taken directly. The shooting Jacobian is already computed; the
+   missing piece is an unsymmetric eigensolver (Hessenberg + Francis QR, ~130 lines).
+3. **The continuous families.** `g2:3,4` sits on a 2-parameter family at `A = 19.827310867` (nullity 6 =
+   4 gauge + 2). `d = 9` and `d = 11` have none — every record is pure gauge — so families are so far a
+   `d = 7` phenomenon, which is itself worth explaining. Folding is lossy, so re-search with looser
+   tolerances rather than expecting to recover members.
+4. **Mine the symmetry classes instead of guessing them.** `symmetry` emits exactly the text `--sym`
+   consumes, so the loop closes: detect the groups that occur, keep those with a small fixed subspace, and
+   re-search inside them.
+5. **The in-plane half of the N-gon spectrum.** Only the out-of-plane frequencies are in the code; the
+   in-plane block is a quartic in `ν` whose real roots give a second family of resonances
+   `m₂/m₁ = 1 ± ν̂_k`. Real roots exist for every `k ≥ 2` at `N = 8…14`. It does not raise `deff`, but it
+   roughly doubles the resonance table and gives `continue` a deterministic bifurcation list.
+6. **More cells.** `d = 13` needs `--omega g2:p,q,r₁,r₂,r₃` and `N ≥ 14`; `d = 12, N = 12` gave 0 records in
+   8 537 trials at a quarter of the trial rate, which is the warning.
+7. Better branch switching for degenerate bifurcations; multi-threaded `continue`; FFT synthesis for
+   `K ≳ 200`; strong-force homotopy classes; mountain-pass between catalogued minimisers; rigorous interval
+   Newton–Kantorovich verification; relative choreographies with several curves.
 
-So `χ*` is silenced by exactly two things — **no resonance** (the relative equilibria) and **time reversal at
-the wrong parity of `k`** — and both are now sharp enough to design against rather than merely observe.
+## 12. References
 
-## 15. References
-
-* C. Simó, *New families of solutions in N-body problems*, 3rd European Congress of Mathematics (2000) —
-  variational Fourier representation, trapezoid rule, shooting Newton `Φ(2π/N, Z) − S(Z) = 0`.
-* G. Minton, *Choreographies* (gminton.org/choreo.html) — Fourier/FFT representation with L-SR1.
+* C. Simó, *New families of solutions in N-body problems*, 3rd European Congress of Mathematics (2000).
+* G. Minton, *Choreographies* (gminton.org/choreo.html).
 * A. Chenciner, R. Montgomery, *A remarkable periodic solution of the three-body problem* (2000).
-* A. Chenciner, J. Féjoz, *Unchained polygons and the N-body problem* (2009) — vertical Lyapunov families
-  of the rotating N-gon and spatial choreographies at rational rotation numbers.
-* D. Ferrario, S. Terracini, *On the existence of collisionless equivariant minimizers* (2004) — symmetry
-  groups and Palais' principle for the N-body action.
+* A. Chenciner, J. Féjoz, *Unchained polygons and the N-body problem* (2009).
+* D. Ferrario, S. Terracini, *On the existence of collisionless equivariant minimizers* (2004).

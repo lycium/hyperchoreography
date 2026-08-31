@@ -548,7 +548,7 @@ CSS = r"""
   --sel:#2f6fd0; --shadow:0 1px 2px rgba(20,26,40,.08),0 4px 14px rgba(20,26,40,.05);
   --b-rig:#c2492a; --b-rot:#8f6a10; --b-cov:#6252bd; --b-fam:#22718f; --b-warn:#b03a3a;
   --c2:#34619e; --c3:#1c7ba0; --c4:#12878c; --c5:#178a68; --c6:#2f8b3c;
-  --c7:#5c8c1f; --c8:#7d8410; --c9:#8f760d; --c10:#9c6a0f;
+  --c7:#5c8c1f; --c8:#7d8410; --c9:#8f760d; --c10:#9c6a0f; --c11:#a75513;
   --trail-a0:.34; --trail-a1:.52; --rtrail-a0:.16; --rtrail-a1:.40;
   --tw:168px;
 }
@@ -562,7 +562,7 @@ CSS = r"""
   --sel:#5c9bff; --shadow:0 1px 2px rgba(0,0,0,.4);
   --b-rig:#e8785a; --b-rot:#d3a14a; --b-cov:#9b8cd6; --b-fam:#6fa8c9; --b-warn:#e06666;
   --c2:#4f7fbf; --c3:#4ba0cc; --c4:#4dbfc4; --c5:#55d2a4; --c6:#63dd7d;
-  --c7:#8ce56a; --c8:#b9ec6d; --c9:#ddf278; --c10:#f6f59a;
+  --c7:#8ce56a; --c8:#b9ec6d; --c9:#ddf278; --c10:#f6f59a; --c11:#ffe89c;
   --trail-a0:.30; --trail-a1:.45; --rtrail-a0:.13; --rtrail-a1:.32;
 }
 }
@@ -573,7 +573,7 @@ CSS = r"""
   --sel:#5c9bff; --shadow:0 1px 2px rgba(0,0,0,.4);
   --b-rig:#e8785a; --b-rot:#d3a14a; --b-cov:#9b8cd6; --b-fam:#6fa8c9; --b-warn:#e06666;
   --c2:#4f7fbf; --c3:#4ba0cc; --c4:#4dbfc4; --c5:#55d2a4; --c6:#63dd7d;
-  --c7:#8ce56a; --c8:#b9ec6d; --c9:#ddf278; --c10:#f6f59a;
+  --c7:#8ce56a; --c8:#b9ec6d; --c9:#ddf278; --c10:#f6f59a; --c11:#ffe89c;
   --trail-a0:.30; --trail-a1:.45; --rtrail-a0:.13; --rtrail-a1:.32;
 }
 *{box-sizing:border-box}
@@ -689,10 +689,10 @@ function readTheme(){
          ta0:parseFloat(css('--trail-a0')), ta1:parseFloat(css('--trail-a1')),
          ra0:parseFloat(css('--rtrail-a0')), ra1:parseFloat(css('--rtrail-a1')),
          ramp:{} };
-  for(var k=2;k<=10;k++) TH.ramp[k]=hex2rgb(css('--c'+k));
+  for(var k=2;k<=11;k++) TH.ramp[k]=hex2rgb(css('--c'+k));
 }
-function dcol(de){ var k=de<2?2:(de>10?10:de); return TH.ramp[k]; }
-function dcolS(de){ return 'var(--c'+(de<2?2:(de>10?10:de))+')'; }
+function dcol(de){ var k=de<2?2:(de>11?11:de); return TH.ramp[k]; }
+function dcolS(de){ return 'var(--c'+(de<2?2:(de>11?11:de))+')'; }
 
 /* ------------------------------------------------------------- geometry */
 var LE=(function(){var b=new ArrayBuffer(2);new DataView(b).setInt16(0,1,true);
@@ -1470,8 +1470,8 @@ PAGE = r"""<!doctype html>
 <script type="application/json" id="DATA">__DATA__</script>
 <script>__JS__
 (function(){var s=document.getElementById('rampsw');if(!s)return;var h='';
-for(var k=2;k<=10;k++)h+='<i style="background:var(--c'+k+')" title="deff '+k+'"></i>';
-s.innerHTML=h+'<span style="margin-left:4px;color:var(--fg3)">2 → 10</span>';})();
+for(var k=2;k<=11;k++)h+='<i style="background:var(--c'+k+')" title="deff '+k+'"></i>';
+s.innerHTML=h+'<span style="margin-left:4px;color:var(--fg3)">2 → 11</span>';})();
 </script>
 </body></html>
 """

@@ -25,7 +25,7 @@ struct Args {
 static void usage() {
   std::puts("hyperchoreography — N-body choreography search in any dimension\n"
     "  hyperchoreography search  --N 3 --d 2 [--K 16 --Kmax 64] [--sym none|random|cyc:p|fano:p|\"t+1/2 s[-1,-2]; ...\"] [--threads T] [--seed S]\n"
-    "                [--trials n] [--minutes m] [--out catalog.bin] [--alpha-start 2 --alpha-steps 8] [--min-deff k --min-rigid 1e-6]\n"
+    "                [--trials n] [--minutes m] [--out catalog.bin] [--alpha-start 2 --alpha-steps 8] [--min-deff k --min-rigid 1e-4]\n"
     "                [--lbfgs-min 20 --lbfgs-max 400 --newton 60 --gtol 1e-10 --ret-tol 1e-8 --K0 2 --K0max 6 --minsep 2e-3]\n"
     "                [--phase1 action|gradnorm|mixed] [--seed-from other.bin --kick-min 0.02 --kick-max 0.5]\n"
     "                [--starts random,torus,vertical,hyper,fano,kick] [--K-index 48] [--Ms 2048 --Kout-max 512 --shoot-tol 1e-12 --ret-double 1e-4]\n"
@@ -54,7 +54,7 @@ static int cmd_search(const Args& a) {
   cfg.N = (int)a.num("N", 3); cfg.d = (int)a.num("d", 2); cfg.K = (int)a.num("K", 16); cfg.Kmax = (int)a.num("Kmax", std::max(4 * cfg.K, 64));
   cfg.sym = named_sym(a.get("sym", "none"), cfg.d); cfg.threads = (int)a.num("threads", std::thread::hardware_concurrency()); cfg.seed = (uint64_t)a.num("seed", 1);
   cfg.trials = (long)a.num("trials", (double)LONG_MAX); cfg.minutes = a.num("minutes", 1e30); cfg.out = a.get("out", "catalog.bin");
-  cfg.alpha_start = a.num("alpha-start", 1.0); cfg.alpha_steps = (int)a.num("alpha-steps", 8); cfg.min_deff = (int)a.num("min-deff", 1); cfg.min_rigid = a.num("min-rigid", 1e-6);
+  cfg.alpha_start = a.num("alpha-start", 1.0); cfg.alpha_steps = (int)a.num("alpha-steps", 8); cfg.min_deff = (int)a.num("min-deff", 1); cfg.min_rigid = a.num("min-rigid", cfg.min_rigid);
   cfg.lbfgs_min = (int)a.num("lbfgs-min", 20); cfg.lbfgs_max = (int)a.num("lbfgs-max", 400); cfg.newton_iters = (int)a.num("newton", 60);
   cfg.gtol = a.num("gtol", 1e-10); cfg.ret_tol = a.num("ret-tol", 1e-8); cfg.K0min = (int)a.num("K0", 2); cfg.K0max = (int)a.num("K0max", 6);
   cfg.minsep = a.num("minsep", 2e-3); cfg.verbose = a.has("verbose"); cfg.checkpoint_secs = (int)a.num("checkpoint", 30);
