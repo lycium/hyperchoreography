@@ -1,0 +1,10 @@
+.venv/
+media/
+out/
+narration/cache/
+__pycache__/
+*.pyc
+*.allura.journal
+comp/.media/
+.venv-tts/
+comp/audition/

@@ -1,0 +1,83 @@
+{
+ "eight": {
+  "catalog": "d2-3_n3.bin",
+  "id": 0,
+  "what": "the figure eight, N = 3",
+  "N": 3,
+  "d": 3,
+  "deff": 2,
+  "action": 8.123975492080955
+ },
+ "n3_spatial": {
+  "catalog": "d2-3_n3.bin",
+  "id": 4,
+  "what": "N = 3 out of the plane, deff = 3",
+  "N": 3,
+  "d": 3,
+  "deff": 3,
+  "action": 16.980584216226056
+ },
+ "n4_planar": {
+  "catalog": "d2-4_n4.bin",
+  "id": 0,
+  "what": "the planar N = 4 minimiser",
+  "N": 4,
+  "d": 2,
+  "deff": 2,
+  "action": 11.109471462888214
+ },
+ "hiphop": {
+  "catalog": "d2-4_n4.bin",
+  "id": 9,
+  "what": "the N = 4 hip-hop resonance, modes (5,6)",
+  "N": 4,
+  "d": 3,
+  "deff": 3,
+  "action": 26.761760441442217
+ },
+ "n4_deff4": {
+  "catalog": "d2-4_n4.bin",
+  "id": 15,
+  "what": "N = 4 filling all four dimensions",
+  "N": 4,
+  "d": 4,
+  "deff": 4,
+  "action": 21.090533996837593
+ },
+ "n6_deff6": {
+  "catalog": "d5-6_n6.bin",
+  "id": 139,
+  "what": "N = 6 at deff = 6, frame su:1,2",
+  "N": 6,
+  "d": 6,
+  "deff": 6,
+  "action": 20.78983937971801
+ },
+ "d7_inertial": {
+  "catalog": "d7_n10.bin",
+  "id": 0,
+  "what": "deff = 7 with no rotating frame",
+  "N": 10,
+  "d": 7,
+  "deff": 7,
+  "action": 61.72415521532396
+ },
+ "d7_twist": {
+  "catalog": "d7_n10_g2_16.bin",
+  "id": 13,
+  "what": "the G2 twist champion, frame g2:1,6",
+  "N": 10,
+  "d": 7,
+  "deff": 7,
+  "action": 20.10597686411579
+ },
+ "d11": {
+  "catalog": "d11_n12_g2.bin",
+  "id": 13,
+  "what": "deff = 11, frame g2:1,2,4,5",
+  "N": 12,
+  "d": 11,
+  "deff": 11,
+  "action": 22.74558276984891
+ }
+}

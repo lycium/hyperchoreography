@@ -1,0 +1,4 @@
+# The presentation needs manim (which brings numpy, cairo and pango with it) and
+# nothing else. ffmpeg is used for the time filter, the downscale and the encode,
+# and must be on PATH: `brew install ffmpeg`.
+manim>=0.19,<1.0

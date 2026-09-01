@@ -1,0 +1,160 @@
+{
+ "fps": 30,
+ "title_seconds": 6.0,
+ "end_seconds": 14.0,
+ "film_frames": 55441,
+ "master_frames": 56041,
+ "master_seconds": 1868.0333333333333,
+ "scenes": [
+  {
+   "module": "s00_open",
+   "video": "../out/s00_open.mkv",
+   "narration": "../out/s00_open.narration.wav",
+   "frames": 1708,
+   "planned_frames": 1709,
+   "samples": 2734402,
+   "lufs": -24.6,
+   "peak": 0.5504150390625
+  },
+  {
+   "module": "s01_choreo",
+   "video": "../out/s01_choreo.mkv",
+   "narration": "../out/s01_choreo.narration.wav",
+   "frames": 3049,
+   "planned_frames": 3050,
+   "samples": 4880798,
+   "lufs": -24.6,
+   "peak": 0.58856201171875
+  },
+  {
+   "module": "s02_action",
+   "video": "../out/s02_action.mkv",
+   "narration": "../out/s02_action.narration.wav",
+   "frames": 3213,
+   "planned_frames": 3214,
+   "samples": 5142000,
+   "lufs": -24.6,
+   "peak": 0.541778564453125
+  },
+  {
+   "module": "s03_fourier",
+   "video": "../out/s03_fourier.mkv",
+   "narration": "../out/s03_fourier.narration.wav",
+   "frames": 2849,
+   "planned_frames": 2850,
+   "samples": 4559602,
+   "lufs": -24.6,
+   "peak": 0.478759765625
+  },
+  {
+   "module": "s04_landscape",
+   "video": "../out/s04_landscape.mkv",
+   "narration": "../out/s04_landscape.narration.wav",
+   "frames": 2773,
+   "planned_frames": 2774,
+   "samples": 4437998,
+   "lufs": -24.5,
+   "peak": 0.459320068359375
+  },
+  {
+   "module": "s05_lbfgs",
+   "video": "../out/s05_lbfgs.mkv",
+   "narration": "../out/s05_lbfgs.narration.wav",
+   "frames": 2899,
+   "planned_frames": 2900,
+   "samples": 4640798,
+   "lufs": -24.5,
+   "peak": 0.526580810546875
+  },
+  {
+   "module": "s06_newton",
+   "video": "../out/s06_newton.mkv",
+   "narration": "../out/s06_newton.narration.wav",
+   "frames": 4260,
+   "planned_frames": 4261,
+   "samples": 6817598,
+   "lufs": -24.5,
+   "peak": 0.50164794921875
+  },
+  {
+   "module": "s07_hard",
+   "video": "../out/s07_hard.mkv",
+   "narration": "../out/s07_hard.narration.wav",
+   "frames": 4920,
+   "planned_frames": 4921,
+   "samples": 7874002,
+   "lufs": -24.5,
+   "peak": 0.568511962890625
+  },
+  {
+   "module": "s08_certify",
+   "video": "../out/s08_certify.mkv",
+   "narration": "../out/s08_certify.narration.wav",
+   "frames": 3971,
+   "planned_frames": 3972,
+   "samples": 6355200,
+   "lufs": -24.6,
+   "peak": 0.6673583984375
+  },
+  {
+   "module": "s09_sameorbit",
+   "video": "../out/s09_sameorbit.mkv",
+   "narration": "../out/s09_sameorbit.narration.wav",
+   "frames": 4410,
+   "planned_frames": 4411,
+   "samples": 7057598,
+   "lufs": -24.6,
+   "peak": 0.535491943359375
+  },
+  {
+   "module": "s10_starts",
+   "video": "../out/s10_starts.mkv",
+   "narration": "../out/s10_starts.narration.wav",
+   "frames": 3506,
+   "planned_frames": 3507,
+   "samples": 5610802,
+   "lufs": -24.6,
+   "peak": 0.5958251953125
+  },
+  {
+   "module": "s11_frame",
+   "video": "../out/s11_frame.mkv",
+   "narration": "../out/s11_frame.narration.wav",
+   "frames": 2999,
+   "planned_frames": 3000,
+   "samples": 4800000,
+   "lufs": -24.6,
+   "peak": 0.5465087890625
+  },
+  {
+   "module": "s12_usage",
+   "video": "../out/s12_usage.mkv",
+   "narration": "../out/s12_usage.narration.wav",
+   "frames": 4864,
+   "planned_frames": 4866,
+   "samples": 7784798,
+   "lufs": -24.6,
+   "peak": 0.6036376953125
+  },
+  {
+   "module": "s13_structure",
+   "video": "../out/s13_structure.mkv",
+   "narration": "../out/s13_structure.narration.wav",
+   "frames": 6639,
+   "planned_frames": 6640,
+   "samples": 10623600,
+   "lufs": -24.6,
+   "peak": 0.516265869140625
+  },
+  {
+   "module": "s14_close",
+   "video": "../out/s14_close.mkv",
+   "narration": "../out/s14_close.narration.wav",
+   "frames": 3381,
+   "planned_frames": 3382,
+   "samples": 5412000,
+   "lufs": -24.6,
+   "peak": 0.468505859375
+  }
+ ]
+}
