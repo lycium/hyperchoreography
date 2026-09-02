@@ -10,12 +10,12 @@ it was not asked to change.
 ## Rebuild the master
 
     make master        # ../out/master.mkv  — FFV1 + FLAC, lossless
-    make mp4           # ../out/hyperchoreography-upload.mp4 — the YouTube copy
+    make mp4           # ../out/hyperchoreography-upload.mp4 — the lossless YouTube copy
     make verify        # every scene and narration proven bit-exact in place
 
-`ALLURA` points at the studio binary (default `../../allura_studio/build/allura`).
+`ALLURA` points at the studio binary (default `../../../allura_studio/build/allura`).
 The master renders under `--exact` — every sample on its pixel centre, 1 spp,
-no resample at 1:1, linear in and linear out — so the fifteen scenes pass
+no resample at 1:1, linear in and linear out — so the sixteen scenes pass
 through the comp **bit-exactly**: `verify_master.py` checks every scene's
 frames and every narration's samples at their placements. (The pipeline's own
 transparency — that a lossless source leaves an `--exact` export as its own
@@ -32,7 +32,7 @@ suite, so the film needs no separate null render to restate it.)
 * **endcard** (14 s) — a spatial three-body choreography behind the catalogue
   and repository links and the subscribe line: the film opens on three bodies
   tracing the planar eight and closes on the same three somewhere richer.
-* **hyperchoreography** (1830.0 s) — the master: title, the fifteen scenes at
+* **hyperchoreography** (2052.4 s) — the master: title, the sixteen scenes at
   their true encoded lengths, each narration at its scene's first frame
   (sample-exact), the end card. Its markers are the YouTube chapters
   (`chapters.txt`).
@@ -68,7 +68,7 @@ human recording still drops in the same way it always did: replace the
 encoded scenes run 1–2 frames shorter than the manifest's planned timeline
 (the tent filter's terminal windows), and each scene's audio overruns its
 picture by a frame or two of silence, which the master lets run under the
-next scene's black head. The fifteen narration tracks measure within 0.1 LU
+next scene's black head. The sixteen narration tracks measure within 0.1 LU
 of one another; `build_spec.py` lifts them uniformly toward −16 LUFS as far
 as the loudest true peak allows (×1.476 → ≈ −21 LUFS at peak −0.13 dBFS for
 the current voice — the rest of the distance would need a limiter, which the

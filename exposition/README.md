@@ -1,7 +1,7 @@
 # exposition
 
 A manim presentation of how the `hyperchoreography` solver works, what its
-parameters mean, and what its outputs are. Fifteen scenes, about half an hour,
+parameters mean, and what its outputs are. Sixteen scenes, about half an hour,
 rendered losslessly with tent-filtered motion blur and a narration track.
 
 ```
@@ -34,6 +34,9 @@ solver's own kernels, in `expo/`:
   eight's stored coefficients it returns a shift residual of 3.7e-11 against the
   record's own stored 3.5e-11.
 * `catalog.py` — records read through `hyperchoreography show`, cached in `data/`.
+* the existence proofs the film shows (`s09_prove`) are the solver's own `prove --verbose` runs,
+  parsed by `make_data.py` into `data/prove_*.json`: the certificate, every validated step's width
+  and the rough enclosure it used. The uncertainty ellipse is `shoot.py`'s flow, differentiated.
 
 So when a scene shows a gradient falling from 3.2 to 7.5e-12 in eight steps, that
 is a real run of the real algorithm, and the orbit it lands on matches the
@@ -55,23 +58,6 @@ ramp of flat frames, where the answer is an integer you can check by hand.
 
 `make_data.py` refreshes `data/` from the catalogue; re-run it after a harvest
 renumbers record ids.
-
-### How much slower
-
-Measured on one core at `d = 7, N = 7, K = 32` (392 parameters), against
-`./hyperchoreography bench --N 7 --d 7 --K 32`:
-
-| | C++ | this | |
-|---|---|---|---|
-| action and gradient | 20 µs | 161 µs | 8x |
-| the Hessian | 423 µs | 5 125 µs | 12x |
-| its eigenvalues | 5 634 µs | 5 727 µs | 1.0x |
-
-The penalty is per-call overhead, so it shrinks as the arrays grow and vanishes
-where LAPACK does the work — and at the sizes the high-dimensional search runs at,
-the eigendecomposition is about half of a trial. At `d = 2, N = 3, K = 16`, where
-the arrays are tiny, the gradient is 29x slower instead of 8x. A full C++ trial at
-the larger size is 231 ms, so one core does four a second.
 
 ## Rendering
 
@@ -145,12 +131,13 @@ timing in the film — so it is worth keeping if you want a re-render to match.
 | 06 | `s06_newton` | phase two: the damped Newton step, and quadratic convergence |
 | 07 | `s07_hard` | the five-fold N=4 orbit from two epicycles; a saddle; the hip-hop |
 | 08 | `s08_certify` | leaving the Fourier world: the shooting Newton |
-| 09 | `s09_sameorbit` | covers, the canonical frame, Procrustes, the rigidity gate |
-| 10 | `s10_starts` | why random starts fail, and the N-gon's transverse spectrum |
-| 11 | `s11_frame` | the rotating frame, and what it buys above six dimensions |
-| 12 | `s12_usage` | the command line, and a record field by field |
-| 13 | `s13_structure` | the redundancies, the dimension budget, the calibration twist |
-| 14 | `s14_close` | what is in the catalogue and what is still open |
+| 09 | `s09_prove` | existence: interval arithmetic, the validated flow, Krawczyk's test |
+| 10 | `s10_sameorbit` | covers, the canonical frame, Procrustes, the rigidity gate |
+| 11 | `s11_starts` | why random starts fail, and the N-gon's transverse spectrum |
+| 12 | `s12_frame` | the rotating frame, and what it buys above six dimensions |
+| 13 | `s13_usage` | the command line, and a record field by field |
+| 14 | `s14_structure` | the redundancies, the dimension budget, the calibration twist |
+| 15 | `s15_close` | what is in the catalogue and what is still open |
 
 ## Layout
 

@@ -11,11 +11,11 @@ from expo.viz import OrbitView, Projector, spin, tumble
 
 
 class Closing(ExpoScene):
-    section_number = 14
+    section_number = 15
     section_title = "what is there"
 
     def story(self):
-        # -- a last look ----------------------------------------------------
+        # — a last look ----------------------------------------------------
         gallery = [("eight", "N = 3, in a plane"),
                    ("hiphop", "N = 4, out of the plane"),
                    ("n4_deff4", "N = 4, four dimensions"),
@@ -34,8 +34,8 @@ class Closing(ExpoScene):
             "Above six, nothing was, because the search that finds them did not "
             "exist.",
             None,
-            "This one fills eleven dimensions, and needed twelve bodies and a frame "
-            "built from an exceptional group to be found at all.",
+            "This one fills eleven dimensions, needed twelve bodies and a frame built "
+            "from an exceptional group to be found at all — and it is a theorem.",
         ]
 
         prev = None
@@ -66,17 +66,17 @@ class Closing(ExpoScene):
 
         self.play(FadeOut(prev[0]), FadeOut(prev[1]), run_time=0.9)
 
-        # -- the honest part -------------------------------------------------
+        # — the honest part -------------------------------------------------
         open_ = VGroup(
             VGroup(B("linear stability", size=T.SZ_BODY, color=T.INK),
                    B("the catalogue reports a Morse index, which is a statement about "
                      "the action, not about whether the orbit survives a nudge",
                      size=T.SZ_SMALL, color=T.INK_DIM))
             .arrange(DOWN, buff=0.20, aligned_edge=LEFT),
-            VGroup(B("no proof of existence", size=T.SZ_BODY, color=T.INK),
-                   B("these are numerical solutions certified to fifteen digits, not "
-                     "theorems; interval arithmetic would settle that",
-                     size=T.SZ_SMALL, color=T.INK_DIM))
+            VGroup(B("existence, record by record", size=T.SZ_BODY, color=T.INK),
+                   B("every orbit the interval method has been run on is a theorem; "
+                     "the rest of the file is still only certified, and the sweep is "
+                     "machine time", size=T.SZ_SMALL, color=T.INK_DIM))
             .arrange(DOWN, buff=0.20, aligned_edge=LEFT),
             VGroup(B("the search above six dimensions needs a turning frame",
                      size=T.SZ_BODY, color=T.INK),
@@ -91,9 +91,9 @@ class Closing(ExpoScene):
         self.say("The Morse index says how the action behaves nearby. It does not say "
                  "whether the orbit is stable, and most of these are violently unstable.")
         self.play(FadeIn(open_[1]), run_time=0.9)
-        self.say("And nothing here is a proof. They are numerical solutions, certified "
-                 "against the equations of motion to fifteen digits, which is a "
-                 "different and weaker claim than existence.")
+        self.say("The existence proofs are the newest part. Every record the interval "
+                 "method has been given has passed, and the rest of the file is still "
+                 "only certified until the sweep reaches it.")
         self.play(FadeIn(open_[2]), run_time=0.9)
         self.say("The largest open question is the last one: whether the high "
                  "dimensional orbits found in a turning frame have relatives that need "
@@ -102,7 +102,7 @@ class Closing(ExpoScene):
 
         self.play(FadeOut(open_), run_time=1.0)
 
-        # -- sign off --------------------------------------------------------
+        # — sign off --------------------------------------------------------
         o = catalog.load("eight")
         v = OrbitView(o.bodies, o.N, radius=1.45, center=UP * 1.15,
                       projector=Projector(o.d, o.principal_frame()),

@@ -7,10 +7,11 @@
 9:16 Phase two: the damped Newton step
 11:38 Three hard orbits
 14:22 Certification: the shooting Newton
-16:34 Covers, frames and the rigidity gate
-19:01 Where to start: the N-gon spectrum
-20:58 The rotating frame
-22:38 The command line and a record
-25:20 Redundancy, budgets and the twist
-29:01 What is in the catalogue
-30:54 The catalogue, and what is open
+16:34 Existence: the interval proof
+20:19 Covers, frames and the rigidity gate
+22:46 Where to start: the N-gon spectrum
+24:43 The rotating frame
+26:23 The command line and a record
+28:23 Redundancy, budgets and the twist
+32:05 What is in the catalogue
+33:58 The catalogue, and what is open

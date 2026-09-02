@@ -54,7 +54,7 @@ for s in T["scenes"]:
         bad = sum(1 for a, b in zip(seg, src) if a != b)
         check(f"scene {s['module']} placed bit-exactly", False, f"{bad} frames differ")
     cursor += s["frames"]
-check("all 15 scenes bit-exact at their placements", all_scenes)
+check("all %d scenes bit-exact at their placements" % len(T["scenes"]), all_scenes)
 check("title + end card fill the remainder",
       len(master) - (cursor - TITLE_F) - TITLE_F == int(round(T["end_seconds"] * FPS)))
 

@@ -4,6 +4,9 @@
 #include "continue.hpp"
 #include "optim.hpp"
 #include "taylor.hpp"
+#ifdef HAVE_MPFR
+#include "prove.hpp"
+#endif
 #include <cstdio>
 #include <chrono>
 #include <complex>
@@ -384,6 +387,73 @@ int main() {
     Record c = b; c.h.action *= 1 + 1e-6;    long fa = cat.find_duplicate(c);   // a real action gap: distinct orbit
     Record e = b; e.h.minsep *= 1 + 1e-2;    long fm = cat.find_duplicate(e);   // same action, different geometry
     CHECK(dup == 0 && fa < 0 && fm < 0 && raw > 1e-2, "continuous family folds on action+energy though the loops are %.2f apart; a 1e-6 action gap or a 1%% minsep gap does not fold", raw); }
+
+
+#ifdef HAVE_MPFR
+  std::printf("[interval arithmetic]\n");
+  { ival::prec() = 128; la::Rng rng(11); double worst = 0; int bad = 0;
+    for (int t = 0; t < 2000; t++) {
+      double a0 = rng.normal(), b0 = rng.normal(), wa = std::fabs(rng.normal()) * 0.1, wb = std::fabs(rng.normal()) * 0.1;
+      ival A(a0 - wa, a0 + wa), B(b0 - wb, b0 + wb), R;
+      for (int s = 0; s < 8; s++) { double x = a0 + wa * (2.0 * rng.uniform() - 1), y = b0 + wb * (2.0 * rng.uniform() - 1);
+        auto in = [&](const ival& I, double v) { return mpfr_cmp_d(I.lo, v) <= 0 && mpfr_cmp_d(I.hi, v) >= 0; };
+        add(R, A, B); if (!in(R, x + y)) bad++;   sub(R, A, B); if (!in(R, x - y)) bad++;   mul(R, A, B); if (!in(R, x * y)) bad++;
+        if (!(mpfr_sgn(B.lo) <= 0 && mpfr_sgn(B.hi) >= 0)) { div(R, A, B); if (!in(R, x / y)) bad++; }
+        R = A; mul(R, R, B); if (!in(R, x * y)) bad++;                                 // aliasing
+        R = A; fma_sub(R, A, B); if (!in(R, x - x * y)) bad++;
+        ival S2; mul(S2, A, A); add_inplace(S2, ival(1)); sqrt_(R, S2); if (!in(R, std::sqrt(x * x + 1))) bad++;
+        pow_d(R, S2, -1.5); if (!in(R, std::pow(x * x + 1, -1.5))) bad++;
+        worst = std::max(worst, R.wid()); }
+      R = A; sub_inplace(R, A); if (!(mpfr_sgn(R.lo) <= 0 && mpfr_sgn(R.hi) >= 0)) bad++; }
+    CHECK(bad == 0, "%d containment failures in 2000 random operand pairs (aliasing included)", bad); }
+
+  std::printf("[tangent series]\n");
+  { int N = 4, d = 3, order = 10, nd = N * d, n2 = 2 * nd; NBody<double> nb(N, d, 1.0, order), nbp(N, d, 1.0, order), nbm(N, d, 1.0, order); Tangent<double> tg(N, d, 1.0, order);
+    la::Rng rng(5); std::vector<double> Z(n2), dir(n2), Zp, Zm; for (double& z : Z) z = rng.normal(); for (double& v : dir) v = rng.normal();
+    nb.series(Z.data(), Z.data() + nd); tg.series(nb, dir.data(), dir.data() + nd);
+    const double eps = 1e-6; Zp = Z; Zm = Z; for (int i = 0; i < n2; i++) { Zp[i] += eps * dir[i]; Zm[i] -= eps * dir[i]; }
+    nbp.series(Zp.data(), Zp.data() + nd); nbm.series(Zm.data(), Zm.data() + nd); double err = 0;
+    for (int k = 0; k <= order; k++) for (int i = 0; i < nd; i++) {
+      double fx = (nbp.X[(size_t)k * nd + i] - nbm.X[(size_t)k * nd + i]) / (2 * eps), fv = (nbp.V[(size_t)k * nd + i] - nbm.V[(size_t)k * nd + i]) / (2 * eps);
+      err = std::max(err, std::fabs(fx - tg.X[(size_t)k * nd + i]) / (1 + std::fabs(fx))); err = std::max(err, std::fabs(fv - tg.V[(size_t)k * nd + i]) / (1 + std::fabs(fv))); }
+    CHECK(err < 1e-6, "linearised Taylor coefficients match central differences to %.1e over orders 0..%d", err, order); }
+
+  std::printf("[validated flow]\n");
+  { // the figure eight (Simo's initial conditions), rescaled to period 2pi and polished by the shooting Newton
+    const int N = 3, d = 2, nd = 6, n2 = 12; const double T0 = 6.32591398, lam = T0 / (2 * PI), sq = std::pow(lam, -2.0 / 3), sv = std::pow(lam, 1.0 / 3);
+    std::vector<double> Z = { 0.97000436, -0.24308753, -0.97000436, 0.24308753, 0, 0, 0.93240737 / 2 * sv, 0.86473146 / 2 * sv, 0.93240737 / 2 * sv, 0.86473146 / 2 * sv, -0.93240737 * sv, -0.86473146 * sv };
+    for (int i = 0; i < nd; i++) Z[i] *= sq;
+    NBody<double> nbd(N, d, 1.0, 22); ShootWork<double> W;
+    { std::vector<double> p0(Z.begin(), Z.begin() + nd), v0(Z.begin() + nd, Z.end());        // the bodies chase in one of two orders
+      if (chore_residual(nbd, p0, v0, 1e-16) > 0.1) for (int h = 0; h < 2; h++) for (int c = 0; c < d; c++) std::swap(Z[h * nd + d + c], Z[h * nd + 2 * d + c]); } double res = shoot_newton(nbd, Z, 1e-16, 30, 1e-14, -18, -40, W, false, (const std::vector<double>*)nullptr);
+    ival::prec() = 200; mpreal::set_default_prec(200); const double tol = 1e-30; const int order = 40;
+    Verified V(N, d, 1.0, order, 2, 2, tol); for (int i = 0; i < n2; i++) V.Z[i] = ival(Z[i]);
+    set_d(V.Psi[0], 1.0); set_d(V.Psi[(size_t)n2 + 7], 1.0);                         // e_0 and e_7
+    ival tend = ival::pi() * 2.0 / ival(N); bool ok = V.integrate(tend);
+    NBody<mpreal> nbm(N, d, 1.0, 50); std::vector<mpreal> p(nd), v(nd); for (int i = 0; i < nd; i++) { p[i] = Z[i]; v[i] = Z[nd + i]; }
+    nbm.integrate(p, v, mpreal::pi() * 2 / N, 1e-40); int inside = 0; double wid = 0;
+    for (int i = 0; i < n2; i++) { const mpreal& x = i < nd ? p[i] : v[i - nd]; if (mpfr_cmp(V.Z[i].lo, x.v) <= 0 && mpfr_cmp(x.v, V.Z[i].hi) <= 0) inside++; wid = std::max(wid, V.Z[i].wid()); }
+    // tangent columns against central differences of the double flow
+    double jerr = 0; for (int c = 0; c < 2; c++) { const int col = c == 0 ? 0 : 7; const double eps = 1e-6;
+      std::vector<double> pp(Z.begin(), Z.begin() + nd), vp(Z.begin() + nd, Z.end()), pm = pp, vm = vp;
+      (col < nd ? pp[col] : vp[col - nd]) += eps; (col < nd ? pm[col] : vm[col - nd]) -= eps;
+      nbd.integrate(pp, vp, 2 * PI / N, 1e-16); nbd.integrate(pm, vm, 2 * PI / N, 1e-16);
+      for (int i = 0; i < n2; i++) { double fd = ((i < nd ? pp[i] : vp[i - nd]) - (i < nd ? pm[i] : vm[i - nd])) / (2 * eps); jerr = std::max(jerr, std::fabs(fd - V.Psi[(size_t)c * n2 + i].mid())); } }
+    CHECK(res < 1e-12 && ok && inside == n2 && wid < 1e-20 && jerr < 1e-6, "eight over T/3: %ld steps, MPFR flow inside the enclosure (%d/%d, width %.1e), tangents vs finite differences %.1e (Newton %.1e)", V.steps, inside, n2, wid, jerr, res);
+    // a frame with a quarter turn (rate N/4) and a half turn: cos(π/2) is a zero crossing, sin(π/2) an
+    // extremum, and neither may widen the block beyond rounding
+    { const int Nf = 12, df = 5; std::vector<double> Om((size_t)df * df, 0.0);
+      Om[0 * df + 1] = -3.0; Om[1 * df + 0] = 3.0; Om[2 * df + 3] = -6.0; Om[3 * df + 2] = 6.0;
+      Frame fq = frame_of(Nf, df, Om.data()); std::vector<ival> G; fq.G_ival(G);
+      double w = 0; for (auto& g : G) w = std::max(w, g.wid());
+      bool blk = std::fabs(G[0 * df + 1].mid() + 1) < 1e-12 && std::fabs(G[1 * df + 0].mid() - 1) < 1e-12 && std::fabs(G[0].mid()) < 1e-12
+              && std::fabs(G[2 * df + 2].mid() + 1) < 1e-12 && fq.cls[0] == 2 && fq.cls[1] == 1 && fq.trans.size() == 1 && fq.rots.size() == 2;
+      CHECK(blk && w < 1e-30, "frame at a quarter turn and a half turn: G blocks exact to %.1e, classes %d/%d, %zu translation, %zu commuting rotations", w, fq.cls[0], fq.cls[1], fq.trans.size(), fq.rots.size()); }
+    std::vector<mpreal> Zm; Frame fr = frame_of(N, d, nullptr); double r2 = refine_state(N, d, 1.0, Z, fr, 20, 2, Zm);
+    Proof P = prove_state(N, d, 1.0, Zm, fr, 1e-10, 1e-24, 32, 2);
+    CHECK(r2 < 1e-20 && P.ok && P.kappa < 0.1 && mpfr_cmp_d(P.action.lo, 8.12397549) <= 0 && mpfr_cmp_d(P.action.hi, 8.12397550) >= 0,
+          "existence proof of the eight: %s, contraction %.1e, closure %.1e, action %s", P.ok ? "proven" : P.why.c_str(), P.kappa, P.closure, P.action.str(12).c_str()); }
+#endif
 
   std::printf("\n%s (%d failures)\n", fails ? "SOME TESTS FAILED" : "ALL TESTS PASSED", fails);
   return fails ? 1 : 0;

@@ -6,13 +6,13 @@ from manim import (VGroup, FadeIn, FadeOut, Create, UP, DOWN, LEFT, RIGHT,
 
 from expo import catalog, nbody, optim, targets, theme as T
 from expo.base import ExpoScene
-from expo.mathtext import B, M, C, sb, sp
+from expo.mathtext import B, M, C, sb, sp, Crow
 from expo.plots import Plot
 from expo.viz import OrbitView, Projector, PlaneGrid, eigen_strip, spin, tumble
 
 
 class TheHigherStructure(ExpoScene):
-    section_number = 13
+    section_number = 14
     section_title = "the structure underneath"
 
     def story(self):
@@ -71,7 +71,7 @@ class TheHigherStructure(ExpoScene):
         self.say("So the program builds the flat directions explicitly, pushes them "
                  "out of the spectrum, and counts what is left.")
         self.say("In a turning frame only the rotations that commute with the frame "
-                 "survive -- a smaller set, and not one you can find a generator at a "
+                 "survive — a smaller set, and not one you can find a generator at a "
                  "time.")
 
         self.wipe(run_time=1.0)
@@ -109,9 +109,9 @@ class TheHigherStructure(ExpoScene):
                  "plane, so it is extra modes, not extra directions, that buy "
                  "dimension.")
 
-        tbl = VGroup(C("N       4    5    6    7    8    9   10   12",
+        tbl = VGroup(Crow("N       4    5    6    7    8    9   10   12",
                        size=T.SZ_SMALL, color=T.INK_DIM),
-                     C("limit   4    4    6    6    8    8   10   12",
+                     Crow("limit   4    4    6    6    8    8   10   12",
                        size=T.SZ_SMALL, color=T.INK))
         tbl.arrange(DOWN, buff=0.24).move_to(DOWN * 0.5)
         self.play(FadeIn(tbl), run_time=1.0)
@@ -180,17 +180,17 @@ class TheHigherStructure(ExpoScene):
         self.say("Written out in the Fourier basis it collapses to a sum over sets of "
                  "modes that add up to zero, weighted by a Vandermonde determinant.")
         self.say("So it is non-zero only for orbits whose modes are in arithmetic "
-                 "resonance -- and being non-zero certifies, on its own, that the orbit "
+                 "resonance — and being non-zero certifies, on its own, that the orbit "
                  "fills at least k dimensions.")
 
         self.wipe(run_time=1.0)
 
-        # -- the ladder ------------------------------------------------------
-        rows = VGroup(C("d     k     group", size=T.SZ_TINY, color=T.INK_DIM))
+        # — the ladder ------------------------------------------------------
+        rows = VGroup(Crow("d     k     group", size=T.SZ_TINY, color=T.INK_DIM))
         for d, k, g in (("3", "3", "SO(3)"), ("4", "2", "SU(2)·U(1)"),
                         ("6", "3", "SU(3)"), ("7", "3", "G2"),
                         ("8", "4", "Spin(7)"), ("10", "5", "SU(5)")):
-            rows.add(C("%-5s %-5s %s" % (d, k, g), size=T.SZ_SMALL,
+            rows.add(Crow("%-5s %-5s %s" % (d, k, g), size=T.SZ_SMALL,
                        color=T.GOLD if g in ("G2", "Spin(7)") else T.INK))
         rows.arrange(DOWN, buff=0.24, aligned_edge=LEFT).move_to(LEFT * 3.0 + UP * 0.2)
         note = VGroup(

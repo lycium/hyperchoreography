@@ -7,7 +7,7 @@ from manim import (VGroup, VMobject, FadeIn, FadeOut, Create, Circle, Dot, Line,
 
 from expo import catalog, nbody, shoot, targets, theme as T
 from expo.base import ExpoScene
-from expo.mathtext import B, M, C, sb, sp
+from expo.mathtext import B, M, C, sb, sp, Crow
 from expo.plots import Plot
 from expo.readout import Field, sci
 from expo.viz import OrbitView, Projector, body_dot, spin
@@ -85,7 +85,7 @@ class Certification(ExpoScene):
                  "condition that makes a choreography a choreography: every body must "
                  "land exactly where the body in front of it started.")
 
-        # -- the under-resolved attempt --------------------------------------
+        # — the under-resolved attempt --------------------------------------
         N, d = P.N, P.d
         Z0, Zc = cache["Z0"], cache["Zc"]
         res = cache["res"]
@@ -143,7 +143,7 @@ class Certification(ExpoScene):
         self.say("Five parts in a hundred out. Small, but the equations of motion do "
                  "not grade on a curve.")
 
-        # -- the shooting Newton ---------------------------------------------
+        # — the shooting Newton ---------------------------------------------
         plot = Plot((0, len(res) - 1), (1e-15, 1.0), width=4.5, height=2.5,
                     center=RIGHT * 3.4 + DOWN * 1.0, log_y=True,
                     x_ticks=list(range(len(res))),
@@ -193,9 +193,9 @@ class Certification(ExpoScene):
                  "repeated in arbitrary precision and rounded back.")
 
         stat = VGroup(
-            C("over about 1800 catalogued records", size=T.SZ_TINY, color=T.INK_DIM),
-            C("median shift residual   2.2e-15", size=T.SZ_SMALL, color=T.GOOD),
-            C("worst                   6.0e-11", size=T.SZ_SMALL, color=T.INK),
+            Crow("over about 1800 catalogued records", size=T.SZ_TINY, color=T.INK_DIM),
+            Crow("median shift residual   2.2e-15", size=T.SZ_SMALL, color=T.GOOD),
+            Crow("worst                   6.0e-11", size=T.SZ_SMALL, color=T.INK),
         ).arrange(DOWN, buff=0.24, aligned_edge=LEFT).move_to(DOWN * 1.72)
         self.play(FadeIn(stat), run_time=1.0)
         self.say("Across the whole catalogue the typical orbit satisfies the shift "

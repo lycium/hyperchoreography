@@ -1,5 +1,5 @@
 (allura-scene 1)
-(idnext 206)
+(idnext 216)
 (state
   (project
     (assets
@@ -83,7 +83,7 @@
         (media
           (size 1920 1080)
           (fps 30 1)
-          (frames 2850)
+          (frames 2852)
           (transfer 0)
           (transport 0)
           (audio 48000 1)))
@@ -94,7 +94,7 @@
         (media
           (size 1920 1080)
           (fps 30 1)
-          (frames 2774)
+          (frames 2772)
           (transfer 0)
           (transport 0)
           (audio 48000 1)))
@@ -116,7 +116,7 @@
         (media
           (size 1920 1080)
           (fps 30 1)
-          (frames 4261)
+          (frames 4262)
           (transfer 0)
           (transport 0)
           (audio 48000 1)))
@@ -127,7 +127,7 @@
         (media
           (size 1920 1080)
           (fps 30 1)
-          (frames 4921)
+          (frames 4919)
           (transfer 0)
           (transport 0)
           (audio 48000 1)))
@@ -144,8 +144,19 @@
           (audio 48000 1)))
       (asset
         (id 97)
-        (name "s09_sameorbit")
-        (path "../out/s09_sameorbit.mkv")
+        (name "s09_prove")
+        (path "../out/s09_prove.mkv")
+        (media
+          (size 1920 1080)
+          (fps 30 1)
+          (frames 6752)
+          (transfer 0)
+          (transport 0)
+          (audio 48000 1)))
+      (asset
+        (id 102)
+        (name "s10_sameorbit")
+        (path "../out/s10_sameorbit.mkv")
         (media
           (size 1920 1080)
           (fps 30 1)
@@ -154,9 +165,9 @@
           (transport 0)
           (audio 48000 1)))
       (asset
-        (id 102)
-        (name "s10_starts")
-        (path "../out/s10_starts.mkv")
+        (id 107)
+        (name "s11_starts")
+        (path "../out/s11_starts.mkv")
         (media
           (size 1920 1080)
           (fps 30 1)
@@ -165,9 +176,9 @@
           (transport 0)
           (audio 48000 1)))
       (asset
-        (id 107)
-        (name "s11_frame")
-        (path "../out/s11_frame.mkv")
+        (id 112)
+        (name "s12_frame")
+        (path "../out/s12_frame.mkv")
         (media
           (size 1920 1080)
           (fps 30 1)
@@ -176,112 +187,117 @@
           (transport 0)
           (audio 48000 1)))
       (asset
-        (id 112)
-        (name "s12_usage")
-        (path "../out/s12_usage.mkv")
-        (media
-          (size 1920 1080)
-          (fps 30 1)
-          (frames 4865)
-          (transfer 0)
-          (transport 0)
-          (audio 48000 1)))
-      (asset
         (id 117)
-        (name "s13_structure")
-        (path "../out/s13_structure.mkv")
+        (name "s13_usage")
+        (path "../out/s13_usage.mkv")
         (media
           (size 1920 1080)
           (fps 30 1)
-          (frames 6640)
+          (frames 3616)
           (transfer 0)
           (transport 0)
           (audio 48000 1)))
       (asset
         (id 122)
-        (name "s14_close")
-        (path "../out/s14_close.mkv")
+        (name "s14_structure")
+        (path "../out/s14_structure.mkv")
         (media
           (size 1920 1080)
           (fps 30 1)
-          (frames 3383)
+          (frames 6642)
           (transfer 0)
           (transport 0)
           (audio 48000 1)))
       (asset
         (id 127)
+        (name "s15_close")
+        (path "../out/s15_close.mkv")
+        (media
+          (size 1920 1080)
+          (fps 30 1)
+          (frames 3414)
+          (transfer 0)
+          (transport 0)
+          (audio 48000 1)))
+      (asset
+        (id 132)
         (name "s00_open.narration")
         (path "../out/s00_open.narration.wav")
         (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1)))
       (asset
-        (id 132)
+        (id 137)
         (name "s01_choreo.narration")
         (path "../out/s01_choreo.narration.wav")
         (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1)))
       (asset
-        (id 137)
+        (id 142)
         (name "s02_action.narration")
         (path "../out/s02_action.narration.wav")
         (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1)))
       (asset
-        (id 142)
+        (id 147)
         (name "s03_fourier.narration")
         (path "../out/s03_fourier.narration.wav")
         (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1)))
       (asset
-        (id 147)
+        (id 152)
         (name "s04_landscape.narration")
         (path "../out/s04_landscape.narration.wav")
         (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1)))
       (asset
-        (id 152)
+        (id 157)
         (name "s05_lbfgs.narration")
         (path "../out/s05_lbfgs.narration.wav")
         (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1)))
       (asset
-        (id 157)
+        (id 162)
         (name "s06_newton.narration")
         (path "../out/s06_newton.narration.wav")
         (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1)))
       (asset
-        (id 162)
+        (id 167)
         (name "s07_hard.narration")
         (path "../out/s07_hard.narration.wav")
         (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1)))
       (asset
-        (id 167)
+        (id 172)
         (name "s08_certify.narration")
         (path "../out/s08_certify.narration.wav")
         (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1)))
       (asset
-        (id 172)
-        (name "s09_sameorbit.narration")
-        (path "../out/s09_sameorbit.narration.wav")
-        (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1)))
-      (asset
         (id 177)
-        (name "s10_starts.narration")
-        (path "../out/s10_starts.narration.wav")
+        (name "s09_prove.narration")
+        (path "../out/s09_prove.narration.wav")
         (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1)))
       (asset
         (id 182)
-        (name "s11_frame.narration")
-        (path "../out/s11_frame.narration.wav")
+        (name "s10_sameorbit.narration")
+        (path "../out/s10_sameorbit.narration.wav")
         (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1)))
       (asset
         (id 187)
-        (name "s12_usage.narration")
-        (path "../out/s12_usage.narration.wav")
+        (name "s11_starts.narration")
+        (path "../out/s11_starts.narration.wav")
         (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1)))
       (asset
         (id 192)
-        (name "s13_structure.narration")
-        (path "../out/s13_structure.narration.wav")
+        (name "s12_frame.narration")
+        (path "../out/s12_frame.narration.wav")
         (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1)))
       (asset
         (id 197)
-        (name "s14_close.narration")
-        (path "../out/s14_close.narration.wav")
+        (name "s13_usage.narration")
+        (path "../out/s13_usage.narration.wav")
+        (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1)))
+      (asset
+        (id 202)
+        (name "s14_structure.narration")
+        (path "../out/s14_structure.narration.wav")
+        (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1)))
+      (asset
+        (id 207)
+        (name "s15_close.narration")
+        (path "../out/s15_close.narration.wav")
         (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))
     (comps
       (comp
@@ -606,7 +622,7 @@
           (name "hyperchoreography")
           (size 1920 1080)
           (fps 30 1)
-          (duration 1868.0333333333333))
+          (duration 2052.4333333333334))
         (layers
           (layer
             (id 48)
@@ -648,7 +664,7 @@
             (source 69)
             (mask 70)
             (xf 71)
-            (time (offset 271.6666666666667) (active 271.6666666666667 366.6333333333333))
+            (time (offset 271.6666666666667) (active 271.6666666666667 366.6666666666667))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 0))))
             (label "s03_fourier" 0))
@@ -657,7 +673,7 @@
             (source 74)
             (mask 75)
             (xf 76)
-            (time (offset 366.6333333333333) (active 366.6333333333333 459.06666666666666))
+            (time (offset 366.6666666666667) (active 366.6666666666667 459))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 0))))
             (label "s04_landscape" 0))
@@ -666,7 +682,7 @@
             (source 79)
             (mask 80)
             (xf 81)
-            (time (offset 459.06666666666666) (active 459.06666666666666 555.7))
+            (time (offset 459) (active 459 555.6333333333333))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 0))))
             (label "s05_lbfgs" 0))
@@ -675,7 +691,7 @@
             (source 84)
             (mask 85)
             (xf 86)
-            (time (offset 555.7) (active 555.7 697.7))
+            (time (offset 555.6333333333333) (active 555.6333333333333 697.6666666666666))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 0))))
             (label "s06_newton" 0))
@@ -684,7 +700,7 @@
             (source 89)
             (mask 90)
             (xf 91)
-            (time (offset 697.7) (active 697.7 861.7))
+            (time (offset 697.6666666666666) (active 697.6666666666666 861.5666666666667))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 0))))
             (label "s07_hard" 0))
@@ -693,7 +709,7 @@
             (source 94)
             (mask 95)
             (xf 96)
-            (time (offset 861.7) (active 861.7 994.0666666666667))
+            (time (offset 861.5666666666667) (active 861.5666666666667 993.9333333333333))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 0))))
             (label "s08_certify" 0))
@@ -702,196 +718,214 @@
             (source 99)
             (mask 100)
             (xf 101)
-            (time (offset 994.0666666666667) (active 994.0666666666667 1141.0666666666666))
+            (time (offset 993.9333333333333) (active 993.9333333333333 1218.9666666666667))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 0))))
-            (label "s09_sameorbit" 0))
+            (label "s09_prove" 0))
           (layer
             (id 103)
             (source 104)
             (mask 105)
             (xf 106)
-            (time (offset 1141.0666666666666) (active 1141.0666666666666 1257.9333333333334))
+            (time (offset 1218.9666666666667) (active 1218.9666666666667 1365.9666666666667))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 0))))
-            (label "s10_starts" 0))
+            (label "s10_sameorbit" 0))
           (layer
             (id 108)
             (source 109)
             (mask 110)
             (xf 111)
-            (time (offset 1257.9333333333334) (active 1257.9333333333334 1357.9))
+            (time (offset 1365.9666666666667) (active 1365.9666666666667 1482.8333333333333))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 0))))
-            (label "s11_frame" 0))
+            (label "s11_starts" 0))
           (layer
             (id 113)
             (source 114)
             (mask 115)
             (xf 116)
-            (time (offset 1357.9) (active 1357.9 1520.0333333333333))
+            (time (offset 1482.8333333333333) (active 1482.8333333333333 1582.8))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 0))))
-            (label "s12_usage" 0))
+            (label "s12_frame" 0))
           (layer
             (id 118)
             (source 119)
             (mask 120)
             (xf 121)
-            (time (offset 1520.0333333333333) (active 1520.0333333333333 1741.3333333333333))
+            (time (offset 1582.8) (active 1582.8 1703.3))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 0))))
-            (label "s13_structure" 0))
+            (label "s13_usage" 0))
           (layer
             (id 123)
             (source 124)
             (mask 125)
             (xf 126)
-            (time (offset 1741.3333333333333) (active 1741.3333333333333 1854.0333333333333))
+            (time (offset 1703.3) (active 1703.3 1924.6666666666667))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 0))))
-            (label "s14_close" 0))
+            (label "s14_structure" 0))
           (layer
             (id 128)
             (source 129)
             (mask 130)
             (xf 131)
-            (time (offset 6) (active 6 62.96670833333334))
+            (time (offset 1924.6666666666667) (active 1924.6666666666667 2038.4333333333334))
             (opacity (param (base (float 1))))
-            (audio-gain (param (base (float 1.476))))
-            (label "s00_open.voice" 0))
+            (audio-gain (param (base (float 0))))
+            (label "s15_close" 0))
           (layer
             (id 133)
             (source 134)
             (mask 135)
             (xf 136)
-            (time (offset 62.93333333333333) (active 62.93333333333333 164.616625))
+            (time (offset 6) (active 6 62.96670833333334))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 1.476))))
-            (label "s01_choreo.voice" 0))
+            (label "s00_open.voice" 0))
           (layer
             (id 138)
             (source 139)
             (mask 140)
             (xf 141)
-            (time (offset 164.56666666666666) (active 164.56666666666666 271.69166666666666))
+            (time (offset 62.93333333333333) (active 62.93333333333333 164.616625))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 1.476))))
-            (label "s02_action.voice" 0))
+            (label "s01_choreo.voice" 0))
           (layer
             (id 143)
             (source 144)
             (mask 145)
             (xf 146)
-            (time (offset 271.6666666666667) (active 271.6666666666667 366.65837500000004))
+            (time (offset 164.56666666666666) (active 164.56666666666666 271.69166666666666))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 1.476))))
-            (label "s03_fourier.voice" 0))
+            (label "s02_action.voice" 0))
           (layer
             (id 148)
             (source 149)
             (mask 150)
             (xf 151)
-            (time (offset 366.6333333333333) (active 366.6333333333333 459.091625))
+            (time (offset 271.6666666666667) (active 271.6666666666667 366.7166666666667))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 1.476))))
-            (label "s04_landscape.voice" 0))
+            (label "s03_fourier.voice" 0))
           (layer
             (id 153)
             (source 154)
             (mask 155)
             (xf 156)
-            (time (offset 459.06666666666666) (active 459.06666666666666 555.7499583333333))
+            (time (offset 366.6666666666667) (active 366.6666666666667 459.04995833333334))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 1.476))))
-            (label "s05_lbfgs.voice" 0))
+            (label "s04_landscape.voice" 0))
           (layer
             (id 158)
             (source 159)
             (mask 160)
             (xf 161)
-            (time (offset 555.7) (active 555.7 697.7332916666667))
+            (time (offset 459) (active 459 555.6832916666667))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 1.476))))
-            (label "s06_newton.voice" 0))
+            (label "s05_lbfgs.voice" 0))
           (layer
             (id 163)
             (source 164)
             (mask 165)
             (xf 166)
-            (time (offset 697.7) (active 697.7 861.7417083333333))
+            (time (offset 555.6333333333333) (active 555.6333333333333 697.6916249999999))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 1.476))))
-            (label "s07_hard.voice" 0))
+            (label "s06_newton.voice" 0))
           (layer
             (id 168)
             (source 169)
             (mask 170)
             (xf 171)
-            (time (offset 861.7) (active 861.7 994.1))
+            (time (offset 697.6666666666666) (active 697.6666666666666 861.6166666666666))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 1.476))))
-            (label "s08_certify.voice" 0))
+            (label "s07_hard.voice" 0))
           (layer
             (id 173)
             (source 174)
             (mask 175)
             (xf 176)
-            (time (offset 994.0666666666667) (active 994.0666666666667 1141.0999583333335))
+            (time (offset 861.5666666666667) (active 861.5666666666667 993.9666666666667))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 1.476))))
-            (label "s09_sameorbit.voice" 0))
+            (label "s08_certify.voice" 0))
           (layer
             (id 178)
             (source 179)
             (mask 180)
             (xf 181)
-            (time (offset 1141.0666666666666) (active 1141.0666666666666 1257.958375))
+            (time (offset 993.9333333333333) (active 993.9333333333333 1219.0083333333332))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 1.476))))
-            (label "s10_starts.voice" 0))
+            (label "s09_prove.voice" 0))
           (layer
             (id 183)
             (source 184)
             (mask 185)
             (xf 186)
-            (time (offset 1257.9333333333334) (active 1257.9333333333334 1357.9333333333334))
+            (time (offset 1218.9666666666667) (active 1218.9666666666667 1365.9999583333333))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 1.476))))
-            (label "s11_frame.voice" 0))
+            (label "s10_sameorbit.voice" 0))
           (layer
             (id 188)
             (source 189)
             (mask 190)
             (xf 191)
-            (time (offset 1357.9) (active 1357.9 1520.0832916666668))
+            (time (offset 1365.9666666666667) (active 1365.9666666666667 1482.8666666666668))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 1.476))))
-            (label "s12_usage.voice" 0))
+            (label "s11_starts.voice" 0))
           (layer
             (id 193)
             (source 194)
             (mask 195)
             (xf 196)
-            (time (offset 1520.0333333333333) (active 1520.0333333333333 1741.3583333333333))
+            (time (offset 1482.8333333333333) (active 1482.8333333333333 1582.8333333333333))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 1.476))))
-            (label "s13_structure.voice" 0))
+            (label "s12_frame.voice" 0))
           (layer
             (id 198)
             (source 199)
             (mask 200)
             (xf 201)
-            (time (offset 1741.3333333333333) (active 1741.3333333333333 1854.0833333333333))
+            (time (offset 1582.8) (active 1582.8 1703.3332916666666))
             (opacity (param (base (float 1))))
             (audio-gain (param (base (float 1.476))))
-            (label "s14_close.voice" 0))
+            (label "s13_usage.voice" 0))
           (layer
-            (id 202)
-            (source 203)
-            (mask 204)
-            (xf 205)
-            (time (offset 1854.0333333333333) (active 1854.0333333333333 1868.0333333333333))
+            (id 203)
+            (source 204)
+            (mask 205)
+            (xf 206)
+            (time (offset 1703.3) (active 1703.3 1924.6917083333333))
+            (opacity (param (base (float 1))))
+            (audio-gain (param (base (float 1.476))))
+            (label "s14_structure.voice" 0))
+          (layer
+            (id 208)
+            (source 209)
+            (mask 210)
+            (xf 211)
+            (time (offset 1924.6666666666667) (active 1924.6666666666667 2038.4666666666667))
+            (opacity (param (base (float 1))))
+            (audio-gain (param (base (float 1.476))))
+            (label "s15_close.voice" 0))
+          (layer
+            (id 212)
+            (source 213)
+            (mask 214)
+            (xf 215)
+            (time (offset 2038.4333333333334) (active 2038.4333333333334 2052.4333333333334))
             (opacity (param (base (float 1))))
             (label "endcard" 0)))
         (nodes
@@ -1095,7 +1129,7 @@
                 (param (base (angle 0))))))
           (n
             99
-            (node (type 3053627164) (name "s09_sameorbit") (params (param (base (int 97))))))
+            (node (type 3053627164) (name "s09_prove") (params (param (base (int 97))))))
           (n
             100
             (node
@@ -1115,7 +1149,7 @@
                 (param (base (angle 0))))))
           (n
             104
-            (node (type 3053627164) (name "s10_starts") (params (param (base (int 102))))))
+            (node (type 3053627164) (name "s10_sameorbit") (params (param (base (int 102))))))
           (n
             105
             (node
@@ -1135,7 +1169,7 @@
                 (param (base (angle 0))))))
           (n
             109
-            (node (type 3053627164) (name "s11_frame") (params (param (base (int 107))))))
+            (node (type 3053627164) (name "s11_starts") (params (param (base (int 107))))))
           (n
             110
             (node
@@ -1155,7 +1189,7 @@
                 (param (base (angle 0))))))
           (n
             114
-            (node (type 3053627164) (name "s12_usage") (params (param (base (int 112))))))
+            (node (type 3053627164) (name "s12_frame") (params (param (base (int 112))))))
           (n
             115
             (node
@@ -1175,7 +1209,7 @@
                 (param (base (angle 0))))))
           (n
             119
-            (node (type 3053627164) (name "s13_structure") (params (param (base (int 117))))))
+            (node (type 3053627164) (name "s13_usage") (params (param (base (int 117))))))
           (n
             120
             (node
@@ -1195,7 +1229,7 @@
                 (param (base (angle 0))))))
           (n
             124
-            (node (type 3053627164) (name "s14_close") (params (param (base (int 122))))))
+            (node (type 3053627164) (name "s14_structure") (params (param (base (int 122))))))
           (n
             125
             (node
@@ -1215,10 +1249,7 @@
                 (param (base (angle 0))))))
           (n
             129
-            (node
-              (type 3053627164)
-              (name "s00_open.narration")
-              (params (param (base (int 127))))))
+            (node (type 3053627164) (name "s15_close") (params (param (base (int 127))))))
           (n
             130
             (node
@@ -1231,8 +1262,8 @@
               (type 8140143)
               (name "xf")
               (params
-                (param (base (vec2 0 0)))
-                (param (base (vec2 0 0)))
+                (param (base (vec2 960 540)))
+                (param (base (vec2 960 540)))
                 (param (base (vec2 1 1)))
                 (param (base (angle 0)))
                 (param (base (angle 0))))))
@@ -1240,7 +1271,7 @@
             134
             (node
               (type 3053627164)
-              (name "s01_choreo.narration")
+              (name "s00_open.narration")
               (params (param (base (int 132))))))
           (n
             135
@@ -1263,7 +1294,7 @@
             139
             (node
               (type 3053627164)
-              (name "s02_action.narration")
+              (name "s01_choreo.narration")
               (params (param (base (int 137))))))
           (n
             140
@@ -1286,7 +1317,7 @@
             144
             (node
               (type 3053627164)
-              (name "s03_fourier.narration")
+              (name "s02_action.narration")
               (params (param (base (int 142))))))
           (n
             145
@@ -1309,7 +1340,7 @@
             149
             (node
               (type 3053627164)
-              (name "s04_landscape.narration")
+              (name "s03_fourier.narration")
               (params (param (base (int 147))))))
           (n
             150
@@ -1332,7 +1363,7 @@
             154
             (node
               (type 3053627164)
-              (name "s05_lbfgs.narration")
+              (name "s04_landscape.narration")
               (params (param (base (int 152))))))
           (n
             155
@@ -1355,7 +1386,7 @@
             159
             (node
               (type 3053627164)
-              (name "s06_newton.narration")
+              (name "s05_lbfgs.narration")
               (params (param (base (int 157))))))
           (n
             160
@@ -1378,7 +1409,7 @@
             164
             (node
               (type 3053627164)
-              (name "s07_hard.narration")
+              (name "s06_newton.narration")
               (params (param (base (int 162))))))
           (n
             165
@@ -1401,7 +1432,7 @@
             169
             (node
               (type 3053627164)
-              (name "s08_certify.narration")
+              (name "s07_hard.narration")
               (params (param (base (int 167))))))
           (n
             170
@@ -1424,7 +1455,7 @@
             174
             (node
               (type 3053627164)
-              (name "s09_sameorbit.narration")
+              (name "s08_certify.narration")
               (params (param (base (int 172))))))
           (n
             175
@@ -1447,7 +1478,7 @@
             179
             (node
               (type 3053627164)
-              (name "s10_starts.narration")
+              (name "s09_prove.narration")
               (params (param (base (int 177))))))
           (n
             180
@@ -1470,7 +1501,7 @@
             184
             (node
               (type 3053627164)
-              (name "s11_frame.narration")
+              (name "s10_sameorbit.narration")
               (params (param (base (int 182))))))
           (n
             185
@@ -1493,7 +1524,7 @@
             189
             (node
               (type 3053627164)
-              (name "s12_usage.narration")
+              (name "s11_starts.narration")
               (params (param (base (int 187))))))
           (n
             190
@@ -1516,7 +1547,7 @@
             194
             (node
               (type 3053627164)
-              (name "s13_structure.narration")
+              (name "s12_frame.narration")
               (params (param (base (int 192))))))
           (n
             195
@@ -1539,7 +1570,7 @@
             199
             (node
               (type 3053627164)
-              (name "s14_close.narration")
+              (name "s13_usage.narration")
               (params (param (base (int 197))))))
           (n
             200
@@ -1559,16 +1590,62 @@
                 (param (base (angle 0)))
                 (param (base (angle 0))))))
           (n
-            203
-            (node (type 1377746913) (name "endcard") (params (param (base (int 17))))))
-          (n
             204
+            (node
+              (type 3053627164)
+              (name "s14_structure.narration")
+              (params (param (base (int 202))))))
+          (n
+            205
             (node
               (type 3269083197)
               (name "mask")
               (params (param (base (float 1))) (param (base (enum 0))))))
           (n
-            205
+            206
+            (node
+              (type 8140143)
+              (name "xf")
+              (params
+                (param (base (vec2 0 0)))
+                (param (base (vec2 0 0)))
+                (param (base (vec2 1 1)))
+                (param (base (angle 0)))
+                (param (base (angle 0))))))
+          (n
+            209
+            (node
+              (type 3053627164)
+              (name "s15_close.narration")
+              (params (param (base (int 207))))))
+          (n
+            210
+            (node
+              (type 3269083197)
+              (name "mask")
+              (params (param (base (float 1))) (param (base (enum 0))))))
+          (n
+            211
+            (node
+              (type 8140143)
+              (name "xf")
+              (params
+                (param (base (vec2 0 0)))
+                (param (base (vec2 0 0)))
+                (param (base (vec2 1 1)))
+                (param (base (angle 0)))
+                (param (base (angle 0))))))
+          (n
+            213
+            (node (type 1377746913) (name "endcard") (params (param (base (int 17))))))
+          (n
+            214
+            (node
+              (type 3269083197)
+              (name "mask")
+              (params (param (base (float 1))) (param (base (enum 0))))))
+          (n
+            215
             (node
               (type 8140143)
               (name "xf")
@@ -1583,18 +1660,19 @@
           (mk 62.93333333333333 "The choreography constraint")
           (mk 164.56666666666666 "Least action")
           (mk 271.6666666666667 "The Fourier basis")
-          (mk 366.6333333333333 "The landscape and the Morse index")
-          (mk 459.06666666666666 "Phase one: L-BFGS")
-          (mk 555.7 "Phase two: the damped Newton step")
-          (mk 697.7 "Three hard orbits")
-          (mk 861.7 "Certification: the shooting Newton")
-          (mk 994.0666666666667 "Covers, frames and the rigidity gate")
-          (mk 1141.0666666666666 "Where to start: the N-gon spectrum")
-          (mk 1257.9333333333334 "The rotating frame")
-          (mk 1357.9 "The command line and a record")
-          (mk 1520.0333333333333 "Redundancy, budgets and the twist")
-          (mk 1741.3333333333333 "What is in the catalogue")
-          (mk 1854.0333333333333 "The catalogue, and what is open"))))))
+          (mk 366.6666666666667 "The landscape and the Morse index")
+          (mk 459 "Phase one: L-BFGS")
+          (mk 555.6333333333333 "Phase two: the damped Newton step")
+          (mk 697.6666666666666 "Three hard orbits")
+          (mk 861.5666666666667 "Certification: the shooting Newton")
+          (mk 993.9333333333333 "Existence: the interval proof")
+          (mk 1218.9666666666667 "Covers, frames and the rigidity gate")
+          (mk 1365.9666666666667 "Where to start: the N-gon spectrum")
+          (mk 1482.8333333333333 "The rotating frame")
+          (mk 1582.8 "The command line and a record")
+          (mk 1703.3 "Redundancy, budgets and the twist")
+          (mk 1924.6666666666667 "What is in the catalogue")
+          (mk 2038.4333333333334 "The catalogue, and what is open"))))))
 (history
   (hn 0 -1)
   (hn
@@ -2294,7 +2372,7 @@
               (name "hyperchoreography")
               (size 1920 1080)
               (fps 30 1)
-              (duration 1868.0333333333333))))))
+              (duration 2052.4333333333334))))))
     (name "ConformComp"))
   (hn
     21
@@ -2592,7 +2670,7 @@
             (media
               (size 1920 1080)
               (fps 30 1)
-              (frames 2850)
+              (frames 2852)
               (transfer 0)
               (transport 0)
               (audio 48000 1))))))
@@ -2647,7 +2725,7 @@
                 (source 69)
                 (mask 70)
                 (xf 71)
-                (time (offset 271.6666666666667) (active 271.6666666666667 366.6333333333333))
+                (time (offset 271.6666666666667) (active 271.6666666666667 366.6666666666667))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 0))))
                 (label "s03_fourier" 0)))))))
@@ -2668,7 +2746,7 @@
             (media
               (size 1920 1080)
               (fps 30 1)
-              (frames 2774)
+              (frames 2772)
               (transfer 0)
               (transport 0)
               (audio 48000 1))))))
@@ -2723,7 +2801,7 @@
                 (source 74)
                 (mask 75)
                 (xf 76)
-                (time (offset 366.6333333333333) (active 366.6333333333333 459.06666666666666))
+                (time (offset 366.6666666666667) (active 366.6666666666667 459))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 0))))
                 (label "s04_landscape" 0)))))))
@@ -2799,7 +2877,7 @@
                 (source 79)
                 (mask 80)
                 (xf 81)
-                (time (offset 459.06666666666666) (active 459.06666666666666 555.7))
+                (time (offset 459) (active 459 555.6333333333333))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 0))))
                 (label "s05_lbfgs" 0)))))))
@@ -2820,7 +2898,7 @@
             (media
               (size 1920 1080)
               (fps 30 1)
-              (frames 4261)
+              (frames 4262)
               (transfer 0)
               (transport 0)
               (audio 48000 1))))))
@@ -2875,7 +2953,7 @@
                 (source 84)
                 (mask 85)
                 (xf 86)
-                (time (offset 555.7) (active 555.7 697.7))
+                (time (offset 555.6333333333333) (active 555.6333333333333 697.6666666666666))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 0))))
                 (label "s06_newton" 0)))))))
@@ -2896,7 +2974,7 @@
             (media
               (size 1920 1080)
               (fps 30 1)
-              (frames 4921)
+              (frames 4919)
               (transfer 0)
               (transport 0)
               (audio 48000 1))))))
@@ -2951,7 +3029,7 @@
                 (source 89)
                 (mask 90)
                 (xf 91)
-                (time (offset 697.7) (active 697.7 861.7))
+                (time (offset 697.6666666666666) (active 697.6666666666666 861.5666666666667))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 0))))
                 (label "s07_hard" 0)))))))
@@ -3027,7 +3105,7 @@
                 (source 94)
                 (mask 95)
                 (xf 96)
-                (time (offset 861.7) (active 861.7 994.0666666666667))
+                (time (offset 861.5666666666667) (active 861.5666666666667 993.9333333333333))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 0))))
                 (label "s08_certify" 0)))))))
@@ -3043,12 +3121,12 @@
         (after
           (asset
             (id 97)
-            (name "s09_sameorbit")
-            (path "../out/s09_sameorbit.mkv")
+            (name "s09_prove")
+            (path "../out/s09_prove.mkv")
             (media
               (size 1920 1080)
               (fps 30 1)
-              (frames 4411)
+              (frames 6752)
               (transfer 0)
               (transport 0)
               (audio 48000 1))))))
@@ -3066,7 +3144,7 @@
             (node 99)
             (ia -1)
             (after
-              (node (type 3053627164) (name "s09_sameorbit") (params (param (base (int 97)))))))
+              (node (type 3053627164) (name "s09_prove") (params (param (base (int 97)))))))
           (op
             add-node
             (comp 47)
@@ -3103,10 +3181,10 @@
                 (source 99)
                 (mask 100)
                 (xf 101)
-                (time (offset 994.0666666666667) (active 994.0666666666667 1141.0666666666666))
+                (time (offset 993.9333333333333) (active 993.9333333333333 1218.9666666666667))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 0))))
-                (label "s09_sameorbit" 0)))))))
+                (label "s09_prove" 0)))))))
     (name "ConformLayer"))
   (hn
     42
@@ -3119,12 +3197,12 @@
         (after
           (asset
             (id 102)
-            (name "s10_starts")
-            (path "../out/s10_starts.mkv")
+            (name "s10_sameorbit")
+            (path "../out/s10_sameorbit.mkv")
             (media
               (size 1920 1080)
               (fps 30 1)
-              (frames 3507)
+              (frames 4411)
               (transfer 0)
               (transport 0)
               (audio 48000 1))))))
@@ -3142,7 +3220,7 @@
             (node 104)
             (ia -1)
             (after
-              (node (type 3053627164) (name "s10_starts") (params (param (base (int 102)))))))
+              (node (type 3053627164) (name "s10_sameorbit") (params (param (base (int 102)))))))
           (op
             add-node
             (comp 47)
@@ -3179,10 +3257,10 @@
                 (source 104)
                 (mask 105)
                 (xf 106)
-                (time (offset 1141.0666666666666) (active 1141.0666666666666 1257.9333333333334))
+                (time (offset 1218.9666666666667) (active 1218.9666666666667 1365.9666666666667))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 0))))
-                (label "s10_starts" 0)))))))
+                (label "s10_sameorbit" 0)))))))
     (name "ConformLayer"))
   (hn
     44
@@ -3195,12 +3273,12 @@
         (after
           (asset
             (id 107)
-            (name "s11_frame")
-            (path "../out/s11_frame.mkv")
+            (name "s11_starts")
+            (path "../out/s11_starts.mkv")
             (media
               (size 1920 1080)
               (fps 30 1)
-              (frames 3000)
+              (frames 3507)
               (transfer 0)
               (transport 0)
               (audio 48000 1))))))
@@ -3218,7 +3296,7 @@
             (node 109)
             (ia -1)
             (after
-              (node (type 3053627164) (name "s11_frame") (params (param (base (int 107)))))))
+              (node (type 3053627164) (name "s11_starts") (params (param (base (int 107)))))))
           (op
             add-node
             (comp 47)
@@ -3255,10 +3333,10 @@
                 (source 109)
                 (mask 110)
                 (xf 111)
-                (time (offset 1257.9333333333334) (active 1257.9333333333334 1357.9))
+                (time (offset 1365.9666666666667) (active 1365.9666666666667 1482.8333333333333))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 0))))
-                (label "s11_frame" 0)))))))
+                (label "s11_starts" 0)))))))
     (name "ConformLayer"))
   (hn
     46
@@ -3271,12 +3349,12 @@
         (after
           (asset
             (id 112)
-            (name "s12_usage")
-            (path "../out/s12_usage.mkv")
+            (name "s12_frame")
+            (path "../out/s12_frame.mkv")
             (media
               (size 1920 1080)
               (fps 30 1)
-              (frames 4865)
+              (frames 3000)
               (transfer 0)
               (transport 0)
               (audio 48000 1))))))
@@ -3294,7 +3372,7 @@
             (node 114)
             (ia -1)
             (after
-              (node (type 3053627164) (name "s12_usage") (params (param (base (int 112)))))))
+              (node (type 3053627164) (name "s12_frame") (params (param (base (int 112)))))))
           (op
             add-node
             (comp 47)
@@ -3331,10 +3409,10 @@
                 (source 114)
                 (mask 115)
                 (xf 116)
-                (time (offset 1357.9) (active 1357.9 1520.0333333333333))
+                (time (offset 1482.8333333333333) (active 1482.8333333333333 1582.8))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 0))))
-                (label "s12_usage" 0)))))))
+                (label "s12_frame" 0)))))))
     (name "ConformLayer"))
   (hn
     48
@@ -3347,12 +3425,12 @@
         (after
           (asset
             (id 117)
-            (name "s13_structure")
-            (path "../out/s13_structure.mkv")
+            (name "s13_usage")
+            (path "../out/s13_usage.mkv")
             (media
               (size 1920 1080)
               (fps 30 1)
-              (frames 6640)
+              (frames 3616)
               (transfer 0)
               (transport 0)
               (audio 48000 1))))))
@@ -3370,7 +3448,7 @@
             (node 119)
             (ia -1)
             (after
-              (node (type 3053627164) (name "s13_structure") (params (param (base (int 117)))))))
+              (node (type 3053627164) (name "s13_usage") (params (param (base (int 117)))))))
           (op
             add-node
             (comp 47)
@@ -3407,10 +3485,10 @@
                 (source 119)
                 (mask 120)
                 (xf 121)
-                (time (offset 1520.0333333333333) (active 1520.0333333333333 1741.3333333333333))
+                (time (offset 1582.8) (active 1582.8 1703.3))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 0))))
-                (label "s13_structure" 0)))))))
+                (label "s13_usage" 0)))))))
     (name "ConformLayer"))
   (hn
     50
@@ -3423,12 +3501,12 @@
         (after
           (asset
             (id 122)
-            (name "s14_close")
-            (path "../out/s14_close.mkv")
+            (name "s14_structure")
+            (path "../out/s14_structure.mkv")
             (media
               (size 1920 1080)
               (fps 30 1)
-              (frames 3383)
+              (frames 6642)
               (transfer 0)
               (transport 0)
               (audio 48000 1))))))
@@ -3446,7 +3524,7 @@
             (node 124)
             (ia -1)
             (after
-              (node (type 3053627164) (name "s14_close") (params (param (base (int 122)))))))
+              (node (type 3053627164) (name "s14_structure") (params (param (base (int 122)))))))
           (op
             add-node
             (comp 47)
@@ -3483,10 +3561,10 @@
                 (source 124)
                 (mask 125)
                 (xf 126)
-                (time (offset 1741.3333333333333) (active 1741.3333333333333 1854.0333333333333))
+                (time (offset 1703.3) (active 1703.3 1924.6666666666667))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 0))))
-                (label "s14_close" 0)))))))
+                (label "s14_structure" 0)))))))
     (name "ConformLayer"))
   (hn
     52
@@ -3499,9 +3577,15 @@
         (after
           (asset
             (id 127)
-            (name "s00_open.narration")
-            (path "../out/s00_open.narration.wav")
-            (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
+            (name "s15_close")
+            (path "../out/s15_close.mkv")
+            (media
+              (size 1920 1080)
+              (fps 30 1)
+              (frames 3414)
+              (transfer 0)
+              (transport 0)
+              (audio 48000 1))))))
     (name "ConformAsset"))
   (hn
     53
@@ -3516,10 +3600,7 @@
             (node 129)
             (ia -1)
             (after
-              (node
-                (type 3053627164)
-                (name "s00_open.narration")
-                (params (param (base (int 127)))))))
+              (node (type 3053627164) (name "s15_close") (params (param (base (int 127)))))))
           (op
             add-node
             (comp 47)
@@ -3540,8 +3621,8 @@
                 (type 8140143)
                 (name "xf")
                 (params
-                  (param (base (vec2 0 0)))
-                  (param (base (vec2 0 0)))
+                  (param (base (vec2 960 540)))
+                  (param (base (vec2 960 540)))
                   (param (base (vec2 1 1)))
                   (param (base (angle 0)))
                   (param (base (angle 0)))))))
@@ -3556,10 +3637,10 @@
                 (source 129)
                 (mask 130)
                 (xf 131)
-                (time (offset 6) (active 6 62.96670833333334))
+                (time (offset 1924.6666666666667) (active 1924.6666666666667 2038.4333333333334))
                 (opacity (param (base (float 1))))
-                (audio-gain (param (base (float 1.476))))
-                (label "s00_open.voice" 0)))))))
+                (audio-gain (param (base (float 0))))
+                (label "s15_close" 0)))))))
     (name "ConformLayer"))
   (hn
     54
@@ -3572,8 +3653,8 @@
         (after
           (asset
             (id 132)
-            (name "s01_choreo.narration")
-            (path "../out/s01_choreo.narration.wav")
+            (name "s00_open.narration")
+            (path "../out/s00_open.narration.wav")
             (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
     (name "ConformAsset"))
   (hn
@@ -3591,7 +3672,7 @@
             (after
               (node
                 (type 3053627164)
-                (name "s01_choreo.narration")
+                (name "s00_open.narration")
                 (params (param (base (int 132)))))))
           (op
             add-node
@@ -3629,10 +3710,10 @@
                 (source 134)
                 (mask 135)
                 (xf 136)
-                (time (offset 62.93333333333333) (active 62.93333333333333 164.616625))
+                (time (offset 6) (active 6 62.96670833333334))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 1.476))))
-                (label "s01_choreo.voice" 0)))))))
+                (label "s00_open.voice" 0)))))))
     (name "ConformLayer"))
   (hn
     56
@@ -3645,8 +3726,8 @@
         (after
           (asset
             (id 137)
-            (name "s02_action.narration")
-            (path "../out/s02_action.narration.wav")
+            (name "s01_choreo.narration")
+            (path "../out/s01_choreo.narration.wav")
             (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
     (name "ConformAsset"))
   (hn
@@ -3664,7 +3745,7 @@
             (after
               (node
                 (type 3053627164)
-                (name "s02_action.narration")
+                (name "s01_choreo.narration")
                 (params (param (base (int 137)))))))
           (op
             add-node
@@ -3702,10 +3783,10 @@
                 (source 139)
                 (mask 140)
                 (xf 141)
-                (time (offset 164.56666666666666) (active 164.56666666666666 271.69166666666666))
+                (time (offset 62.93333333333333) (active 62.93333333333333 164.616625))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 1.476))))
-                (label "s02_action.voice" 0)))))))
+                (label "s01_choreo.voice" 0)))))))
     (name "ConformLayer"))
   (hn
     58
@@ -3718,8 +3799,8 @@
         (after
           (asset
             (id 142)
-            (name "s03_fourier.narration")
-            (path "../out/s03_fourier.narration.wav")
+            (name "s02_action.narration")
+            (path "../out/s02_action.narration.wav")
             (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
     (name "ConformAsset"))
   (hn
@@ -3737,7 +3818,7 @@
             (after
               (node
                 (type 3053627164)
-                (name "s03_fourier.narration")
+                (name "s02_action.narration")
                 (params (param (base (int 142)))))))
           (op
             add-node
@@ -3775,10 +3856,10 @@
                 (source 144)
                 (mask 145)
                 (xf 146)
-                (time (offset 271.6666666666667) (active 271.6666666666667 366.65837500000004))
+                (time (offset 164.56666666666666) (active 164.56666666666666 271.69166666666666))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 1.476))))
-                (label "s03_fourier.voice" 0)))))))
+                (label "s02_action.voice" 0)))))))
     (name "ConformLayer"))
   (hn
     60
@@ -3791,8 +3872,8 @@
         (after
           (asset
             (id 147)
-            (name "s04_landscape.narration")
-            (path "../out/s04_landscape.narration.wav")
+            (name "s03_fourier.narration")
+            (path "../out/s03_fourier.narration.wav")
             (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
     (name "ConformAsset"))
   (hn
@@ -3810,7 +3891,7 @@
             (after
               (node
                 (type 3053627164)
-                (name "s04_landscape.narration")
+                (name "s03_fourier.narration")
                 (params (param (base (int 147)))))))
           (op
             add-node
@@ -3848,10 +3929,10 @@
                 (source 149)
                 (mask 150)
                 (xf 151)
-                (time (offset 366.6333333333333) (active 366.6333333333333 459.091625))
+                (time (offset 271.6666666666667) (active 271.6666666666667 366.7166666666667))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 1.476))))
-                (label "s04_landscape.voice" 0)))))))
+                (label "s03_fourier.voice" 0)))))))
     (name "ConformLayer"))
   (hn
     62
@@ -3864,8 +3945,8 @@
         (after
           (asset
             (id 152)
-            (name "s05_lbfgs.narration")
-            (path "../out/s05_lbfgs.narration.wav")
+            (name "s04_landscape.narration")
+            (path "../out/s04_landscape.narration.wav")
             (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
     (name "ConformAsset"))
   (hn
@@ -3883,7 +3964,7 @@
             (after
               (node
                 (type 3053627164)
-                (name "s05_lbfgs.narration")
+                (name "s04_landscape.narration")
                 (params (param (base (int 152)))))))
           (op
             add-node
@@ -3921,10 +4002,10 @@
                 (source 154)
                 (mask 155)
                 (xf 156)
-                (time (offset 459.06666666666666) (active 459.06666666666666 555.7499583333333))
+                (time (offset 366.6666666666667) (active 366.6666666666667 459.04995833333334))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 1.476))))
-                (label "s05_lbfgs.voice" 0)))))))
+                (label "s04_landscape.voice" 0)))))))
     (name "ConformLayer"))
   (hn
     64
@@ -3937,8 +4018,8 @@
         (after
           (asset
             (id 157)
-            (name "s06_newton.narration")
-            (path "../out/s06_newton.narration.wav")
+            (name "s05_lbfgs.narration")
+            (path "../out/s05_lbfgs.narration.wav")
             (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
     (name "ConformAsset"))
   (hn
@@ -3956,7 +4037,7 @@
             (after
               (node
                 (type 3053627164)
-                (name "s06_newton.narration")
+                (name "s05_lbfgs.narration")
                 (params (param (base (int 157)))))))
           (op
             add-node
@@ -3994,10 +4075,10 @@
                 (source 159)
                 (mask 160)
                 (xf 161)
-                (time (offset 555.7) (active 555.7 697.7332916666667))
+                (time (offset 459) (active 459 555.6832916666667))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 1.476))))
-                (label "s06_newton.voice" 0)))))))
+                (label "s05_lbfgs.voice" 0)))))))
     (name "ConformLayer"))
   (hn
     66
@@ -4010,8 +4091,8 @@
         (after
           (asset
             (id 162)
-            (name "s07_hard.narration")
-            (path "../out/s07_hard.narration.wav")
+            (name "s06_newton.narration")
+            (path "../out/s06_newton.narration.wav")
             (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
     (name "ConformAsset"))
   (hn
@@ -4029,7 +4110,7 @@
             (after
               (node
                 (type 3053627164)
-                (name "s07_hard.narration")
+                (name "s06_newton.narration")
                 (params (param (base (int 162)))))))
           (op
             add-node
@@ -4067,10 +4148,10 @@
                 (source 164)
                 (mask 165)
                 (xf 166)
-                (time (offset 697.7) (active 697.7 861.7417083333333))
+                (time (offset 555.6333333333333) (active 555.6333333333333 697.6916249999999))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 1.476))))
-                (label "s07_hard.voice" 0)))))))
+                (label "s06_newton.voice" 0)))))))
     (name "ConformLayer"))
   (hn
     68
@@ -4083,8 +4164,8 @@
         (after
           (asset
             (id 167)
-            (name "s08_certify.narration")
-            (path "../out/s08_certify.narration.wav")
+            (name "s07_hard.narration")
+            (path "../out/s07_hard.narration.wav")
             (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
     (name "ConformAsset"))
   (hn
@@ -4102,7 +4183,7 @@
             (after
               (node
                 (type 3053627164)
-                (name "s08_certify.narration")
+                (name "s07_hard.narration")
                 (params (param (base (int 167)))))))
           (op
             add-node
@@ -4140,10 +4221,10 @@
                 (source 169)
                 (mask 170)
                 (xf 171)
-                (time (offset 861.7) (active 861.7 994.1))
+                (time (offset 697.6666666666666) (active 697.6666666666666 861.6166666666666))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 1.476))))
-                (label "s08_certify.voice" 0)))))))
+                (label "s07_hard.voice" 0)))))))
     (name "ConformLayer"))
   (hn
     70
@@ -4156,8 +4237,8 @@
         (after
           (asset
             (id 172)
-            (name "s09_sameorbit.narration")
-            (path "../out/s09_sameorbit.narration.wav")
+            (name "s08_certify.narration")
+            (path "../out/s08_certify.narration.wav")
             (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
     (name "ConformAsset"))
   (hn
@@ -4175,7 +4256,7 @@
             (after
               (node
                 (type 3053627164)
-                (name "s09_sameorbit.narration")
+                (name "s08_certify.narration")
                 (params (param (base (int 172)))))))
           (op
             add-node
@@ -4213,10 +4294,10 @@
                 (source 174)
                 (mask 175)
                 (xf 176)
-                (time (offset 994.0666666666667) (active 994.0666666666667 1141.0999583333335))
+                (time (offset 861.5666666666667) (active 861.5666666666667 993.9666666666667))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 1.476))))
-                (label "s09_sameorbit.voice" 0)))))))
+                (label "s08_certify.voice" 0)))))))
     (name "ConformLayer"))
   (hn
     72
@@ -4229,8 +4310,8 @@
         (after
           (asset
             (id 177)
-            (name "s10_starts.narration")
-            (path "../out/s10_starts.narration.wav")
+            (name "s09_prove.narration")
+            (path "../out/s09_prove.narration.wav")
             (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
     (name "ConformAsset"))
   (hn
@@ -4248,7 +4329,7 @@
             (after
               (node
                 (type 3053627164)
-                (name "s10_starts.narration")
+                (name "s09_prove.narration")
                 (params (param (base (int 177)))))))
           (op
             add-node
@@ -4286,10 +4367,10 @@
                 (source 179)
                 (mask 180)
                 (xf 181)
-                (time (offset 1141.0666666666666) (active 1141.0666666666666 1257.958375))
+                (time (offset 993.9333333333333) (active 993.9333333333333 1219.0083333333332))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 1.476))))
-                (label "s10_starts.voice" 0)))))))
+                (label "s09_prove.voice" 0)))))))
     (name "ConformLayer"))
   (hn
     74
@@ -4302,8 +4383,8 @@
         (after
           (asset
             (id 182)
-            (name "s11_frame.narration")
-            (path "../out/s11_frame.narration.wav")
+            (name "s10_sameorbit.narration")
+            (path "../out/s10_sameorbit.narration.wav")
             (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
     (name "ConformAsset"))
   (hn
@@ -4321,7 +4402,7 @@
             (after
               (node
                 (type 3053627164)
-                (name "s11_frame.narration")
+                (name "s10_sameorbit.narration")
                 (params (param (base (int 182)))))))
           (op
             add-node
@@ -4359,10 +4440,10 @@
                 (source 184)
                 (mask 185)
                 (xf 186)
-                (time (offset 1257.9333333333334) (active 1257.9333333333334 1357.9333333333334))
+                (time (offset 1218.9666666666667) (active 1218.9666666666667 1365.9999583333333))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 1.476))))
-                (label "s11_frame.voice" 0)))))))
+                (label "s10_sameorbit.voice" 0)))))))
     (name "ConformLayer"))
   (hn
     76
@@ -4375,8 +4456,8 @@
         (after
           (asset
             (id 187)
-            (name "s12_usage.narration")
-            (path "../out/s12_usage.narration.wav")
+            (name "s11_starts.narration")
+            (path "../out/s11_starts.narration.wav")
             (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
     (name "ConformAsset"))
   (hn
@@ -4394,7 +4475,7 @@
             (after
               (node
                 (type 3053627164)
-                (name "s12_usage.narration")
+                (name "s11_starts.narration")
                 (params (param (base (int 187)))))))
           (op
             add-node
@@ -4432,10 +4513,10 @@
                 (source 189)
                 (mask 190)
                 (xf 191)
-                (time (offset 1357.9) (active 1357.9 1520.0832916666668))
+                (time (offset 1365.9666666666667) (active 1365.9666666666667 1482.8666666666668))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 1.476))))
-                (label "s12_usage.voice" 0)))))))
+                (label "s11_starts.voice" 0)))))))
     (name "ConformLayer"))
   (hn
     78
@@ -4448,8 +4529,8 @@
         (after
           (asset
             (id 192)
-            (name "s13_structure.narration")
-            (path "../out/s13_structure.narration.wav")
+            (name "s12_frame.narration")
+            (path "../out/s12_frame.narration.wav")
             (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
     (name "ConformAsset"))
   (hn
@@ -4467,7 +4548,7 @@
             (after
               (node
                 (type 3053627164)
-                (name "s13_structure.narration")
+                (name "s12_frame.narration")
                 (params (param (base (int 192)))))))
           (op
             add-node
@@ -4505,10 +4586,10 @@
                 (source 194)
                 (mask 195)
                 (xf 196)
-                (time (offset 1520.0333333333333) (active 1520.0333333333333 1741.3583333333333))
+                (time (offset 1482.8333333333333) (active 1482.8333333333333 1582.8333333333333))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 1.476))))
-                (label "s13_structure.voice" 0)))))))
+                (label "s12_frame.voice" 0)))))))
     (name "ConformLayer"))
   (hn
     80
@@ -4521,8 +4602,8 @@
         (after
           (asset
             (id 197)
-            (name "s14_close.narration")
-            (path "../out/s14_close.narration.wav")
+            (name "s13_usage.narration")
+            (path "../out/s13_usage.narration.wav")
             (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
     (name "ConformAsset"))
   (hn
@@ -4540,7 +4621,7 @@
             (after
               (node
                 (type 3053627164)
-                (name "s14_close.narration")
+                (name "s13_usage.narration")
                 (params (param (base (int 197)))))))
           (op
             add-node
@@ -4578,14 +4659,29 @@
                 (source 199)
                 (mask 200)
                 (xf 201)
-                (time (offset 1741.3333333333333) (active 1741.3333333333333 1854.0833333333333))
+                (time (offset 1582.8) (active 1582.8 1703.3332916666666))
                 (opacity (param (base (float 1))))
                 (audio-gain (param (base (float 1.476))))
-                (label "s14_close.voice" 0)))))))
+                (label "s13_usage.voice" 0)))))))
     (name "ConformLayer"))
   (hn
     82
     81
+    (op
+      (op
+        add-asset
+        (asset 202)
+        (ia 38)
+        (after
+          (asset
+            (id 202)
+            (name "s14_structure.narration")
+            (path "../out/s14_structure.narration.wav")
+            (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
+    (name "ConformAsset"))
+  (hn
+    83
+    82
     (op
       (op
         group
@@ -4593,14 +4689,17 @@
           (op
             add-node
             (comp 47)
-            (node 203)
+            (node 204)
             (ia -1)
             (after
-              (node (type 1377746913) (name "endcard") (params (param (base (int 17)))))))
+              (node
+                (type 3053627164)
+                (name "s14_structure.narration")
+                (params (param (base (int 202)))))))
           (op
             add-node
             (comp 47)
-            (node 204)
+            (node 205)
             (ia -1)
             (after
               (node
@@ -4610,7 +4709,135 @@
           (op
             add-node
             (comp 47)
-            (node 205)
+            (node 206)
+            (ia -1)
+            (after
+              (node
+                (type 8140143)
+                (name "xf")
+                (params
+                  (param (base (vec2 0 0)))
+                  (param (base (vec2 0 0)))
+                  (param (base (vec2 1 1)))
+                  (param (base (angle 0)))
+                  (param (base (angle 0)))))))
+          (op
+            add-layer
+            (comp 47)
+            (layer 203)
+            (ia 31)
+            (after
+              (layer
+                (id 203)
+                (source 204)
+                (mask 205)
+                (xf 206)
+                (time (offset 1703.3) (active 1703.3 1924.6917083333333))
+                (opacity (param (base (float 1))))
+                (audio-gain (param (base (float 1.476))))
+                (label "s14_structure.voice" 0)))))))
+    (name "ConformLayer"))
+  (hn
+    84
+    83
+    (op
+      (op
+        add-asset
+        (asset 207)
+        (ia 39)
+        (after
+          (asset
+            (id 207)
+            (name "s15_close.narration")
+            (path "../out/s15_close.narration.wav")
+            (media (size 0 0) (fps 0 1) (frames 0) (transfer 1) (audio 48000 1))))))
+    (name "ConformAsset"))
+  (hn
+    85
+    84
+    (op
+      (op
+        group
+        (ops
+          (op
+            add-node
+            (comp 47)
+            (node 209)
+            (ia -1)
+            (after
+              (node
+                (type 3053627164)
+                (name "s15_close.narration")
+                (params (param (base (int 207)))))))
+          (op
+            add-node
+            (comp 47)
+            (node 210)
+            (ia -1)
+            (after
+              (node
+                (type 3269083197)
+                (name "mask")
+                (params (param (base (float 1))) (param (base (enum 0)))))))
+          (op
+            add-node
+            (comp 47)
+            (node 211)
+            (ia -1)
+            (after
+              (node
+                (type 8140143)
+                (name "xf")
+                (params
+                  (param (base (vec2 0 0)))
+                  (param (base (vec2 0 0)))
+                  (param (base (vec2 1 1)))
+                  (param (base (angle 0)))
+                  (param (base (angle 0)))))))
+          (op
+            add-layer
+            (comp 47)
+            (layer 208)
+            (ia 32)
+            (after
+              (layer
+                (id 208)
+                (source 209)
+                (mask 210)
+                (xf 211)
+                (time (offset 1924.6666666666667) (active 1924.6666666666667 2038.4666666666667))
+                (opacity (param (base (float 1))))
+                (audio-gain (param (base (float 1.476))))
+                (label "s15_close.voice" 0)))))))
+    (name "ConformLayer"))
+  (hn
+    86
+    85
+    (op
+      (op
+        group
+        (ops
+          (op
+            add-node
+            (comp 47)
+            (node 213)
+            (ia -1)
+            (after
+              (node (type 1377746913) (name "endcard") (params (param (base (int 17)))))))
+          (op
+            add-node
+            (comp 47)
+            (node 214)
+            (ia -1)
+            (after
+              (node
+                (type 3269083197)
+                (name "mask")
+                (params (param (base (float 1))) (param (base (enum 0)))))))
+          (op
+            add-node
+            (comp 47)
+            (node 215)
             (ia -1)
             (after
               (node
@@ -4625,21 +4852,21 @@
           (op
             add-layer
             (comp 47)
-            (layer 202)
-            (ia 31)
+            (layer 212)
+            (ia 33)
             (after
               (layer
-                (id 202)
-                (source 203)
-                (mask 204)
-                (xf 205)
-                (time (offset 1854.0333333333333) (active 1854.0333333333333 1868.0333333333333))
+                (id 212)
+                (source 213)
+                (mask 214)
+                (xf 215)
+                (time (offset 2038.4333333333334) (active 2038.4333333333334 2052.4333333333334))
                 (opacity (param (base (float 1))))
                 (label "endcard" 0)))))))
     (name "ConformLayer"))
   (hn
-    83
-    82
+    87
+    86
     (op
       (op
         set-markers
@@ -4652,18 +4879,19 @@
             (mk 62.93333333333333 "The choreography constraint")
             (mk 164.56666666666666 "Least action")
             (mk 271.6666666666667 "The Fourier basis")
-            (mk 366.6333333333333 "The landscape and the Morse index")
-            (mk 459.06666666666666 "Phase one: L-BFGS")
-            (mk 555.7 "Phase two: the damped Newton step")
-            (mk 697.7 "Three hard orbits")
-            (mk 861.7 "Certification: the shooting Newton")
-            (mk 994.0666666666667 "Covers, frames and the rigidity gate")
-            (mk 1141.0666666666666 "Where to start: the N-gon spectrum")
-            (mk 1257.9333333333334 "The rotating frame")
-            (mk 1357.9 "The command line and a record")
-            (mk 1520.0333333333333 "Redundancy, budgets and the twist")
-            (mk 1741.3333333333333 "What is in the catalogue")
-            (mk 1854.0333333333333 "The catalogue, and what is open")))))
+            (mk 366.6666666666667 "The landscape and the Morse index")
+            (mk 459 "Phase one: L-BFGS")
+            (mk 555.6333333333333 "Phase two: the damped Newton step")
+            (mk 697.6666666666666 "Three hard orbits")
+            (mk 861.5666666666667 "Certification: the shooting Newton")
+            (mk 993.9333333333333 "Existence: the interval proof")
+            (mk 1218.9666666666667 "Covers, frames and the rigidity gate")
+            (mk 1365.9666666666667 "Where to start: the N-gon spectrum")
+            (mk 1482.8333333333333 "The rotating frame")
+            (mk 1582.8 "The command line and a record")
+            (mk 1703.3 "Redundancy, budgets and the twist")
+            (mk 1924.6666666666667 "What is in the catalogue")
+            (mk 2038.4333333333334 "The catalogue, and what is open")))))
     (name "ConformMarkers")))
-(cursor 83)
+(cursor 87)
 (view (comp 47))

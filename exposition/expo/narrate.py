@@ -105,9 +105,25 @@ def _load_index() -> dict:
 
 
 def _save_index():
+    """Merge into the file on disk under a lock and replace it atomically, so several
+    scenes rendering at once neither lose each other's lines nor read a half-written index
+    (which would look empty and re-synthesise every line)."""
+    import fcntl
     os.makedirs(os.path.dirname(INDEX), exist_ok=True)
-    with open(INDEX, "w") as f:
-        json.dump(_load_index(), f, indent=0, sort_keys=True)
+    with open(INDEX + ".lock", "w") as lf:
+        fcntl.flock(lf, fcntl.LOCK_EX)
+        try:
+            with open(INDEX) as f:
+                disk = json.load(f)
+        except (OSError, ValueError):
+            disk = {}
+        mine = _load_index()
+        disk.update(mine)
+        mine.update(disk)
+        tmp = INDEX + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(disk, f, indent=0, sort_keys=True)
+        os.replace(tmp, INDEX)
 
 
 def key(text: str) -> str:

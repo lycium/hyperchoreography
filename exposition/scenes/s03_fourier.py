@@ -95,7 +95,7 @@ class TheFourierLoop(ExpoScene):
                       UpdateFromAlphaFunc(view2, push), run_time=7.0)
 
         self.say_with("The shape never changes, only where it sits. That is the centre "
-                      "of mass drifting, and it is not a new orbit -- so those modes "
+                      "of mass drifting, and it is not a new orbit — so those modes "
                       "are simply left out of the basis.",
                       UpdateFromAlphaFunc(view2, push), run_time=8.0)
 

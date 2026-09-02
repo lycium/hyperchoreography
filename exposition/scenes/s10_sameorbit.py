@@ -14,7 +14,7 @@ from expo.viz import OrbitView, Projector, spin, tumble
 
 
 class TheSameOrbitTwice(ExpoScene):
-    section_number = 9
+    section_number = 10
     section_title = "the same orbit twice"
 
     def story(self):
@@ -122,7 +122,7 @@ class TheSameOrbitTwice(ExpoScene):
         ).arrange(DOWN, buff=0.30).move_to(RIGHT * 3.1 + DOWN * 1.5)
         self.play(FadeIn(deff), run_time=1.0)
         self.say_with("Counting how many of those axes carry anything gives the number "
-                      "the catalogue calls the effective dimension -- which is a "
+                      "the catalogue calls the effective dimension — which is a "
                       "property of the orbit, not of the search that found it.",
                       spin(v, 1.0), run_time=9.0)
 

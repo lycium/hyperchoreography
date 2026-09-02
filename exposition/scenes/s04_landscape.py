@@ -40,7 +40,7 @@ class TheLandscape(ExpoScene):
                  "valleys, and it will find some real orbits. But it is not enough, "
                  "and it is worth seeing exactly why.")
 
-        # -- the eight: a bowl ---------------------------------------------
+        # — the eight: a bowl ---------------------------------------------
         rec = catalog.load("eight")
         P = nbody.Action(3, 2, 16)
         x = P.flat(targets.embed(rec, P))
@@ -75,7 +75,7 @@ class TheLandscape(ExpoScene):
         lab1.next_to(wire, DOWN, buff=0.25)
         self.play(FadeIn(lab1), run_time=0.6)
 
-        # -- the saddle -----------------------------------------------------
+        # — the saddle -----------------------------------------------------
         s = targets.saddle_n3()
         Ps, xs = s.P, s.x
         Hs = Ps.hessian(xs)
@@ -107,7 +107,7 @@ class TheLandscape(ExpoScene):
 
         self.wipe(run_time=1.0)
 
-        # -- Morse index ----------------------------------------------------
+        # — Morse index ----------------------------------------------------
         self.say("The number of downhill directions has a name: the Morse index. "
                  "Zero means a genuine minimum.")
 
@@ -116,7 +116,7 @@ class TheLandscape(ExpoScene):
         cap = C("the figure eight:  Morse index %d,  nullity %d" % (neg, zero),
                 size=T.SZ_SMALL, color=T.INK_DIM)
         cap.next_to(strip, DOWN, buff=0.28)
-        self.say_with("These are the smallest second derivatives at the figure eight -- "
+        self.say_with("These are the smallest second derivatives at the figure eight — "
                       "green where the action curves up, red where it curves down, and "
                       "violet for the directions that change nothing at all.",
                       FadeIn(strip), FadeIn(cap), run_time=1.2)

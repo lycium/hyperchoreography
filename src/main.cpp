@@ -1,6 +1,9 @@
 // CLI: search | continue | list | show | export | verify | refine | merge | extras | symmetry | bench
 #include "search.hpp"
 #include "continue.hpp"
+#ifdef HAVE_MPFR
+#include "prove.hpp"
+#endif
 #include <thread>
 #include <atomic>
 #include <mutex>
@@ -36,6 +39,8 @@ static void usage() {
     "  hyperchoreography export  catalog.bin --id i [--samples 720] [--out curve.csv]   (body positions over one period)\n"
     "  hyperchoreography verify  catalog.bin [--id i] [--gate 1e-9]  (Taylor checks; no --id sweeps the whole file)\n"
     "  hyperchoreography refine  catalog.bin --id i --digits 60 [--K 64] [--threads T] [--out refined.txt]   (MPFR shooting Newton)\n"
+    "  hyperchoreography prove   catalog.bin [--id i] [--digits 40] [--order 55] [--radius 1e-20] [--threads T] [--write] [--force] [--verbose]\n"
+    "                                                  (interval-arithmetic existence proof: Krawczyk on the shooting map; --write stores the radius, --force redoes proven records)\n"
     "  hyperchoreography merge   out.bin in1.bin in2.bin ... [--min-rigid r --min-deff k]   (union, de-duplicate, re-gate)\n"
     "  hyperchoreography extras  catalog.bin [--K-index 48]        (recompute Morse index, nullity, twist and rigidity)\n"
 
@@ -117,7 +122,7 @@ static int cmd_list(const Args& a) {
   std::sort(rs.begin(), rs.end(), [&](const Record* x, const Record* y) { if (sort == "id") return x->h.id < y->h.id; if (sort == "hits") return x->h.hits > y->h.hits; if (sort == "twist") return x->twist() > y->twist(); if (sort == "rigid") return x->rigid() < y->rigid();
     if (x->h.deff != y->h.deff) return x->h.deff < y->h.deff; if (x->h.N != y->h.N) return x->h.N < y->h.N; return x->h.action < y->h.action; });
   std::printf("%5s %2s/%-2s %2s %4s %14s %12s %5s %4s %7s %8s %10s %6s %8s %5s %3s %s\n", "id", "de", "d", "N", "K", "action", "energy", "morse", "null", "minsep", "ret_err", "twist", "tw_rel", "rigid", "hits", "cov", "sym");
-  for (auto r : rs) std::printf("%5lld %2d/%-2d %2d %4d %14.9f %12.7f %5d %4d %7.4f %8.1e %10.4g %6.3f %8.2e %5d %3d %s\n", (long long)r->h.id, r->h.deff, r->h.d, r->h.N, r->h.K, r->h.action, r->h.energy, r->h.morse, r->h.nullity, r->h.minsep, r->h.ret_err, r->twist(), r->extra.size() > 1 ? r->extra[1] : 0.0, r->rigid(), r->h.hits, r->h.cover, r->sym.c_str());
+  for (auto r : rs) std::printf("%5lld %2d/%-2d %2d %4d %14.9f %12.7f %5d %4d %7.4f %8.1e %10.4g %6.3f %8.2e %5d %3d %s%s\n", (long long)r->h.id, r->h.deff, r->h.d, r->h.N, r->h.K, r->h.action, r->h.energy, r->h.morse, r->h.nullity, r->h.minsep, r->h.ret_err, r->twist(), r->extra.size() > 1 ? r->extra[1] : 0.0, r->rigid(), r->h.hits, r->h.cover, r->sym.c_str(), r->proven() > 0 ? " proven" : "");
   std::printf("%zu records\n", rs.size());
   return 0;
 }
@@ -331,6 +336,51 @@ static int cmd_bench(const Args& a) {
 }
 
 #ifdef HAVE_MPFR
+
+// Existence proof of one record (or every record): refine the certified state, then the Krawczyk test of
+// prove.hpp. On success the proven box radius goes into extra[7] with --write.
+static int cmd_prove(const Args& a) {
+  const std::string path = a.pos.at(0); Catalog cat = load_cat(path);
+  const int digits = (int)a.num("digits", 40); int threads = (int)a.num("threads", (double)std::thread::hardware_concurrency()); if (threads < 1) threads = 1;
+  const int order = (int)a.num("order", 1.15 * (digits + 4) + 4); const bool verbose = a.has("verbose"), write = a.has("write");
+  const double radius = a.num("radius", std::pow(10.0, -digits / 2.0)), tol = std::pow(10.0, -(digits + 4));
+  const mpfr_prec_t bits = (mpfr_prec_t)(digits * 3.3219280948873626 + 256); mpreal::set_default_prec(bits); ival::prec() = bits;
+  std::vector<Record*> recs; for (auto& r : cat.recs) if (!a.has("id") || r.h.id == (long)a.num("id", 0)) recs.push_back(&r);
+  if (recs.empty()) throw std::runtime_error("no such record");
+  int proven = 0;
+  for (Record* rp : recs) { Record& r = *rp; const int N = r.h.N, d = r.h.d, nd = N * d;
+    std::printf("record %lld (N=%d d=%d deff=%d action=%.12f):", (long long)r.h.id, N, d, r.h.deff, r.h.action);
+    if (r.h.alpha != 1.0) { std::printf(" alpha != 1 — not supported yet\n"); continue; }
+    if (r.proven() > 0 && !a.has("force")) { std::printf(" already proven (radius %.1e)\n", r.proven()); proven++; continue; }
+    std::vector<double> pos, vel; initial_state(N, d, r.mode_list(), r.coef.data(), r.omega(), pos, vel);
+    if (const double* z = r.state()) { pos.assign(z, z + nd); vel.assign(z + nd, z + 2 * nd); }
+    std::vector<double> Zd(pos); Zd.insert(Zd.end(), vel.begin(), vel.end()); int dp = d; Frame fr;
+    if (r.omega()) { fr = frame_of(N, d, r.omega()); std::vector<double> Zr; fr.apply(N, Zd.data(), Zr); Zd.swap(Zr);
+      if (verbose) { std::printf("\n  frame: %d planes, rates", fr.nplanes()); for (int i = 0; i < fr.nplanes(); i++) std::printf(" %.12g%s", fr.rate[i], fr.cls[i] == 0 ? "(fixed)" : fr.cls[i] == 1 ? "(pi)" : ""); std::printf("; %zu translations, %zu commuting rotations\n", fr.trans.size(), fr.rots.size()); } }
+    else {
+      // the orbit lives in its leading canonical axes; coordinates it does not use are dropped exactly
+      double sc = 0; for (double v : Zd) sc = std::max(sc, std::fabs(v));
+      std::vector<int> axes; for (int c = 0; c < d; c++) { double amp = 0; for (int k = 0; k < N; k++) amp = std::max(amp, std::max(std::fabs(pos[k * d + c]), std::fabs(vel[k * d + c]))); if (amp > 1e-7 * sc) axes.push_back(c); }
+      dp = (int)axes.size(); Zd.assign(2 * (size_t)N * dp, 0.0);
+      for (int k = 0; k < N; k++) for (int c = 0; c < dp; c++) { Zd[k * dp + c] = pos[k * d + axes[c]]; Zd[(size_t)N * dp + k * dp + c] = vel[k * d + axes[c]]; }
+      fr = frame_of(N, dp, nullptr); }
+    std::fflush(stdout); auto t0 = std::chrono::steady_clock::now();
+    std::vector<mpreal> Z; double res = refine_state(N, dp, 1.0, Zd, fr, digits, threads, Z, verbose);
+    if (verbose) std::printf("  refined to residual %.2e in %.1fs (%ld bits, order %d, radius %.1e, tol %.0e)\n", res, std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), (long)bits, order, radius, tol);
+    if (!(res < radius * 1e-3)) { std::printf(" refinement stalled at %.2e — not proven\n", res); continue; }
+    Proof P = prove_state(N, dp, 1.0, Z, fr, radius, tol, order, threads, verbose);
+    if (!P.ok) { std::printf(" NOT PROVEN (%s; Newton %.1e/%.1e, contraction %.2e, closure %.2e)\n", P.why.c_str(), P.newton, radius, P.kappa, P.closure); continue; }
+    proven++;
+    std::printf(" PROVEN in %.1fs\n  a choreography of N=%d bodies in R^%d, period 2pi%s, exists with initial state within %.1e (max norm) of the refined state;\n"
+                "  unique there up to time shift, translation and rotation. Krawczyk: |Y F| = %.1e, contraction %.2e, closure %.2e;\n"
+                "  slice dim %d, %d gauge generators; %ld validated Taylor steps (%ld rejected), h in [%.1e, %.1e], state width <= %.1e\n"
+                "  energy in %s\n  action in %s\n", P.seconds, N, dp, fr.rotating() ? " in the rotating frame" : "", P.radius, P.newton, P.kappa, P.closure, P.m, P.k, P.steps, P.rejects, P.hmin, P.hmax, P.maxwid, P.energy.str(digits / 2 + 4).c_str(), P.action.str(digits / 2 + 4).c_str());
+    if (write && r.extra.size() > 7) { r.extra[7] = P.radius; cat.save(path); }   // saved per record: a killed sweep resumes
+  }
+  if (write) std::printf("%d proven, catalogue saved\n", proven); else std::printf("%d of %zu proven\n", proven, recs.size());
+  return 0;
+}
+
 static int cmd_refine(const Args& a) {
   Catalog cat = load_cat(a.pos.at(0)); const Record& r = rec_by_id(cat, (long)a.num("id", 0)); Problem P; std::vector<double> x; r.to_problem(P, x);
   int digits = (int)a.num("digits", 50), Kout = (int)a.num("K", P.K); std::string outp = a.get("out", "");
@@ -454,7 +504,9 @@ int main(int argc, char** argv) {
     if (cmd == "continue") return cmd_continue(a);
 #ifdef HAVE_MPFR
     if (cmd == "refine") return cmd_refine(a);
+    if (cmd == "prove") return cmd_prove(a);
 #else
+    if (cmd == "prove") { std::fprintf(stderr, "built without MPFR (make without NOMPFR=1)\n"); return 1; }
     if (cmd == "refine") { std::fprintf(stderr, "built without MPFR (make without NOMPFR=1)\n"); return 1; }
 #endif
   } catch (std::exception& e) { std::fprintf(stderr, "error: %s\n", e.what()); return 1; }

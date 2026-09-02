@@ -40,12 +40,13 @@ CHAPTERS = {
     "s06_newton": "Phase two: the damped Newton step",
     "s07_hard": "Three hard orbits",
     "s08_certify": "Certification: the shooting Newton",
-    "s09_sameorbit": "Covers, frames and the rigidity gate",
-    "s10_starts": "Where to start: the N-gon spectrum",
-    "s11_frame": "The rotating frame",
-    "s12_usage": "The command line and a record",
-    "s13_structure": "Redundancy, budgets and the twist",
-    "s14_close": "What is in the catalogue",
+    "s09_prove": "Existence: the interval proof",
+    "s10_sameorbit": "Covers, frames and the rigidity gate",
+    "s11_starts": "Where to start: the N-gon spectrum",
+    "s12_frame": "The rotating frame",
+    "s13_usage": "The command line and a record",
+    "s14_structure": "Redundancy, budgets and the twist",
+    "s15_close": "What is in the catalogue",
 }
 
 

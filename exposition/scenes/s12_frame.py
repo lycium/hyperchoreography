@@ -6,12 +6,12 @@ from manim import (VGroup, FadeIn, FadeOut, Create, UP, DOWN, LEFT, RIGHT,
 
 from expo import catalog, nbody, targets, theme as T
 from expo.base import ExpoScene
-from expo.mathtext import B, M, C, sb, sp
+from expo.mathtext import B, M, C, sb, sp, Crow
 from expo.viz import OrbitView, Projector, PlaneGrid, spin, tumble
 
 
 class TheRotatingFrame(ExpoScene):
-    section_number = 11
+    section_number = 12
     section_title = "the rotating frame"
 
     def story(self):
@@ -19,10 +19,10 @@ class TheRotatingFrame(ExpoScene):
                  "stops working, and the fix is a change of viewpoint.")
 
         wall = VGroup(
-            C("eight dimensions, no rotating frame", size=T.SZ_SMALL, color=T.INK_DIM),
-            C("60 331 trials     0 orbits", size=T.SZ_BODY, color=T.BAD),
-            C("eight dimensions, a calibrated frame", size=T.SZ_SMALL, color=T.INK_DIM),
-            C("8 799 trials      6 orbits", size=T.SZ_BODY, color=T.GOOD),
+            Crow("eight dimensions, no rotating frame", size=T.SZ_SMALL, color=T.INK_DIM),
+            Crow("60 331 trials     0 orbits", size=T.SZ_BODY, color=T.BAD),
+            Crow("eight dimensions, a calibrated frame", size=T.SZ_SMALL, color=T.INK_DIM),
+            Crow("8 799 trials      6 orbits", size=T.SZ_BODY, color=T.GOOD),
         ).arrange(DOWN, buff=0.28, aligned_edge=LEFT).move_to(UP * 0.6)
         self.play(FadeIn(wall[0]), FadeIn(wall[1]), run_time=1.0)
         self.say("Sixty thousand trials in eight dimensions, with the relative "
@@ -95,11 +95,11 @@ class TheRotatingFrame(ExpoScene):
         om = VGroup(
             B("Omega is a rotation rate in each of several orthogonal planes at once",
               size=T.SZ_BODY, color=T.INK),
-            C("--omega \"1,2\"        rates in the coordinate planes",
+            Crow("--omega \"1,2\"        rates in the coordinate planes",
               size=T.SZ_SMALL, color=T.INK_DIM),
-            C("--omega su:1,2       rates that sum to zero",
+            Crow("--omega su:1,2       rates that sum to zero",
               size=T.SZ_SMALL, color=T.INK_DIM),
-            C("--omega g2:1,6       the maximal torus of the group G2",
+            Crow("--omega g2:1,6       the maximal torus of the group G2",
               size=T.SZ_SMALL, color=T.GOLD),
         ).arrange(DOWN, buff=0.30, aligned_edge=LEFT).move_to(UP * 0.9)
         self.say_with("What is left is choosing the rotation, and that turns out to "

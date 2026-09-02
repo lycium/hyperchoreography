@@ -32,7 +32,7 @@ class TheActionPrinciple(ExpoScene):
                  "is stationary: nudge the path a little, and the action does not "
                  "change to first order.")
 
-        # -- the real thing: A along a perturbation of the eight ----------
+        # — the real thing: A along a perturbation of the eight ----------
         rec = catalog.load("eight")
         P = nbody.Action(rec.N, 2, 24)
         x = P.flat(targets.embed(rec, P))
@@ -123,7 +123,7 @@ class TheActionPrinciple(ExpoScene):
         # band's top, and fading in beside a stale caption reads as leftover text
         self.play(FadeOut(note), *self.caption_anims(None), run_time=0.6)
 
-        # -- Palais --------------------------------------------------------
+        # — Palais --------------------------------------------------------
         palais = B("Palais' principle of symmetric criticality", size=T.SZ_BODY,
                    color=T.INK).move_to(DOWN * 1.35)
         sub = B("a critical point of the reduced functional is a genuine solution, "

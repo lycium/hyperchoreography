@@ -24,7 +24,7 @@ class PhaseOne(ExpoScene):
         xs = tr.x
         frame = targets.principal_frame(P, feat.x)
 
-        # -- the stage ------------------------------------------------------
+        # — the stage ------------------------------------------------------
         view = OrbitView(lambda ts: P.bodies(xs[0], ts), P.N, radius=1.85,
                          center=LEFT * 3.4 + UP * 0.55,
                          projector=Projector(2, frame), samples=600,
@@ -58,7 +58,7 @@ class PhaseOne(ExpoScene):
                       FadeIn(blab), FadeIn(fA), FadeIn(fG), run_time=1.6)
         self.add(gline)
 
-        # -- the descent ----------------------------------------------------
+        # — the descent ----------------------------------------------------
         n = len(tr)
         pmax = float(power0.max())
 
@@ -98,7 +98,7 @@ class PhaseOne(ExpoScene):
 
         self.wipe(run_time=1.0)
 
-        # -- the same descent, drawn on the action itself --------------------
+        # — the same descent, drawn on the action itself --------------------
 
         # the two directions the search actually moved in, over its last stretch
         tail = np.array([P.flat(v) for v in xs[-70:]])
@@ -156,7 +156,7 @@ class PhaseOne(ExpoScene):
         self.say("So that is what a good case looks like. Two things are still wrong "
                  "with it.")
 
-        # -- what is wrong with it ------------------------------------------
+        # — what is wrong with it ------------------------------------------
         pts = [
             ("Downhill only finds minima.",
              "and almost no choreography is a minimum"),

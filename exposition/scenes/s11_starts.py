@@ -6,7 +6,7 @@ from manim import (VGroup, FadeIn, FadeOut, Create, UP, DOWN, LEFT, RIGHT,
 
 from expo import catalog, nbody, targets, theme as T
 from expo.base import ExpoScene
-from expo.mathtext import B, M, C, sb, sp
+from expo.mathtext import B, M, C, sb, sp, Crow
 from expo.plots import Plot
 from expo.viz import OrbitView, Projector, spin, tumble
 
@@ -28,7 +28,7 @@ def ngon_frequencies(N: int):
 
 
 class WhereStartsComeFrom(ExpoScene):
-    section_number = 10
+    section_number = 11
     section_title = "starts"
 
     def story(self):
@@ -36,11 +36,11 @@ class WhereStartsComeFrom(ExpoScene):
                  "start turns out to matter more than any of it.")
 
         stat = VGroup(
-            C("120 random low-mode starts, three bodies in a plane",
+            Crow("120 random low-mode starts, three bodies in a plane",
               size=T.SZ_TINY, color=T.INK_DIM),
-            C("circle   82", size=T.SZ_BODY, color=T.INK),
-            C("eight    36", size=T.SZ_BODY, color=T.INK),
-            C("covers    2", size=T.SZ_BODY, color=T.INK),
+            Crow("circle   82", size=T.SZ_BODY, color=T.INK),
+            Crow("eight    36", size=T.SZ_BODY, color=T.INK),
+            Crow("covers    2", size=T.SZ_BODY, color=T.INK),
         ).arrange(DOWN, buff=0.26, aligned_edge=LEFT).move_to(UP * 1.0)
         self.play(FadeIn(stat), run_time=1.1)
         self.say("A hundred and twenty random starts in the plane give the circle, the "
@@ -75,11 +75,11 @@ class WhereStartsComeFrom(ExpoScene):
                       "pattern has its own frequency, in closed form.",
                       spin(view, 1.0), run_time=10.0)
 
-        tab = VGroup(C("N   pattern   frequency", size=T.SZ_TINY, color=T.INK_DIM))
+        tab = VGroup(Crow("N   pattern   frequency", size=T.SZ_TINY, color=T.INK_DIM))
         for N in (4, 5, 6, 7):
             _R, w = ngon_frequencies(N)
             best = max(w, key=lambda k: w[k])
-            tab.add(C("%-3d    k = %d      %.4f" % (N, best, w[best]),
+            tab.add(Crow("%-3d    k = %d      %.4f" % (N, best, w[best]),
                       size=T.SZ_SMALL, color=T.INK))
         tab.arrange(DOWN, buff=0.22, aligned_edge=LEFT)
         tab.move_to(RIGHT * 3.1 + DOWN * 0.9)
@@ -89,14 +89,14 @@ class WhereStartsComeFrom(ExpoScene):
                       "whole numbers, the wobble closes up after a whole number of "
                       "turns.",
                       spin(view, 1.0), run_time=7.0)
-        self.say_with("And then the whole motion is periodic again -- which is the "
+        self.say_with("And then the whole motion is periodic again — which is the "
                       "one thing a choreography has to be.",
                       spin(view, 1.0), run_time=6.5)
         self.say_with("So the program builds starts at simple ratios near those "
                       "frequencies: a circle at one mode, plus a transverse "
                       "oscillation at another.",
                       spin(view, 1.0), run_time=9.0)
-        self.say("That is where the hip-hop's modes five and six came from -- and it is "
+        self.say("That is where the hip-hop's modes five and six came from — and it is "
                  "how the search gets out of the plane at all.")
 
         self.wipe(run_time=1.0)

@@ -7,7 +7,7 @@ from manim import (VGroup, VMobject, FadeIn, FadeOut, Create, Line, Dot, UP, DOW
 
 from expo import catalog, nbody, optim, targets, theme as T
 from expo.base import ExpoScene
-from expo.mathtext import B, M, C, sb, sp
+from expo.mathtext import B, M, C, sb, sp, Crow
 from expo.plots import Plot
 from expo.readout import Field, sci
 from expo.viz import OrbitView, Projector, spin, tumble, spectrum_bars
@@ -89,7 +89,7 @@ class HardCases(ExpoScene):
         self.play(FadeIn(ep), run_time=1.0)
 
         self.say_with("Start with one arm turning twice per period. Its tip goes round "
-                      "a circle -- which is a perfectly good, if dull, choreography.",
+                      "a circle — which is a perfectly good, if dull, choreography.",
                       UpdateFromAlphaFunc(ep, lambda m, a: m.set_state(a * 2 * PI, 0.0)),
                       run_time=7.0, rate_func=linear)
 
@@ -125,7 +125,7 @@ class HardCases(ExpoScene):
                       UpdateFromAlphaFunc(ep, lambda m, a: m.set_state(a * 2 * PI, 0.35)),
                       run_time=7.0, rate_func=linear)
 
-        # -- hand it to the optimiser ---------------------------------------
+        # — hand it to the optimiser ---------------------------------------
         self.play(FadeOut(VGroup(f2, why)), run_time=0.7)
         feat = targets.pentagon()
         P, tr1, tr2 = feat.P, feat.run.phase1, feat.run.phase2
@@ -158,8 +158,8 @@ class HardCases(ExpoScene):
 
         self.say_with("So hand it to the two phases and let them work.",
                       UpdateFromAlphaFunc(view, drive), run_time=11.0, rate_func=linear)
-        self.say_with("The petals stay -- the start put the orbit in the right family "
-                      "-- and everything else moves until the gradient is gone.",
+        self.say_with("The petals stay — the start put the orbit in the right family "
+                      "— and everything else moves until the gradient is gone.",
                       UpdateFromAlphaFunc(view, drive), run_time=9.0, rate_func=linear)
 
         fM.set("%d" % feat.run.morse_index)
@@ -206,15 +206,15 @@ class HardCases(ExpoScene):
                       "action, descend on the size of its gradient.",
                       spin(v2, 1.0), run_time=7.0)
         self.say_with("Every critical point of the action, whatever its index, is a "
-                      "minimum of that -- so downhill now works, and lands wherever "
+                      "minimum of that — so downhill now works, and lands wherever "
                       "the gradient happens to vanish.",
                       spin(v2, 1.0), run_time=8.5)
 
         tbl = VGroup(
-            C("120 random starts, N = 3 in the plane", size=T.SZ_TINY, color=T.INK_DIM),
-            C("descending on the action     circle 82   eight 36   double cover 2",
+            Crow("120 random starts, N = 3 in the plane", size=T.SZ_TINY, color=T.INK_DIM),
+            Crow("descending on the action     circle 82   eight 36   double cover 2",
               size=T.SZ_SMALL, color=T.INK),
-            C("descending on |grad A|^2     circle 57   eight 35   two saddles",
+            Crow("descending on |grad A|^2     circle 57   eight 35   two saddles",
               size=T.SZ_SMALL, color=T.INK),
         ).arrange(DOWN, buff=0.26, aligned_edge=LEFT)
         tbl.move_to(RIGHT * 2.6 + DOWN * 1.4)
@@ -261,7 +261,7 @@ class HardCases(ExpoScene):
                       tumble(v3, turns=1.0, sweep=2 * PI), run_time=8.5,
                       rate_func=linear)
         self.say_with("Six to five is such a rate, and the orbit it converges on is "
-                      "genuinely three-dimensional -- the hip-hop, at action twenty-six "
+                      "genuinely three-dimensional — the hip-hop, at action twenty-six "
                       "point seven six.",
                       tumble(v3, turns=1.0, sweep=2 * PI), run_time=9.0,
                       rate_func=linear, extra=0.4)

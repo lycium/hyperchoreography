@@ -51,9 +51,15 @@ class Wireframe(VGroup):
 
         self.rows = VGroup()
         self.cols = VGroup()
+        # Strands must sit on grid nodes, and they must be evenly spaced: rounding
+        # linspace(0, n-1, lines) to integers gives strides of 2 and 3 in an irregular
+        # pattern that reads as missing lines. So the stride is an integer and `lines`
+        # is whatever that stride yields -- 21 on a 41-point grid asked for 19.
         ny, nx = self.Z.shape
-        ri = np.unique(np.linspace(0, ny - 1, min(lines, ny)).astype(int))
-        ci = np.unique(np.linspace(0, nx - 1, min(lines, nx)).astype(int))
+        ri = np.arange(0, ny, max(1, int(round((ny - 1) / max(lines - 1, 1)))))
+        ci = np.arange(0, nx, max(1, int(round((nx - 1) / max(lines - 1, 1)))))
+        if ri[-1] != ny - 1: ri = np.append(ri, ny - 1)
+        if ci[-1] != nx - 1: ci = np.append(ci, nx - 1)
         self._ri, self._ci = ri, ci
         for _ in ri:
             m = VMobject(stroke_width=stroke)

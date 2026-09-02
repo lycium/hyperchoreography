@@ -63,6 +63,17 @@ def C(markup: str, size: float = None, color=None, **kw):
     return _text(markup, T.FONT_CODE, size or T.SZ_SMALL, color or T.INK_DIM, **kw)
 
 
+def Crow(markup: str, size: float = None, color=None, **kw):
+    """A row of a monospaced table. Rows are separate objects (so they can be coloured and
+    revealed one by one), and manim aligns objects by their ink: two rows whose first glyphs
+    have different side bearings land a pixel or two apart, and their columns with them. A
+    hidden leading glyph gives every row the same bearing, so left-aligned rows share one
+    character grid exactly."""
+    m = C("|" + markup, size, color, **kw)
+    m[0].set_color(T.BG).set_opacity(0)          # invisible whichever of the two a later call resets
+    return m
+
+
 def var(name: str) -> str:
     """A variable: italic, as it would be set in print."""
     return "<i>%s</i>" % name

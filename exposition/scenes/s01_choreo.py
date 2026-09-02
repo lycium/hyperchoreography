@@ -15,7 +15,7 @@ class WhatIsAChoreography(ExpoScene):
     section_title = "the problem"
 
     def story(self):
-        # -- Newton ------------------------------------------------------
+        # — Newton ------------------------------------------------------
         law = M("<i>q̈</i>%s  =  " % sb("<i>k</i>"), size=0.52)
         rhs = M("∑%s  <i>m</i>%s (<i>q</i>%s − <i>q</i>%s) / "
                 "|<i>q</i>%s − <i>q</i>%s|%s"
@@ -34,7 +34,7 @@ class WhatIsAChoreography(ExpoScene):
                       "Solving it in general is hopeless.",
                       FadeIn(note), run_time=1.4)
 
-        # -- the choreography constraint ---------------------------------
+        # — the choreography constraint ---------------------------------
         self.play(FadeOut(note), eq.animate.move_to(UP * 2.55).scale(0.72),
                   run_time=1.2)
 
@@ -57,7 +57,7 @@ class WhatIsAChoreography(ExpoScene):
                       "a hopeless problem there is a hard but finite one.",
                       spin(view, 1.0), run_time=7.5)
 
-        # -- it is a real restriction, and it still leaves plenty ---------
+        # — it is a real restriction, and it still leaves plenty ---------
         self.play(FadeOut(VGroup(eq, cons)), spin_and_place(view, radius=2.0,
                   center=UP * 0.35, turns=0.4), run_time=1.6)
 

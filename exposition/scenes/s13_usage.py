@@ -6,14 +6,14 @@ from manim import (VGroup, FadeIn, FadeOut, UP, DOWN, LEFT, RIGHT, ORIGIN, PI,
 
 from expo import catalog, theme as T
 from expo.base import ExpoScene
-from expo.mathtext import B, M, C, sb, sp
+from expo.mathtext import B, M, C, sb, sp, Crow
 from expo.viz import OrbitView, Projector, PlaneGrid, spin, tumble
 
 
 def annotated(pairs, size=None, buff=0.26):
     rows = VGroup()
     for flag, meaning in pairs:
-        rows.add(VGroup(C(flag, size=size or T.SZ_SMALL, color=T.GOLD),
+        rows.add(VGroup(Crow(flag, size=size or T.SZ_SMALL, color=T.GOLD),
                         B(meaning, size=T.SZ_SMALL, color=T.INK_DIM))
                  .arrange(RIGHT, buff=0.5, aligned_edge=DOWN))
     rows.arrange(DOWN, buff=buff, aligned_edge=LEFT)
@@ -24,7 +24,7 @@ def annotated(pairs, size=None, buff=0.26):
 
 
 class ParametersAndOutputs(ExpoScene):
-    section_number = 12
+    section_number = 13
     section_title = "using it"
 
     def story(self):
@@ -55,7 +55,7 @@ class ParametersAndOutputs(ExpoScene):
                  "seconds. Stop it with control-C and run the same line again, and it "
                  "picks up at the trial it was on.")
         self.say("Trials are a deterministic function of the seed and the trial number, "
-                 "so a resumed run is the same run -- whatever order the threads "
+                 "so a resumed run is the same run — whatever order the threads "
                  "happen to finish in.")
 
         self.wipe(run_time=1.0)
@@ -95,7 +95,7 @@ class ParametersAndOutputs(ExpoScene):
                       FadeIn(view), run_time=1.2)
 
         fields = annotated([
-            ("action", "the value of A at the orbit, per body -- its name, in practice"),
+            ("action", "the value of A at the orbit, per body — its name, in practice"),
             ("energy", "fixed by the action through the virial theorem"),
             ("deff / d", "dimensions the motion uses, out of the ones searched"),
             ("morse", "how many directions the action goes down in"),
@@ -125,6 +125,7 @@ class ParametersAndOutputs(ExpoScene):
             ("export", "body positions over one period, as a CSV"),
             ("verify", "re-integrate and re-check, one record or the whole file"),
             ("refine", "redo the solve in arbitrary precision, to any number of digits"),
+            ("prove", "turn a certified record into a theorem, by interval arithmetic"),
             ("merge", "union two catalogues, de-duplicating and re-applying the gates"),
             ("symmetry", "detect each loop's symmetry group rather than assume it"),
             ("continue", "follow a solution as a parameter is changed"),
@@ -134,56 +135,9 @@ class ParametersAndOutputs(ExpoScene):
             self.play(FadeIn(r, shift=RIGHT * 0.08), run_time=0.32)
         self.say("The rest of the program is about reading catalogues back: listing "
                  "them, dumping a record, exporting the trajectories, re-verifying, "
-                 "and refining to as many digits as you like.")
+                 "refining to as many digits as you like — and proving.")
         self.say("Merging is how a long search is spread over several machines: run "
                  "them with different seeds and union the results, and duplicates fold "
-                 "together with their hit counts added.")
+                 "together with their hit counts added.", extra=0.5)
 
-        self.wipe(run_time=1.0)
-
-        # ------------------------------------------------------------------
-        # how fast the real thing is, against the version that drew this film
-        #
-        # Measured on one core at d = 7, N = 7, K = 32 (392 parameters):
-        #   ./hyperchoreography bench --N 7 --d 7 --K 32
-        #   and the same three kernels timed in expo/nbody.py.
-        head = B("a note on speed", size=T.SZ_HEAD, color=T.GOLD).move_to(UP * 2.9)
-
-        rows = VGroup(
-            C("d = 7,  N = 7,  K = 32,  392 parameters, one core",
-              size=T.SZ_TINY, color=T.INK_DIM),
-            # same size as the rows below, or the monospace columns do not line up
-            C("                           C++      this film", size=T.SZ_BODY,
-              color=T.RULE),
-            C("action and gradient      20 us         161 us", size=T.SZ_BODY,
-              color=T.INK),
-            C("the Hessian             423 us       5 125 us", size=T.SZ_BODY,
-              color=T.INK),
-            C("its eigenvalues       5 634 us       5 727 us", size=T.SZ_BODY,
-              color=T.GOOD),
-        ).arrange(DOWN, buff=0.30, aligned_edge=LEFT).move_to(UP * 0.55)
-
-        self.say_with("Every number in this film was computed by a re-implementation of "
-                      "the solver's kernels in Python, which agrees with it exactly and "
-                      "is a good deal slower.",
-                      FadeIn(head), FadeIn(rows), run_time=1.6)
-
-        self.say("Ten times slower on the gradient, twelve on the Hessian -- and not "
-                 "slower at all on the eigenvalues, because there both versions hand "
-                 "the work to the same library.")
-
-        note = VGroup(
-            B("and that last row is most of the cost", size=T.SZ_BODY, color=T.INK),
-            B("at the sizes the high-dimensional search runs at, the eigendecomposition "
-              "is about half of a trial", size=T.SZ_SMALL, color=T.INK_DIM),
-        ).arrange(DOWN, buff=0.26).move_to(DOWN * 1.55)
-        self.play(FadeIn(note), run_time=1.0)
-        self.say("Which is the useful part of the comparison. The interpreted version "
-                 "is slow where it does its own arithmetic, and at these sizes that is "
-                 "not where the time goes.")
-        self.say("A full trial in the real thing takes about a quarter of a second at "
-                 "this size, so one core does four a second, eighteen cores do seventy, "
-                 "and a harvest runs for hours.", extra=0.5)
-
-        self.play(FadeOut(VGroup(head, rows, note)), *self.caption_anims(None),
-                  run_time=1.0)
+        self.play(FadeOut(cmds), *self.caption_anims(None), run_time=1.0)
