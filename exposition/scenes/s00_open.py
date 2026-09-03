@@ -20,12 +20,12 @@ class Opening(ExpoScene):
         view.curve.set_stroke(opacity=0.0)
         self.add(view)
 
-        # the bodies alone: nothing on screen but three moving points
-        self.play(*[FadeIn(d, scale=0.4) for d in view.dots], run_time=1.6)
+        self.play(*[FadeIn(d, scale=0.4) for d in view.dots], spin(view, 1.6 / 7.0),
+                  run_time=1.6)
         self.play(spin(view), run_time=7.0, rate_func=linear)
 
-        # then the curve all three of them are on
-        self.play(view.curve.animate.set_stroke(opacity=0.9), run_time=1.8)
+        self.play(view.curve.animate.set_stroke(opacity=0.9), spin(view, 1.8 / 7.0),
+                  run_time=1.8)
         self.play(spin(view), run_time=6.0, rate_func=linear)
 
         self.say_with("Three equal masses, pulling on each other by Newton's law of "
@@ -44,14 +44,14 @@ class Opening(ExpoScene):
         sub = B("a search engine for N-body choreographies in any dimension",
                 size=T.SZ_BODY, color=T.INK_DIM)
         g = VGroup(title, sub).arrange(DOWN, buff=0.34).move_to(DOWN * 1.15)
-        self.play(FadeIn(title, shift=UP * 0.18), run_time=1.2)
-        self.play(FadeIn(sub, shift=UP * 0.10), run_time=1.0)
+        self.play(FadeIn(title, shift=UP * 0.18), spin(view, 1.2 / 7.0), run_time=1.2)
+        self.play(FadeIn(sub, shift=UP * 0.10), spin(view, 1.0 / 7.0), run_time=1.0)
 
         self.say_with("This one is the figure eight, found by Cristopher Moore in 1993 "
                       "and proved to exist by Chenciner and Montgomery in 2000.",
                       spin(view), run_time=8.0)
 
-        self.say_with("This film is about the program that goes looking for the others.",
+        self.say_with("This film is about a program that goes looking for the others.",
                       spin(view), run_time=7.0, extra=1.0)
 
         self.play(FadeOut(VGroup(view, g)), *self.caption_anims(None), run_time=1.6)

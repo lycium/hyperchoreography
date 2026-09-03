@@ -9,7 +9,7 @@ rendered losslessly with tent-filtered motion blur and a narration track.
 .venv/bin/python render.py --list           # the running order
 .venv/bin/python render.py --preview s05_lbfgs      # one scene, fast
 .venv/bin/python render.py --res 1080p --ss 4       # the whole film
-.venv/bin/python render.py --res 4k --ss 8 --ssaa 2 --mp4
+.venv/bin/python render.py --res 4k --ss 16 --jobs 8    # the delivered film
 ```
 
 Needs `ffmpeg` on PATH. No LaTeX: the formulas are set in Palatino through Pango,
@@ -54,7 +54,8 @@ eleven-dimensional record, at 11 and 6), the Hessian against finite differences,
 the three featured descents against the orbits they are supposed to reach, the
 `k^(2/3)` law for k-fold covers, the shooting residual against the record's own,
 and the time filter against the tent mean it claims to be — that last one on a
-ramp of flat frames, where the answer is an integer you can check by hand.
+ramp of flat frames, where every answer is an integer you can check by hand, at
+both `--ss 4` and the `--ss 16` the film is delivered at.
 
 `make_data.py` refreshes `data/` from the catalogue; re-run it after a harvest
 renumbers record ids.
@@ -62,8 +63,8 @@ renumbers record ids.
 ## Rendering
 
 Manim's frames never reach a lossy encoder. `expo/pipeline.py` patches the frame
-writer to hand raw RGBA straight to an ffmpeg process, which does three jobs in
-one pass:
+writer, filters the frames in time, and hands the result to an ffmpeg process that
+does the rest:
 
 **Time.** Manim renders at `fps * ss` frames per second. Each output frame is a
 tent-weighted mean over `2*ss - 1` of them, and consecutive windows overlap by
@@ -73,16 +74,39 @@ side. That is a reconstruction filter rather than a shutter: motion reads as
 continuous instead of stepped. `--shape box` gives the disjoint-block average
 instead, for comparison.
 
+The filter runs in `expo/pipeline.py` rather than in ffmpeg's `tmix`, which is
+where it used to run. tmix recomputes its whole window at every input frame, so at
+a stride of `ss` it does `2*ss - 1` weighted adds where two would do: at 4K and
+`--ss 16` that was fifteen cores of ffmpeg with the renderer itself idle at nine
+per cent, and one scene took longer than the film is. Here a frame is added into
+the (at most two) windows that want it, which is about eight times less work and
+leaves the machine free to render — so `--jobs` can put a scene on every core.
+
 **Space.** `--ssaa 2` renders at twice the output resolution and scales back down
 with Lanczos.
 
+**Depth.** The mean of thirty-one 8-bit frames is not an 8-bit number, and neither
+is a Lanczos downscale of one, so the filter hands ffmpeg sixteen bits and the
+single rounding to the delivered depth happens after both rather than between them.
+
+That leaves the shallow, wide gradients — a body's halo falls about forty code
+values over eighty pixels — quantised at 8 bits, which is where the contour rings
+in a glow come from. The answer is in the drawing rather than the encoding:
+`viz.halo_alphas` solves for layer opacities that composite to a smooth profile
+and uses enough layers that each step is under one code value. Nine layers, which
+is what it was, step by five.
+
 **Encoding.** FFV1 in Matroska by default, which is lossless; `--codec x264rgb`,
 `utvideo`, `prores` and `h264` are also there, and `--depth 16` keeps sixteen bits
-per channel through the whole chain. `--mp4` additionally writes a shareable
+per channel all the way into the file. `--mp4` additionally writes a shareable
 H.264 copy. Scenes are joined with a stream copy, so the finished film is bit for
 bit the scenes that went into it.
 
 `--linear-light` averages in linear light rather than in gamma-encoded values.
+
+**Jobs.** A scene is one process and about two cores (the renderer, and ffmpeg
+behind it), so `--jobs 8` renders eight at once. The longest scenes are started
+first: the film is only finished when its longest scene is.
 
 ## What `out/` contains
 

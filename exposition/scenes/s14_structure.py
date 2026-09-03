@@ -6,7 +6,7 @@ from manim import (VGroup, FadeIn, FadeOut, Create, UP, DOWN, LEFT, RIGHT,
 
 from expo import catalog, nbody, optim, targets, theme as T
 from expo.base import ExpoScene
-from expo.mathtext import B, M, C, sb, sp, Crow
+from expo.mathtext import B, M, C, sb, sp, var, table
 from expo.plots import Plot
 from expo.viz import OrbitView, Projector, PlaneGrid, eigen_strip, spin, tumble
 
@@ -22,9 +22,6 @@ class TheHigherStructure(ExpoScene):
                  "many descriptions, and the redundancy has to be taken out by hand, "
                  "carefully, in the right place.")
 
-        # ==================================================================
-        # 1. counting the free directions
-        # ==================================================================
         h = B("counting the directions that mean nothing", size=T.SZ_HEAD,
               color=T.GOLD).move_to(UP * 3.0)
         self.play(FadeIn(h), run_time=0.8)
@@ -34,9 +31,6 @@ class TheHigherStructure(ExpoScene):
         x = np.array(rec.coef)
         H = P.hessian(x)
         neg, zero, _lifted = optim.inertia_gauge(P, x, H)
-        # the strip shows the *raw* spectrum, where the flat directions are still
-        # sitting at zero; the two counts come from the careful computation, which
-        # lifts them out rather than trying to recognise them by size
         raw = np.linalg.eigvalsh(H)
         strip = eigen_strip(raw, width=7.2, height=0.5, label=False,
                             window=40).move_to(UP * 1.1)
@@ -76,9 +70,6 @@ class TheHigherStructure(ExpoScene):
 
         self.wipe(run_time=1.0)
 
-        # ==================================================================
-        # 2. why the dimension saturates
-        # ==================================================================
         h2 = B("why the dimension runs out", size=T.SZ_HEAD,
                color=T.GOLD).move_to(UP * 3.0)
         self.play(FadeIn(h2), run_time=0.8)
@@ -109,11 +100,11 @@ class TheHigherStructure(ExpoScene):
                  "plane, so it is extra modes, not extra directions, that buy "
                  "dimension.")
 
-        tbl = VGroup(Crow("N       4    5    6    7    8    9   10   12",
-                       size=T.SZ_SMALL, color=T.INK_DIM),
-                     Crow("limit   4    4    6    6    8    8   10   12",
-                       size=T.SZ_SMALL, color=T.INK))
-        tbl.arrange(DOWN, buff=0.24).move_to(DOWN * 0.5)
+        tbl = table([("N",) + tuple("4 5 6 7 8 9 10 12".split()),
+                     ("limit",) + tuple("4 4 6 6 8 8 10 12".split())],
+                    align="l" + "r" * 8, sizes=T.SZ_SMALL,
+                    colors=[T.INK_DIM, T.INK], col_buff=0.42, row_buff=0.24)
+        tbl.move_to(DOWN * 0.5)
         self.play(FadeIn(tbl), run_time=1.0)
         self.say("The table it predicts was checked against the catalogue, and then "
                  "used the other way round: eleven dimensions needs at least twelve "
@@ -137,21 +128,18 @@ class TheHigherStructure(ExpoScene):
 
         self.wipe(run_time=1.0)
 
-        # ==================================================================
-        # 3. the twist
-        # ==================================================================
         h3 = B("a number that sees the group", size=T.SZ_HEAD,
                color=T.GOLD).move_to(UP * 3.0)
         self.play(FadeIn(h3), run_time=0.8)
 
         jet = VGroup(
             M("<i>A</i>%s  =  (1/2π) ∮ <i>q</i> ∧ <i>q̇</i> ∧ … ∧ "
-              "<i>q</i>%s d<i>t</i>" % (sb("k"), sp("(<i>k</i>−1)")), size=0.48),
+              "<i>q</i>%s d<i>t</i>" % (sb(var("k")), sp("(<i>k</i>−1)")), size=0.48),
             B("the jet moment: a k-form built from the loop and its derivatives",
               size=T.SZ_SMALL, color=T.INK_DIM),
         ).arrange(DOWN, buff=0.28).move_to(UP * 1.3)
         tw = VGroup(
-            M("χ*  =  max over rotations of  ⟨ <i>A</i>%s , <i>R</i>·ψ ⟩" % sb("k"),
+            M("χ*  =  max over rotations of  ⟨ <i>A</i>%s , <i>R</i>·ψ ⟩" % sb(var("k")),
               size=0.48, color=T.GOLD),
             B("paired against the form that the group preserves", size=T.SZ_SMALL,
               color=T.INK_DIM),
@@ -185,21 +173,25 @@ class TheHigherStructure(ExpoScene):
 
         self.wipe(run_time=1.0)
 
-        # — the ladder ------------------------------------------------------
-        rows = VGroup(Crow("d     k     group", size=T.SZ_TINY, color=T.INK_DIM))
-        for d, k, g in (("3", "3", "SO(3)"), ("4", "2", "SU(2)·U(1)"),
-                        ("6", "3", "SU(3)"), ("7", "3", "G2"),
-                        ("8", "4", "Spin(7)"), ("10", "5", "SU(5)")):
-            rows.add(Crow("%-5s %-5s %s" % (d, k, g), size=T.SZ_SMALL,
-                       color=T.GOLD if g in ("G2", "Spin(7)") else T.INK))
-        rows.arrange(DOWN, buff=0.24, aligned_edge=LEFT).move_to(LEFT * 3.0 + UP * 0.2)
+        ladder = (("3", "3", "SO(3)"), ("4", "2", "SU(2)·U(1)"),
+                  ("6", "3", "SU(3)"), ("7", "3", "G2"),
+                  ("8", "4", "Spin(7)"), ("10", "5", "SU(5)"))
+        rows = table([("d", "k", "group")] + list(ladder), align="rrl",
+                     sizes=[T.SZ_TINY] + [T.SZ_SMALL] * len(ladder),
+                     colors=[T.INK_DIM] + [T.GOLD if g in ("G2", "Spin(7)") else T.INK
+                                           for _d, _k, g in ladder],
+                     col_buff=0.55, head_buff=0.12)
+        rows.move_to(LEFT * 3.4 + UP * 0.2)
         note = VGroup(
-            B("seven is the only odd dimension with a proper reduction",
-              size=T.SZ_BODY, color=T.INK),
-            B("which is why the seven-dimensional case is the one that opened, and why "
-              "nine and eleven are built on top of it", size=T.SZ_SMALL,
+            B("seven is the only odd dimension", size=T.SZ_BODY, color=T.INK),
+            B("with a proper reduction", size=T.SZ_BODY, color=T.INK),
+            B("which is why the seven-dimensional case is", size=T.SZ_SMALL,
               color=T.INK_DIM),
-        ).arrange(DOWN, buff=0.28).move_to(RIGHT * 2.6 + UP * 0.2)
+            B("the one that opened, and why nine and", size=T.SZ_SMALL,
+              color=T.INK_DIM),
+            B("eleven are built on top of it", size=T.SZ_SMALL, color=T.INK_DIM),
+        ).arrange(DOWN, buff=0.24).move_to(RIGHT * 2.9 + UP * 0.2)
+        note[2:].shift(DOWN * 0.16)
         self.play(FadeIn(rows), run_time=1.0)
         self.say("There is one of these in each of a handful of dimensions, and the "
                  "list is short because the groups are.")

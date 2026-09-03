@@ -6,21 +6,15 @@ from manim import (VGroup, FadeIn, FadeOut, UP, DOWN, LEFT, RIGHT, ORIGIN, PI,
 
 from expo import catalog, theme as T
 from expo.base import ExpoScene
-from expo.mathtext import B, M, C, sb, sp, Crow
+from expo.mathtext import B, M, C, sb, sp, table
 from expo.viz import OrbitView, Projector, PlaneGrid, spin, tumble
 
 
 def annotated(pairs, size=None, buff=0.26):
-    rows = VGroup()
-    for flag, meaning in pairs:
-        rows.add(VGroup(Crow(flag, size=size or T.SZ_SMALL, color=T.GOLD),
-                        B(meaning, size=T.SZ_SMALL, color=T.INK_DIM))
-                 .arrange(RIGHT, buff=0.5, aligned_edge=DOWN))
-    rows.arrange(DOWN, buff=buff, aligned_edge=LEFT)
-    for r in rows:
-        r[0].align_to(rows[0][0], LEFT)
-        r[1].align_to(rows, LEFT).shift(RIGHT * 3.6)
-    return rows
+    """A monospaced flag against a sentence of prose, in two aligned columns."""
+    return table(pairs, sizes=size or T.SZ_SMALL,
+                 col_colors=[T.GOLD, T.INK_DIM], maker=[C, B],
+                 col_buff=0.80, row_buff=buff)
 
 
 class ParametersAndOutputs(ExpoScene):
@@ -60,7 +54,6 @@ class ParametersAndOutputs(ExpoScene):
 
         self.wipe(run_time=1.0)
 
-        # ------------------------------------------------------------------
         three = annotated([
             ("--K", "too few modes and a close approach cannot be represented; "
                     "too many and every trial costs more"),
@@ -84,7 +77,6 @@ class ParametersAndOutputs(ExpoScene):
 
         self.wipe(run_time=1.0)
 
-        # ------------------------------------------------------------------
         rec = catalog.load("d7_twist")
         view = OrbitView(rec.bodies, rec.N, radius=1.55,
                          center=LEFT * 4.0 + UP * 0.4,
@@ -118,7 +110,6 @@ class ParametersAndOutputs(ExpoScene):
 
         self.wipe(run_time=1.0)
 
-        # ------------------------------------------------------------------
         cmds = annotated([
             ("list", "everything in a file, sorted how you like"),
             ("show", "one record as JSON, coefficients and all"),

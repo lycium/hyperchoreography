@@ -6,7 +6,7 @@ from manim import (VGroup, FadeIn, FadeOut, Create, UP, DOWN, LEFT, RIGHT,
 
 from expo import catalog, nbody, targets, theme as T
 from expo.base import ExpoScene
-from expo.mathtext import B, M, C, sb, sp, Crow
+from expo.mathtext import B, M, C, sb, sp, Crow, table
 from expo.viz import OrbitView, Projector, PlaneGrid, spin, tumble
 
 
@@ -22,7 +22,7 @@ class TheRotatingFrame(ExpoScene):
             Crow("eight dimensions, no rotating frame", size=T.SZ_SMALL, color=T.INK_DIM),
             Crow("60 331 trials     0 orbits", size=T.SZ_BODY, color=T.BAD),
             Crow("eight dimensions, a calibrated frame", size=T.SZ_SMALL, color=T.INK_DIM),
-            Crow("8 799 trials      6 orbits", size=T.SZ_BODY, color=T.GOOD),
+            Crow(" 8 799 trials     6 orbits", size=T.SZ_BODY, color=T.GOOD),
         ).arrange(DOWN, buff=0.28, aligned_edge=LEFT).move_to(UP * 0.6)
         self.play(FadeIn(wall[0]), FadeIn(wall[1]), run_time=1.0)
         self.say("Sixty thousand trials in eight dimensions, with the relative "
@@ -33,7 +33,6 @@ class TheRotatingFrame(ExpoScene):
 
         self.wipe(run_time=1.0)
 
-        # ------------------------------------------------------------------
         ans = M("<i>q</i>%s(<i>t</i>)  =  exp(Ω<i>t</i>) · <i>q</i>(<i>t</i> + "
                 "2π<i>j</i>/<i>N</i>)" % sb("<i>j</i>"), size=0.52, color=T.GOLD)
         ans.move_to(UP * 2.35)
@@ -69,7 +68,6 @@ class TheRotatingFrame(ExpoScene):
 
         self.wipe(run_time=1.0)
 
-        # ------------------------------------------------------------------
         f1 = VGroup(
             B("the potential does not change at all", size=T.SZ_BODY, color=T.GOOD),
             B("a rotation preserves every distance, so the term that costs the most to "
@@ -91,17 +89,17 @@ class TheRotatingFrame(ExpoScene):
 
         self.wipe(run_time=1.0)
 
-        # ------------------------------------------------------------------
+        flags = table([("--omega \"1,2\"", "rates in the coordinate planes"),
+                       ("--omega su:1,2", "rates that sum to zero"),
+                       ("--omega g2:1,6", "the maximal torus of the group G2")],
+                      sizes=T.SZ_SMALL,
+                      colors=[T.INK_DIM, T.INK_DIM, T.GOLD],
+                      maker=[C, B], col_buff=0.80, row_buff=0.30)
         om = VGroup(
             B("Omega is a rotation rate in each of several orthogonal planes at once",
               size=T.SZ_BODY, color=T.INK),
-            Crow("--omega \"1,2\"        rates in the coordinate planes",
-              size=T.SZ_SMALL, color=T.INK_DIM),
-            Crow("--omega su:1,2       rates that sum to zero",
-              size=T.SZ_SMALL, color=T.INK_DIM),
-            Crow("--omega g2:1,6       the maximal torus of the group G2",
-              size=T.SZ_SMALL, color=T.GOLD),
-        ).arrange(DOWN, buff=0.30, aligned_edge=LEFT).move_to(UP * 0.9)
+            flags,
+        ).arrange(DOWN, buff=0.36, aligned_edge=LEFT).move_to(UP * 0.9)
         self.say_with("What is left is choosing the rotation, and that turns out to "
                       "matter enormously.", FadeIn(om), run_time=1.4)
         self.say("The rates that work are not arbitrary. The ones that opened seven "

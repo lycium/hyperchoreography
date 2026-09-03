@@ -1,11 +1,4 @@
-"""Drawing loops, bodies, spectra and eigenvalues.
-
-Everything in the deck is drawn through an orthographic projection from R^d down
-to the screen, so a d = 2 orbit and a d = 11 orbit go through the same code path,
-and a projection can be rotated smoothly between principal planes. A curve is
-always drawn in the orbit's own principal frame: a deff = 9 orbit and a circle
-look identical in whichever two coordinates you happen to pick.
-"""
+"""Drawing loops, bodies, spectra and eigenvalues."""
 
 from __future__ import annotations
 
@@ -17,16 +10,8 @@ from . import theme as T
 from .mathtext import C
 
 
-# ---------------------------------------------------------------------------
-# projection
-# ---------------------------------------------------------------------------
 class Projector:
-    """An orthographic camera in R^d: two orthonormal rows, freely rotatable.
-
-    `basis` starts as the first two principal axes. `spin(plane, angle)` turns the
-    camera inside one coordinate plane of the principal frame, which is how the
-    deck shows that a high-deff orbit is not a circle seen edge-on.
-    """
+    """An orthographic camera in R^d: two orthonormal rows, freely rotatable."""
 
     def __init__(self, d: int, frame: np.ndarray | None = None):
         self.d = d
@@ -65,9 +50,6 @@ def to_screen(points2: np.ndarray, scale: float, center) -> np.ndarray:
     return out + np.asarray(center, dtype=float)
 
 
-# ---------------------------------------------------------------------------
-# the loop
-# ---------------------------------------------------------------------------
 def loop_curve(pts3: np.ndarray, color=None, width: float = 3.2,
                opacity: float = 1.0, gradient: bool = False) -> VMobject:
     """A closed curve through the given screen points."""
@@ -81,32 +63,34 @@ def loop_curve(pts3: np.ndarray, color=None, width: float = 3.2,
     return m
 
 
-def body_dot(color, r: float = 0.085, glow: bool = True, layers: int = 9) -> VGroup:
-    """A body: a solid dot inside a soft halo.
+HALO_LAYERS = 40
+HALO_PEAK = 0.24
+HALO_POWER = 1.7
 
-    The halo is a stack of discs whose opacity falls off quadratically, which reads
-    as a smooth glow rather than as a set of rings -- with three layers the edge of
-    each disc is visible against a dark ground.
-    """
+
+def halo_alphas(layers: int = HALO_LAYERS, peak: float = HALO_PEAK,
+                power: float = HALO_POWER):
+    """Layer opacities that composite to the profile above; index 0 is the innermost"""
+    t = [peak * max(0.0, 1.0 - (j - 0.5) / layers) ** power
+         for j in range(1, layers + 1)] + [0.0]
+    return [(t[j - 1] - t[j]) / (1.0 - t[j]) for j in range(1, layers + 1)]
+
+
+def body_dot(color, r: float = 0.085, glow: bool = True,
+             layers: int = HALO_LAYERS, reach: float = 3.4) -> VGroup:
+    """A body: a solid dot inside a soft halo."""
     parts = []
     if glow:
-        for k in range(layers, 0, -1):
-            f = k / layers
-            parts.append(Circle(radius=r * (1.0 + 3.4 * f), stroke_width=0,
-                                fill_color=color,
-                                fill_opacity=0.055 * (1 - f) ** 2 + 0.012))
+        alphas = halo_alphas(layers)
+        for j in range(layers, 0, -1):
+            parts.append(Circle(radius=r * (1.0 + reach * j / layers), stroke_width=0,
+                                fill_color=color, fill_opacity=alphas[j - 1]))
     parts.append(Circle(radius=r, stroke_width=0, fill_color=color, fill_opacity=1.0))
     return VGroup(*parts)
 
 
 class OrbitView(VGroup):
-    """A loop with its N bodies, ready to be animated in time.
-
-    `set_time(t)` moves the bodies; `set_projector(p)` re-draws everything through
-    a new camera. Positions come from a callable `bodies(ts) -> (N, T, d)`, which
-    is either an Orbit or an Action + coefficients, so the same view serves a
-    catalogued record and a half-converged iterate.
-    """
+    """A loop with its N bodies, ready to be animated in time."""
 
     def __init__(self, bodies_fn, N: int, radius: float = 2.4, center=ORIGIN,
                  projector: Projector = None, samples: int = 720,
@@ -129,7 +113,7 @@ class OrbitView(VGroup):
         self.fixed_scale = fixed_scale
 
         ts = np.linspace(0, 2 * PI, samples, endpoint=False)
-        self.raw = bodies_fn(ts)                       # (N, S, d)
+        self.raw = bodies_fn(ts)
         if self.proj is None:
             self.proj = Projector(self.raw.shape[2])
         self._rescale()
@@ -151,14 +135,8 @@ class OrbitView(VGroup):
             self.add(self.trails)
         self.set_time(0.0)
 
-    # -- internals --------------------------------------------------------
     def _rescale(self):
-        """Fit the drawing to `radius`.
-
-        With `fixed_scale` the fit uses the orbit's extent in R^d rather than in the
-        current projection, so a turning camera cannot make the picture breathe --
-        which is what you want while tumbling, and not what you want for a still.
-        """
+        """Fit the drawing to `radius`."""
         X = self.raw.reshape(-1, self.raw.shape[2])
         flat = X if self.fixed_scale else self.proj(X)
         self.scale_factor, _ = fit(flat, self.radius)
@@ -167,18 +145,12 @@ class OrbitView(VGroup):
         return to_screen(self.proj(X), self.scale_factor, self.center)
 
     def redraw(self):
-        """Rebuild every part from the current camera, scale, centre and time.
-
-        Everything the view shows is derived, so a move is a redraw rather than a
-        transform: applying manim's own scale or shift to the group would leave the
-        bodies behind the next time the clock ticks.
-        """
+        """Rebuild every part from the current camera, scale, centre and time."""
         pts = self._screen(self.raw[0])
         self.curve.set_points_smoothly([*pts, pts[0]])
         self.set_time(self._t)
         return self
 
-    # -- public -----------------------------------------------------------
     def place(self, radius: float = None, center=None, rescale: bool = True):
         if radius is not None:
             self.radius = float(radius)
@@ -215,9 +187,6 @@ class OrbitView(VGroup):
         return self
 
 
-# ---------------------------------------------------------------------------
-# diagnostics
-# ---------------------------------------------------------------------------
 def spectrum_bars(modes, power, width: float = 5.6, height: float = 1.5,
                   color=None, log: bool = True, floor: float = 1e-10,
                   label_every: int = 0) -> VGroup:
@@ -254,14 +223,7 @@ def spectrum_bars(modes, power, width: float = 5.6, height: float = 1.5,
 
 def eigen_strip(w, width: float = 6.4, height: float = 0.5, rel_tol: float = 1e-8,
                 label: bool = True, window: int = 0) -> VGroup:
-    """The Hessian spectrum as a signed strip: red below zero, green above, violet
-    for the directions that change nothing. The Morse index is the count of red.
-
-    `window` keeps only the smallest that many eigenvalues. At a real orbit the
-    spectrum runs from a handful of negative values up to several thousand, so a
-    strip of all of them is a green bar with an invisible red sliver; the
-    interesting end is the low one.
-    """
+    """The Hessian spectrum as a signed strip: red below zero, green above, violet"""
     w = np.asarray(w, dtype=float)
     lmax = float(np.abs(w).max())
     ws = np.sort(w)
@@ -316,8 +278,7 @@ def axes_box(width: float, height: float, color=None) -> VGroup:
 
 def log_plot(values, width: float = 5.2, height: float = 2.4, lo: float = None,
              hi: float = None, color=None, width_stroke: float = 2.6):
-    """A |grad| history on a log scale, returned with the mapping so points can be
-    added one at a time as an animation plays."""
+    """A |grad| history on a log scale, returned with the mapping so points can be"""
     v = np.maximum(np.asarray(values, dtype=float), 1e-300)
     lo = np.log10(lo if lo else max(v.min() * 0.5, 1e-16))
     hi = np.log10(hi if hi else v.max() * 2)
@@ -337,16 +298,18 @@ def log_plot(values, width: float = 5.2, height: float = 2.4, lo: float = None,
     return m
 
 
-def spin(view: OrbitView, turns: float = 1.0, t0: float = 0.0):
+def spin(view: OrbitView, turns: float = 1.0, t0: float = None):
     """An animation that runs the orbit clock forward."""
     from manim import UpdateFromAlphaFunc
+    t0 = view._t if t0 is None else t0
     return UpdateFromAlphaFunc(view, lambda m, a: m.set_time(t0 + a * 2 * PI * turns))
 
 
 def spin_and_place(view: OrbitView, radius: float = None, center=None,
-                   turns: float = 1.0, t0: float = 0.0):
+                   turns: float = 1.0, t0: float = None):
     """Move and rescale the view while the orbit keeps running."""
     from manim import UpdateFromAlphaFunc
+    t0 = view._t if t0 is None else t0
     r0 = view.radius
     c0 = np.array(view.center, dtype=float)
     r1 = r0 if radius is None else float(radius)
@@ -363,13 +326,7 @@ def spin_and_place(view: OrbitView, radius: float = None, center=None,
 
 
 def default_tumble_planes(d: int):
-    """Which planes to turn the camera in.
-
-    Rotating inside a principal plane shows nothing: these orbits are sums of
-    circular motions, so each principal plane is close to a circle and stays one.
-    What reveals the shape is mixing the *first* axis of one principal plane with
-    the *second* of the next, which is what these cross pairs do.
-    """
+    """Which planes to turn the camera in."""
     if d < 4:
         return [(0, 2)] if d >= 3 else []
     planes = []
@@ -380,15 +337,11 @@ def default_tumble_planes(d: int):
 
 
 def tumble(view: OrbitView, turns: float = 1.0, sweep: float = 2 * PI,
-           planes=None, t0: float = 0.0, base: Projector = None):
-    """Turn the camera through the orbit's own principal planes while it runs.
-
-    In any two coordinates you happen to pick, a loop that fills eleven dimensions
-    and a circle look the same. Rotating the projection is the cheapest honest way
-    to show the difference: the circle stays a circle, and the other one does not.
-    """
+           planes=None, t0: float = None, base: Projector = None):
+    """Turn the camera through the orbit's own principal planes while it runs."""
     from manim import UpdateFromAlphaFunc
     base = base or view.proj
+    t0 = view._t if t0 is None else t0
     d = base.d
     if planes is None:
         planes = default_tumble_planes(d)
@@ -405,15 +358,7 @@ def tumble(view: OrbitView, turns: float = 1.0, sweep: float = 2 * PI,
 
 
 class PlaneGrid(VGroup):
-    """One small panel per principal plane -- the gallery's own way of drawing a
-    high-dimensional orbit.
-
-    A loop that occupies eleven dimensions is a circle in every one of its principal
-    planes, so a single picture of it is a lie. Laying the planes out side by side
-    makes the effective dimension countable: a plane the loop really turns in shows
-    a curve, one it only oscillates along shows a line, and one it never enters
-    shows a grey rule.
-    """
+    """One small panel per principal plane -- the gallery's own way of drawing a"""
 
     def __init__(self, orbit, cols: int = 3, panel: float = 1.55, gap: float = 0.42,
                  center=ORIGIN, samples: int = 480, show_bodies: bool = False,
@@ -422,7 +367,7 @@ class PlaneGrid(VGroup):
         d = orbit.d
         ts = np.linspace(0, 2 * PI, samples, endpoint=False)
         F = orbit.principal_frame()
-        X = np.einsum("ab,ktb->kta", F, orbit.bodies(ts))       # (N, T, d)
+        X = np.einsum("ab,ktb->kta", F, orbit.bodies(ts))
         sv = orbit.principal_values()
         scale = panel * 0.44 / max(float(np.abs(X).max()), 1e-12)
         npl = (d + 1) // 2

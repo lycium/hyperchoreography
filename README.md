@@ -26,12 +26,18 @@ eigensolver, pivoted LU, optimisers, Taylor integrator, MPFR wrapper — is in `
 
 Naming: **dimension first, then bodies** (`d3n4.bin`); `list` sorts by (deff, N, action).
 
+The paper is `paper/hyperchoreography.tex` (`tectonic hyperchoreography.tex`), with the
+existence certificates it cites in `paper/certificates/`. The 35-minute exposition film is
+`exposition/` — sixteen manim scenes, narrated and mastered into one lossless upload;
+`exposition/comp/README.md` is its build.
+
 ---
 
 ## 1. What is in the catalogue
 
 `deff` is the dimension the motion actually occupies; `d` is the ambient dimension it was found in. The
-budget of §5 caps `deff` at `2⌊N/2⌋`, and that ceiling has been reached exactly at `N = 6`, `7` and `10`.
+budget of §5, `2⌊N/2⌋`, bounds every record with `N ≥ 4` and is reached exactly at `N = 6`, `7` and `10`; it is
+a count for one start family, not a theorem, and `N = 3` has three non-planar records (`d2-3_n3:2–4`, proven).
 
 Every record stores the **certified initial state** as well as the Fourier series rendering it: `h.ret_err`
 is the state's residual (median 2.2e-15, worst 6.0e-11 over 1800 records), `extra[6]` the series', which the
@@ -145,10 +151,13 @@ parameters.
 
 ### Existence proofs (`prove`)
 
-Everything above is numerical evidence. `prove` turns a record into a theorem: *there is an initial state
-within `r` of the refined one whose flow satisfies `Φ_{T/N}(Z) = G S Z` exactly*, hence a choreography of
-period 2π, unique in that box up to the gauge group — every quantity an interval computed in MPFR with
-outward rounding (`interval.hpp`), nothing that matters a floating-point approximation.
+Everything above is numerical evidence. `prove` turns a record into a theorem: *in a box of radius `r` of a
+slice transversal to the gauge group there is exactly one initial state whose flow satisfies
+`Φ_{T/N}(Z) = G S Z` exactly*, hence a choreography of period 2π; on the same run it verifies that the bodies
+span `R^d` (the interval Gram matrix of the positions over the segment, relative to their centre of mass, is positive definite) and that the orbit
+is not a relative equilibrium (a pair distance has disjoint enclosures at two times) — every quantity an
+interval computed in MPFR with outward rounding (`interval.hpp`), nothing that matters a floating-point
+approximation. The formal statements and proofs are in `paper/` (`tectonic hyperchoreography.tex`).
 
 * **The test** is Krawczyk's: with `Y ≈ DF(Z₀)⁻¹` (any real matrix), `K = Z₀ − Y F(Z₀) + (I − Y [DF](B))(B − Z₀)`
   lands strictly inside the box `B` and `‖I − Y [DF](B)‖ < 1`. `F(Z₀)` needs a validated flow from a point,
@@ -174,9 +183,9 @@ outward rounding (`interval.hpp`), nothing that matters a floating-point approxi
 * **Rotating frames** are exact: `Ω` is decomposed into planes, rates snapped so that coinciding angles
   coincide exactly, and the theorem stated for that frame in its own axes with `G` a block matrix of interval
   cosines. The commutant of `G` is built structurally from the angle classes.
-* **Output**: the box radius, `|Y F|`, the contraction and closure norms, and interval enclosures of the
-  energy and the action (carried in the flow with its own remainder). With `--write` the proven radius goes
-  into `extra[7]`; `list` marks such records `proven`.
+* **Output**: the box's half-width and slice radius, `|Y F|`, the contraction and closure norms, the two
+  qualifiers, and interval enclosures of the energy and the action (carried in the flow with its own
+  remainder). With `--write` the proven radius goes into `extra[7]`; `list` marks such records `proven`.
 
 Measured at `--digits 40`: the eight in 1 s, every `N = 3` record in under a minute, `N = 10` in `d = 3` in
 132 s, `N = 8` in `d = 6` in 216 s, `d = 5, N = 6` in a rotating frame in 41 s, the `deff = 7` champion
@@ -200,8 +209,8 @@ Hessian directions) complete the set.
 Linearising the rotating N-gon gives the transverse frequencies in closed form,
 `ω_k² = Σ_{l≠0} (1 − cos 2πkl/N)/d_l³`, `d_l = 2R sin(πl/N)`, so inertial choreographies of vertical type sit
 at rational resonances `m₂/m₁ ≈ ω_k/ω_N` with pattern `k ≡ m₂·m₁⁻¹ (mod N)`. N=4, k=2 gives 1.2156 → the
-(5,6) solution; N=5, k=2 gives 1.3277 → the (7,9) solution. For N=3 every transverse mode is a tilt, which is
-why nothing spatial exists there.
+(5,6) solution; N=5, k=2 gives 1.3277 → the (7,9) solution. For N=3 every transverse mode is a tilt, so this
+family produces nothing spatial there; the non-planar `N = 3` records are not of this type.
 
 The **in-plane** block is the other half of the same linearisation (`ngon_inplane_freq`): a quartic in the
 same sums `C_k = Σ_{p≠0} g_p cos(2πkp/N)`, of which `C_0 − C_1 = 1` *is* the radius equation. Its real roots,
@@ -227,9 +236,10 @@ transverse patterns,
 
     deff_max(N) = 2⌊N/2⌋ :   N=3→2, 4→4, 5→4, 6→6, 7→6, 8→8, 9→8, 10→10, 12→12 .
 
-This reproduces the whole earlier catalogue and predicted the rest before the runs: `d = 7` with `N = 4` or
+This reproduces the whole catalogue at `N ≥ 4` and predicted the rest before the runs: `d = 7` with `N = 4` or
 `5` cannot exceed `deff = 4` however long it runs (measured over 3·10⁴ trials), while `N ≥ 8` admits
-`deff = 7`, and `deff = 11` needs `N ≥ 12`.
+`deff = 7`, and `deff = 11` needs `N ≥ 12`. It counts the vertical family's resonances and is not a theorem:
+the three non-planar `N = 3` records are not of that type.
 
 ## 6. The rotating frame (`--omega`)
 

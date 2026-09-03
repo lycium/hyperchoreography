@@ -1,0 +1,61 @@
+record 0 (N=8 d=7 deff=6 action=47.841443792442):  iter 0: residual 1.892e-15  [0.4s]
+  refined to residual 6.63e-50 in 24.5s (388 bits, order 54, radius 1.0e-20, tol 1e-44)
+  conservation rows (6 translations, energy, 15 rotations), max entries: 1 1 1 1 1 1 9.59 1.79 1.77 1.77 1.77 1.77 1.79 1.79 1.79 1.79 1.3 1.3 1.3 0.526 0.376 0.526
+  point run: 52 steps, 1 rejected, h in [6.25e-03, 1.58e-02], |F(Z0)| <= 4.79e-42
+  box run:   52 steps, 1 rejected, h in [6.25e-03, 1.58e-02], max state width 2.04e-14 (radius 1.0e-20)
+ PROVEN in 204.5s
+  a choreography of N=8 bodies in R^6, period 2pi, exists with initial state within 6.7e-20 (max norm) of the refined state,
+  the only zero of the shooting map in the slice box Z0 + Q[-r, r]^m, r = 1.0e-20; the bodies span R^6: verified; not a relative equilibrium: verified.
+  Krawczyk: |Y F| = 3.7e-41, contraction 1.08e-10, closure 1.75e-13; slice dim 74, 22 gauge generators;
+  52 validated Taylor steps (1 rejected), h in [6.2e-03, 1.6e-02], state width <= 2.0e-14
+  energy in [-2.03045393712540902088579e+01, -2.03045393712540901831510e+01]
+  action in [4.78414437924423640753460e+01, 4.78414437924424897055006e+01]
+record 1 (N=8 d=7 deff=6 action=75.979899775174):  iter 0: residual 6.027e-15  [0.8s]
+  refined to residual 4.18e-49 in 50.4s (388 bits, order 54, radius 1.0e-20, tol 1e-44)
+  conservation rows (6 translations, energy, 15 rotations), max entries: 1 1 1 1 1 1 17.6 1.92 1.92 1.92 1.92 1.92 1.92 1.92 1.92 1.92 1.69 1.68 1.68 1.69 1.69 1.17
+  point run: 164 steps, 54 rejected, h in [3.28e-03, 6.68e-03], |F(Z0)| <= 2.53e-45
+  box run:   164 steps, 54 rejected, h in [3.28e-03, 6.68e-03], max state width 6.13e-10 (radius 1.0e-20)
+ PROVEN in 634.6s
+  a choreography of N=8 bodies in R^6, period 2pi, exists with initial state within 6.2e-20 (max norm) of the refined state,
+  the only zero of the shooting map in the slice box Z0 + Q[-r, r]^m, r = 1.0e-20; the bodies span R^6: verified; not a relative equilibrium: verified.
+  Krawczyk: |Y F| = 5.6e-44, contraction 5.44e-05, closure 2.54e-08; slice dim 74, 22 gauge generators;
+  164 validated Taylor steps (54 rejected), h in [3.3e-03, 6.7e-03], state width <= 6.1e-10
+  energy in [-3.22468709995885776058796e+01, -3.22468709995885775312482e+01]
+  action in [7.59798997734731805032019e+01, 7.59798997768746611810135e+01]
+record 2 (N=8 d=7 deff=6 action=68.425106290114):  iter 0: residual 1.341e-13  [0.5s]
+  refined to residual 4.96e-43 in 31.3s (388 bits, order 54, radius 1.0e-20, tol 1e-44)
+  conservation rows (6 translations, energy, 15 rotations), max entries: 1 1 1 1 1 1 19.6 2.72 2.72 2.72 2.72 2.72 2.3 2.3 2.3 2.3 0.679 0.679 0.679 0.361 0.359 0.361
+  point run: 196 steps, 65 rejected, h in [2.61e-03, 5.64e-03], |F(Z0)| <= 4.96e-43
+  box run:   196 steps, 65 rejected, h in [2.61e-03, 5.64e-03], max state width 6.76e-10 (radius 1.0e-20)
+ PROVEN in 799.6s
+  a choreography of N=8 bodies in R^6, period 2pi, exists with initial state within 6.6e-20 (max norm) of the refined state,
+  the only zero of the shooting map in the slice box Z0 + Q[-r, r]^m, r = 1.0e-20; the bodies span R^6: verified; not a relative equilibrium: verified.
+  Krawczyk: |Y F| = 8.4e-41, contraction 7.02e-04, closure 3.70e-08; slice dim 74, 22 gauge generators;
+  196 validated Taylor steps (65 rejected), h in [2.6e-03, 5.6e-03], state width <= 6.8e-10
+  energy in [-2.90405170604267412635680e+01, -2.90405170604267412087172e+01]
+  action in [6.84251062888950034588881e+01, 6.84251062913335584151544e+01]
+record 3 (N=8 d=7 deff=6 action=43.015354763785):  iter 0: residual 1.484e-15  [1.3s]
+  refined to residual 6.71e-49 in 78.5s (388 bits, order 54, radius 1.0e-20, tol 1e-44)
+  conservation rows (6 translations, energy, 15 rotations), max entries: 1 1 1 1 1 1 6.94 1.81 1.81 1.81 1.81 1.81 1.1 1.1 1.1 1.1 1.01 0.6 0.671 1.01 1.01 0.671
+  point run: 82 steps, 1 rejected, h in [3.83e-03, 1.13e-02], |F(Z0)| <= 2.59e-42
+  box run:   82 steps, 1 rejected, h in [3.83e-03, 1.13e-02], max state width 1.31e-14 (radius 1.0e-20)
+ PROVEN in 337.9s
+  a choreography of N=8 bodies in R^6, period 2pi, exists with initial state within 6.4e-20 (max norm) of the refined state,
+  the only zero of the shooting map in the slice box Z0 + Q[-r, r]^m, r = 1.0e-20; the bodies span R^6: verified; not a relative equilibrium: verified.
+  Krawczyk: |Y F| = 1.5e-41, contraction 5.06e-11, closure 7.79e-14; slice dim 74, 22 gauge generators;
+  82 validated Taylor steps (1 rejected), h in [3.8e-03, 1.1e-02], state width <= 1.3e-14
+  energy in [-1.82562835720210670094568e+01, -1.82562835720210669860454e+01]
+  action in [4.30153547637850254645453e+01, 4.30153547637850941128403e+01]
+record 4 (N=8 d=7 deff=5 action=53.313827828182):  iter 0: residual 3.721e-15  [0.7s]
+  refined to residual 1.02e-48 in 37.9s (388 bits, order 54, radius 1.0e-20, tol 1e-44)
+  conservation rows (5 translations, energy, 10 rotations), max entries: 1 1 1 1 1 9.71 1.84 1.84 1.84 1.84 1.84 1.84 1.84 1.11 1.11 1.03
+  point run: 65 steps, 1 rejected, h in [7.92e-03, 1.28e-02], |F(Z0)| <= 2.05e-40
+  box run:   65 steps, 1 rejected, h in [7.92e-03, 1.28e-02], max state width 2.70e-13 (radius 1.0e-20)
+ PROVEN in 182.5s
+  a choreography of N=8 bodies in R^5, period 2pi, exists with initial state within 6.4e-20 (max norm) of the refined state,
+  the only zero of the shooting map in the slice box Z0 + Q[-r, r]^m, r = 1.0e-20; the bodies span R^5: verified; not a relative equilibrium: verified.
+  Krawczyk: |Y F| = 7.7e-39, contraction 8.89e-09, closure 2.00e-12; slice dim 64, 16 gauge generators;
+  65 validated Taylor steps (1 rejected), h in [7.9e-03, 1.3e-02], state width <= 2.7e-13
+  energy in [-2.26270912906811321162964e+01, -2.26270912906811320823322e+01]
+  action in [5.33138278281811645137088e+01, 5.33138278281829916136647e+01]
+5 of 5 proven

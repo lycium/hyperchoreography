@@ -6,18 +6,13 @@ from manim import (VGroup, FadeIn, FadeOut, Create, UP, DOWN, LEFT, RIGHT,
 
 from expo import catalog, nbody, targets, theme as T
 from expo.base import ExpoScene
-from expo.mathtext import B, M, C, sb, sp, Crow
+from expo.mathtext import B, M, C, sb, sp, var, table
 from expo.plots import Plot
 from expo.viz import OrbitView, Projector, spin, tumble
 
 
 def ngon_frequencies(N: int):
-    """Transverse frequencies of the rotating N-gon, in units of the rotation rate.
-
-    Linearise the equations about the polygon and the motion across its plane
-    decouples into patterns numbered by k; each one has its own frequency, and the
-    formula is a finite sum over the other bodies.
-    """
+    """Transverse frequencies of the rotating N-gon, in units of the rotation rate."""
     R = sum(1.0 / (4.0 * np.sin(PI * k / N)) for k in range(1, N)) ** (1.0 / 3.0)
     dl = [2 * R * np.sin(PI * l / N) for l in range(N)]
     w = {}
@@ -35,13 +30,12 @@ class WhereStartsComeFrom(ExpoScene):
         self.say("Everything so far has been about what happens after the start. The "
                  "start turns out to matter more than any of it.")
 
-        stat = VGroup(
-            Crow("120 random low-mode starts, three bodies in a plane",
-              size=T.SZ_TINY, color=T.INK_DIM),
-            Crow("circle   82", size=T.SZ_BODY, color=T.INK),
-            Crow("eight    36", size=T.SZ_BODY, color=T.INK),
-            Crow("covers    2", size=T.SZ_BODY, color=T.INK),
-        ).arrange(DOWN, buff=0.26, aligned_edge=LEFT).move_to(UP * 1.0)
+        stat = table([("120 random low-mode starts, three bodies in a plane", ""),
+                      ("circle", "82"), ("eight", "36"), ("covers", "2")],
+                     align="lr",
+                     sizes=[T.SZ_TINY, T.SZ_BODY, T.SZ_BODY, T.SZ_BODY],
+                     colors=[T.INK_DIM, T.INK, T.INK, T.INK],
+                     col_buff=0.55, head_buff=0.10).move_to(UP * 1.0)
         self.play(FadeIn(stat), run_time=1.1)
         self.say("A hundred and twenty random starts in the plane give the circle, the "
                  "figure eight, and covers of the circle. Nothing else.")
@@ -53,7 +47,6 @@ class WhereStartsComeFrom(ExpoScene):
 
         self.wipe(run_time=1.0)
 
-        # ------------------------------------------------------------------
         P = nbody.Action(5, 3, 24)
         x = targets.circle_start(P, 1)
         x = x * P.optimal_scale(x)
@@ -67,7 +60,8 @@ class WhereStartsComeFrom(ExpoScene):
                       spin(view, 1.0), run_time=7.0)
 
         f = M("ω%s%s  =  ∑%s  ( 1 − cos 2π<i>kl</i>/<i>N</i> ) / <i>d</i>%s"
-              % (sb("k"), sp("2"), sb("<i>l</i> ≠ 0"), sb("<i>l</i>") + sp("3")),
+              % (sb(var("k")), sp("2"), sb(var("l") + " ≠ 0"),
+                 sb(var("l")) + sp("3")),
               size=0.46, color=T.GOLD).move_to(RIGHT * 3.1 + UP * 1.6)
         self.play(FadeIn(f), run_time=1.0)
         self.say_with("Linearise, and the wobble splits into independent patterns, one "
@@ -75,13 +69,15 @@ class WhereStartsComeFrom(ExpoScene):
                       "pattern has its own frequency, in closed form.",
                       spin(view, 1.0), run_time=10.0)
 
-        tab = VGroup(Crow("N   pattern   frequency", size=T.SZ_TINY, color=T.INK_DIM))
+        rows = [("N", "pattern", "frequency")]
         for N in (4, 5, 6, 7):
             _R, w = ngon_frequencies(N)
             best = max(w, key=lambda k: w[k])
-            tab.add(Crow("%-3d    k = %d      %.4f" % (N, best, w[best]),
-                      size=T.SZ_SMALL, color=T.INK))
-        tab.arrange(DOWN, buff=0.22, aligned_edge=LEFT)
+            rows.append(("%d" % N, "k = %d" % best, "%.4f" % w[best]))
+        tab = table(rows, align="rcr",
+                    sizes=[T.SZ_TINY] + [T.SZ_SMALL] * 4,
+                    colors=[T.INK_DIM] + [T.INK] * 4,
+                    col_buff=0.50, head_buff=0.12)
         tab.move_to(RIGHT * 3.1 + DOWN * 0.9)
         self.play(FadeIn(tab), run_time=1.1)
 
@@ -101,7 +97,6 @@ class WhereStartsComeFrom(ExpoScene):
 
         self.wipe(run_time=1.0)
 
-        # ------------------------------------------------------------------
         fam = [
             ("random", "low modes, random amplitudes"),
             ("torus", "a rotation in each of several orthogonal planes at once"),
@@ -111,12 +106,10 @@ class WhereStartsComeFrom(ExpoScene):
             ("kick", "a catalogued orbit, embedded and pushed along its softest "
                      "directions"),
         ]
-        rows = VGroup()
-        for name, desc in fam:
-            rows.add(VGroup(C(name, size=T.SZ_BODY, color=T.GOLD),
-                            B(desc, size=T.SZ_SMALL, color=T.INK_DIM))
-                     .arrange(RIGHT, buff=0.45, aligned_edge=DOWN))
-        rows.arrange(DOWN, buff=0.34, aligned_edge=LEFT).move_to(UP * 0.2)
+        tabf = table(fam, col_sizes=[T.SZ_BODY, T.SZ_SMALL],
+                     col_colors=[T.GOLD, T.INK_DIM], maker=[C, B],
+                     col_buff=0.80, row_buff=0.34).move_to(UP * 0.2)
+        rows = tabf
         self.say_with("There are six families of start in the program, and this "
                       "reasoning is behind most of them.",
                       FadeIn(rows[0], shift=RIGHT * 0.1), run_time=1.2)

@@ -1,0 +1,488 @@
+% Build: tectonic hyperchoreography.tex   (or pdflatex + bibtex)
+\documentclass[11pt]{amsart}
+\usepackage[a4paper,margin=26mm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,booktabs,array,url}
+\usepackage[hidelinks]{hyperref}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\so}{\mathfrak{so}}
+\newcommand{\act}{\mathcal{A}}
+\newcommand{\dd}{\,\mathrm{d}}
+\newcommand{\intv}[1]{[#1]}
+\newcommand{\deff}{d_{\mathrm{eff}}}
+\DeclareMathOperator{\spn}{span}
+\DeclareMathOperator{\SO}{SO}
+\DeclareMathOperator{\Orth}{O}
+\DeclareMathOperator{\Fix}{Fix}
+\DeclareMathOperator{\intr}{int}
+\DeclareMathOperator{\sgn}{sgn}
+
+\title[Choreographies of the $N$-body problem in dimension up to eleven]{Choreographies and relative choreographies of the equal-mass $N$-body problem in dimension up to eleven}
+\author{Thomas Ludwig}
+\thanks{Produced by an AI system directed by the author; see the authorship statement.}
+\email{thomas.ludwig@gmail.com}
+\date{September 2026}
+
+\begin{document}
+
+\begin{abstract}
+We consider periodic solutions of the Newtonian $N$-body problem with equal masses in $\R^d$ in which the bodies follow one another along a single closed curve, in an inertial frame (choreographies) or in a uniformly rotating one (relative choreographies). Newton's method on the gradient of the action in a Fourier basis, which reaches critical points of every Morse index, followed by certification of each candidate against the equations of motion by a shooting method, produced $1800$ records of such solutions, with configurations spanning spaces of every dimension from $2$ to $11$; among them are choreographies spanning $\R^6$ ($N=6,7,8$) and $\R^7$ ($N=10$), and relative choreographies spanning $\R^9$ ($N=10$) and $\R^{11}$ ($N=12$). These dimensions are reached through the starting loops, which are built on the resonances of the rotating regular $N$-gon, in frames whose rotation rates make several resonances sharp at once. For nineteen of the solutions existence is proved by interval arithmetic: Krawczyk's test on the shooting map, on a slice transversal to the symmetry group, with the dropped equations recovered from the conservation laws. They include the figure eight, three non-planar choreographies of three bodies, eight choreographies of ten bodies in $\R^3$, five choreographies of eight bodies spanning $\R^5$ and $\R^6$, and a relative choreography of twelve bodies spanning $\R^{11}$ that is not a relative equilibrium.
+\end{abstract}
+
+\maketitle
+
+\section*{Authorship}
+The programs, the proofs and the text of this paper were produced by Claude, an AI system made by Anthropic, in sessions directed by the author, who set the goals, suggested the twisted, rotating basis of Section~\ref{sec:frames}, pressed for higher dimensions, and required a search that could be spread over several computers (Section~\ref{sec:organisation}). Since neither arXiv nor the journals admit an AI system as an author, the author's name appears alone; the author is responsible for the content, of which the AI system is the principal contributor. Every statement is proved in the text or verified by the public programs, and the computer-assisted proofs can be re-run as described in Appendix~\ref{app:repro}.
+
+\section{Introduction}
+
+A \emph{choreography} of the $N$-body problem is a periodic solution in which $N$ bodies of equal mass follow one another along a single closed curve at equal time intervals. The rotating regular $N$-gon is the trivial example. The figure eight of three bodies, found numerically by Moore~\cite{Moore1993} and proved to exist by Chenciner and Montgomery~\cite{ChencinerMontgomery2000}, is the first non-trivial one; the name is due to Sim\'o, whose numerical explorations~\cite{Simo2001,Simo2002,CGMS2002} showed that planar choreographies exist in great abundance. The variational method behind the eight, minimisation of the action on loops with a prescribed symmetry, was developed into a general theory by Ferrario and Terracini~\cite{FerrarioTerracini2004}; Yu~\cite{Yu2017} proved that the number of planar simple choreographies grows exponentially with $N$, and Montaldi and Steckles~\cite{MontaldiSteckles2013} classified their symmetry groups. Barutello and Terracini~\cite{BarutelloTerracini2004} showed that the action restricted to simple choreographies attains its minimum at the rotating $N$-gon, so every other choreography is at best a local minimiser; in the catalogue below fewer than one record in twenty is a local minimiser.
+
+Outside the plane the known examples are sparser. The hip-hop of Chenciner and Venturelli~\cite{ChencinerVenturelli2000} and its generalisations~\cite{TerraciniVenturelli2007} are spatial periodic solutions of $2n$ bodies; Ferrario~\cite{Ferrario2006} classified the symmetry groups of the three-body problem in $\R^3$ that yield collision-free minimisers and obtained non-planar periodic orbits among them; Fusco, Gronchi and Negrini~\cite{FGN2011} found periodic solutions with the symmetry of a Platonic polyhedron. Chenciner and F\'ejoz~\cite{ChencinerFejoz2005,ChencinerFejoz2009} observed that the vertical variational equation of a planar relative equilibrium, put in resonance with a rotating frame, is a source of periodic solutions: the vertical Lyapunov families of the regular $N$-gon, continued in the rotating frame, consist of non-planar solutions which are choreographies in that frame---\emph{relative choreographies}, in the terminology of~\cite{Chenciner2002ICM,CFM2005}---and, when the rotation is commensurable with the period, in the inertial frame as well. Marchal's family $P_{12}$~\cite{Marchal2000}, which joins the Lagrange triangle to the figure eight~\cite{CGHLM2024}, and the rotating eights of~\cite{CFM2005} are three-body instances; Garc\'{\i}a-Azpeitia and Ize~\cite{GarciaAzpeitiaIze2013} proved the global bifurcation of these families from the polygon, and Calleja, Doedel and Garc\'{\i}a-Azpeitia~\cite{CDG2018} followed them numerically and identified the choreographies among them. Computer-assisted existence proofs have been given for planar choreographies by Kapela, Zgliczy\'nski and Sim\'o~\cite{KapelaZgliczynski2003,KapelaSimo2007} and, in $\R^3$, for choreographies with the topology of torus knots by Calleja, Garc\'{\i}a-Azpeitia, Lessard and Mireles James~\cite{CGLM2021}. In dimension four and above, the only periodic solutions we have found in the literature are relative equilibria~\cite{AlbouyChenciner1998}.
+
+This paper reports on a systematic computation of choreographies and relative choreographies in $\R^d$ for $2\le d\le11$, with three aims: to find solutions whose configurations span $\R^d$ for $d$ as large as possible; to certify every solution against the equations of motion; and to turn a selection of them into theorems by interval arithmetic. The search is variational in a Fourier basis, but it does not minimise: Newton's method on the gradient of the action reaches critical points of every Morse index. It differs from earlier computations mainly in the starting loops, which are built from several simultaneous resonances of the rotating $N$-gon, and in the use of rotating frames whose rates are chosen to make those resonances sharp (Section~\ref{sec:structure}); the existence proofs treat every $N$, $d$ and frame by one argument (Section~\ref{sec:proofs}).
+
+\subsection*{Results}
+Write $Q=(Q_0,\dots,Q_{N-1})$ for the positions of $N$ unit masses in $\R^d$, let $\Omega\in\so(d)$, and let $T=2\pi$. A \emph{relative choreography with frame} $\Omega$ is a collision-free solution of the form $Q_j(t)=e^{t\Omega}q(t+jT/N)$ for a $T$-periodic loop $q$ (Definition~\ref{def:chor}); when $\Omega=0$ it is a choreography. All frames below have integer rotation rates, so every solution is $2\pi$-periodic in the inertial frame as well. The \emph{span dimension} $\deff$ of a solution is the dimension of the space spanned by the differences $Q_i(t)-Q_j(t)$ over all $i$, $j$ and $t$.
+
+\begin{theorem}\label{thm:main}
+The following collision-free periodic solutions of the Newtonian $N$-body problem with equal masses exist. In each case the initial state lies within $2\cdot10^{-19}$, in maximum norm, of a reference state, obtained from the catalogued state (Section~\ref{sec:catalogue}) by Newton refinement in $40$-digit arithmetic, which moves it by less than $10^{-11}$; it is the only zero of the shooting map~\eqref{eq:shooting} in a box of a slice transversal to the symmetry group; the motion is not rigid; and the leading digits of the energy and of the action are those of Table~\ref{tab:proven}.
+\begin{enumerate}
+\item Five choreographies of $N=3$ bodies: the figure eight, a second planar one, and three whose configurations span $\R^3$.
+\item Eight choreographies of $N=10$ bodies whose configurations span $\R^3$.
+\item Five choreographies of $N=8$ bodies, four of which span $\R^6$ and one $\R^5$.
+\item A relative choreography of $N=12$ bodies whose configurations span $\R^{11}$, in the frame $\Omega$ that rotates five mutually orthogonal planes at the rates $1,2,3,4,5$ and fixes the remaining axis.
+\end{enumerate}
+\end{theorem}
+
+The proofs are computer-assisted; Proposition~\ref{prop:krawczyk} states what is verified and why it implies the theorem. The numerical catalogue of which these nineteen solutions are a sample is described in Section~\ref{sec:catalogue}: $1800$ records, all certified in double precision against the equations of motion to a relative residual of order $10^{-12}$, with span dimensions taking every value from $2$ to $11$.
+
+Three facts, none of them new in substance, organise the search; we state them in the form in which they are used, with short proofs. The first (Proposition~\ref{prop:strata}) is the fixed-point-subspace property of equivariant maps: for any orthogonal involution $\sigma$ of $\R^d$ preserving the action, the loops with values in $\Fix\sigma$ form an invariant set of every equivariant iteration, and Newton's method contracts the transversal component of a loop near such a stratum by a factor that vanishes with the distance to the stratum, whatever the transversal Morse index. Since a reflection fixing $\R^r\subset\R^d$ preserves the action when $\Omega=0$, this explains why unstructured searches in $\R^d$ return planar and low-dimensional solutions: they enter a stratum and never leave it. The second (Proposition~\ref{prop:ngon}) is the linear spectrum of the rotating regular $N$-gon: its vertical part is the variational equation of Chenciner and F\'ejoz~\cite{ChencinerFejoz2005}, and its planar part goes back to Maxwell~\cite{Maxwell1859} and, for the polygon without a central mass, to Moeckel~\cite{Moeckel1995}. The starting loops are built from its resonances. The third (Proposition~\ref{prop:jet}) is an identity for the moments $A_k[q]=\frac1{2\pi}\oint q\wedge q'\wedge\dots\wedge q^{(k-1)}\dd t\in\Lambda^k\R^d$ of a loop: in terms of its complex Fourier coefficients $z_n$,
+\[
+A_k[q]=i^{k(k-1)/2}\sum_{\substack{n_1<\dots<n_k\\ n_1+\dots+n_k=0}}\prod_{r<s}(n_s-n_r)\; z_{n_1}\wedge\dots\wedge z_{n_k},
+\]
+so that the moment vanishes unless the loop carries $k$ distinct frequencies summing to zero. Its pairing with the associative $3$-form of $\R^7$, maximised over $\Orth(d)$, is the invariant used to rank solutions in dimension seven and above.
+
+\subsection*{Scope}
+Linear stability is not computed; the catalogue records the Morse index of the action, a different quantity. The proofs are for the Newtonian potential only. The identification of records that represent the same solution is a numerical heuristic (Section~\ref{sec:cert}), so the number of distinct solutions in the catalogue is somewhat smaller than the number of records.
+
+\subsection*{Reproducibility}
+The programs, the catalogue and the proof certificates are in the repository \url{https://github.com/lycium/hyperchoreography}; every proof of Theorem~\ref{thm:main} is re-run by the commands of Appendix~\ref{app:repro}.
+
+\section{Setting}\label{sec:setting}
+
+Let $N\ge3$, $d\ge2$, and let $Q_j\in\R^d$, $j\in\Z/N\Z$, be the positions of $N$ bodies of unit mass. For $\alpha>0$ put
+\[
+U(Q)=\sum_{i<j}|Q_i-Q_j|^{-\alpha},\qquad L(Q,\dot Q)=\tfrac12\sum_j|\dot Q_j|^2+U(Q),
+\]
+so that the equations of motion $\ddot Q_j=\partial U/\partial Q_j$ are attractive; $\alpha=1$ is the Newtonian case with the gravitational constant equal to one. The energy $E=\frac12\sum|\dot Q_j|^2-U$, the momentum $P=\sum\dot Q_j$ and the angular momentum $\Lambda=\sum Q_j\wedge\dot Q_j\in\Lambda^2\R^d\cong\so(d)$ are conserved. If $Q(t)$ is a solution, so is $\lambda Q(\lambda^{-(\alpha+2)/2}t)$ for every $\lambda>0$, so a periodic solution can be normalised to period $T=2\pi$; we do so throughout. Only $\alpha=1$ is used in the proofs.
+
+\begin{definition}\label{def:chor}
+Let $\Omega\in\so(d)$ and $G=e^{T\Omega/N}$. A \emph{relative choreography with frame} $\Omega$ is a collision-free solution of the form
+\begin{equation}\label{eq:ansatz}
+Q_j(t)=e^{t\Omega}\,q(t+jT/N),\qquad j\in\Z/N\Z,
+\end{equation}
+where $q\colon\R/T\Z\to\R^d$ is a smooth loop. If $\Omega=0$ it is a \emph{choreography}.
+\end{definition}
+
+Evaluating~\eqref{eq:ansatz} at $t+T/N$ gives $Q_j(t+T/N)=G\,Q_{j+1}(t)$: after the time $T/N$ and up to the fixed rotation $G$, each body has taken the place of the next. The bodies move on congruent curves, and on the same curve when $G=1$. A skew matrix $\Omega$ has rotation rates $w_1,\dots,w_{\lfloor d/2\rfloor}$ (its eigenvalues are $\pm iw_p$, and $0$ if $d$ is odd), and $Q(t+T)=e^{T\Omega}Q(t)$; the solution is $T$-periodic in the inertial frame if $e^{T\Omega}=1$, that is, if every $w_p$ is an integer, and, when its span is $\R^d$, only then. Replacing $\Omega$ by $\Omega+\Omega'$ with $\Omega'$ commuting with $\Omega$ and with rates in $N\Z$ leaves $G$ and the solution unchanged and replaces $q(t)$ by $e^{-t\Omega'}q(t)$; the loop is determined by the solution only up to this gauge, and a choreography is also a relative choreography with respect to any frame whose rates lie in $N\Z$.
+
+The \emph{span} of a solution is $V=\spn\{Q_i(t)-Q_j(t): i,j,t\}$ and its dimension is the \emph{span dimension} $\deff$. For a periodic solution the centre of mass is fixed, and $V$ is the span of the positions once the centre of mass is placed at the origin; $\deff$ is invariant under isometries and does not depend on the ambient $d$ in which the solution is written. A solution all of whose mutual distances are constant is a rigid motion; by Albouy and Chenciner~\cite{AlbouyChenciner1998} such a motion is a relative equilibrium $Q(t)=e^{t\Omega'}Q(0)$. Those relative equilibria whose configuration is an orbit of a cyclic group inside a torus of $\SO(d)$---the rotating $N$-gon, or in $\R^4$ a configuration rotating in two orthogonal planes at commensurable rates---are relative choreographies in the sense of Definition~\ref{def:chor}. They can have span dimension up to $d$ and appear in large numbers in any search; we exclude them.
+
+Two solutions are regarded as the same if they differ by a time shift, a time reversal, an isometry of $\R^d$ or a relabelling of the bodies; a $k$-fold traversal of a loop is identified with the loop.
+
+\subsection{The reduced action}
+The ansatz~\eqref{eq:ansatz} reduces the action of $N$ bodies to a functional of the single loop $q$.
+
+\begin{lemma}\label{lem:reduced}
+For a $T$-periodic loop $q$ and $Q$ defined by~\eqref{eq:ansatz},
+\[
+\int_0^T L(Q,\dot Q)\dd t=N\,\act_\Omega[q],\qquad
+\act_\Omega[q]=\int_0^T\Big(\tfrac12|\dot q+\Omega q|^2+\tfrac12\sum_{k=1}^{N-1}\big|q(t)-q(t+kT/N)\big|^{-\alpha}\Big)\dd t.
+\]
+If $e^{T\Omega}=1$, every collision-free critical point of $\act_\Omega$ on $H^1(\R/T\Z,\R^d)$ defines through~\eqref{eq:ansatz} a relative choreography with frame $\Omega$.
+\end{lemma}
+
+\begin{proof}
+Since $\dot Q_j=e^{t\Omega}(\dot q+\Omega q)(t+jT/N)$ and $e^{t\Omega}$ is orthogonal, $\frac12\sum_j\int_0^T|\dot Q_j|^2=N\int_0^T\frac12|\dot q+\Omega q|^2$. Likewise $|Q_i-Q_j|=|q(t+iT/N)-q(t+jT/N)|$, and writing $\sum_{i<j}=\frac12\sum_i\sum_{k\ne0}$ with $j=i+k$ and substituting $s=t+iT/N$ in each term gives $N\cdot\frac12\sum_{k=1}^{N-1}\int_0^T|q(s)-q(s+kT/N)|^{-\alpha}\dd s$. For the second statement let $g$ act on $T$-periodic $N$-body loops by $(gQ)_j(t)=G\,Q_{j+1}(t-T/N)$. Then $g$ is a linear isometry of $H^1$; it preserves the action, because $L$ is invariant under rotations and relabellings and the action under time shifts; $g^N=1$ because $e^{T\Omega}=1$; and $\Fix g$ is the set of loops of the form~\eqref{eq:ansatz}. By the principle of symmetric criticality~\cite{Palais1979}, applied as in~\cite{FerrarioTerracini2004}, a critical point of the action restricted to $\Fix g$ is a critical point of the action, hence a solution.
+\end{proof}
+
+The potential term of $\act_\Omega$ is that of the inertial problem; only the kinetic term sees the frame. The shifts $k$ and $N-k$ contribute equally (substitute $s=t+kT/N$), so only $\lfloor N/2\rfloor$ shifts need be evaluated. For $\alpha=1$ the Lagrange--Jacobi identity gives $\langle\tfrac12\sum|\dot Q_j|^2\rangle=\tfrac12\langle U\rangle$ over a period, hence
+\begin{equation}\label{eq:virial}
+N\act_\Omega[q]+6\pi E=0
+\end{equation}
+for every relative choreography, which we use as an independent check on every computed action.
+
+\subsection{Fourier representation}
+Write $q(t)=\sum_{m\ge1}(c_m\cos mt+s_m\sin mt)$ with $c_m,s_m\in\R^d$. Then $\sum_jq(t+jT/N)=N\sum_{m\in N\Z}(c_m\cos mt+s_m\sin mt)$: the modes with $m\equiv0\pmod N$ describe the centre of mass; they do not enter the mutual distances, and the kinetic form $\frac12\int|\dot q+\Omega q|^2$ is block diagonal over modes, so they may be omitted, which places the centre of mass at the origin. Per mode $m$ the kinetic form has, with respect to $(c_m,s_m)\in\R^{2d}$, the Hessian
+\begin{equation}\label{eq:kinblock}
+\pi\begin{pmatrix} m^2-\Omega^2 & -2m\Omega\\ 2m\Omega & m^2-\Omega^2\end{pmatrix},
+\end{equation}
+which reduces to $\pi m^2$ when $\Omega=0$. For a collision-free loop the potential term is a smooth periodic function of $t$, and the trapezoidal rule integrates it with geometric convergence.
+
+\section{Three structural facts}\label{sec:structure}
+
+\subsection{Fixed-point subspaces}
+Let $X$ be a finite-dimensional Euclidean space (below, the Fourier coefficients of a loop in $\R^d$, restricted to finitely many modes), let $\sigma\in\Orth(X)$ be an involution with eigenspaces $X=X_+\oplus X_-$, and write $x=(x_+,x_-)$. Let $f\colon X\to\R$ be smooth with $f\circ\sigma=f$, and $H=\nabla^2f$. The first two statements below are the fixed-point-subspace property familiar from equivariant bifurcation theory~\cite{GSS1988}; the third is the estimate we need.
+
+\begin{proposition}\label{prop:strata}
+\begin{enumerate}
+\item $\nabla f(\sigma x)=\sigma\nabla f(x)$ and $H(\sigma x)=\sigma H(x)\sigma$; in particular $\nabla f$ maps $X_+$ into $X_+$, and at $x\in X_+$ the Hessian is block diagonal with respect to $X_+\oplus X_-$.
+\item Every iteration $x\mapsto x+\Phi(x)$ with $\Phi(\sigma x)=\sigma\Phi(x)$ leaves $X_+$ invariant.
+\item The transversal component $g_-(x_+,x_-):=P_{X_-}\nabla f(x)$ is odd in $x_-$, so $g_-(x_+,x_-)=H_{--}(x_+,0)\,x_-+O(|x_-|^3)$. For Newton's method $x'=x-H(x)^{-1}\nabla f(x)$, wherever $H_{--}(x_+,0)$ is invertible,
+\[
+x_-'=O\big(|x_-|^3+|x_-|\,|\delta_+|\big),\qquad \delta_+:=(x'-x)_+ .
+\]
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+Differentiating $f(\sigma x)=f(x)$ gives $\sigma\nabla f(\sigma x)=\nabla f(x)$, using $\sigma^{\mathsf T}=\sigma$, and differentiating again gives $\sigma H(\sigma x)\sigma=H(x)$. If $x\in X_+$ then $\sigma x=x$, so $\nabla f(x)=\sigma\nabla f(x)\in X_+$ and $H(x)$ commutes with $\sigma$, which is the block structure. Statement (2) is immediate from $\Phi(x)=\sigma\Phi(x)$ for $x\in X_+$. For (3), $g_-(\sigma x)=P_{X_-}\sigma\nabla f(x)=-g_-(x)$ while $\sigma x=(x_+,-x_-)$, so the Taylor expansion of $g_-$ in $x_-$ has only odd terms, with linear term $\partial_{x_-}g_-(x_+,0)=H_{--}(x_+,0)$. In the same way $H_{-+}$ is odd in $x_-$, hence $O(|x_-|)$, and $H_{--}$ is even, hence $H_{--}(x)=H_{--}(x_+,0)+O(|x_-|^2)$. The second block row of $H\delta=-\nabla f$ for the Newton step $\delta$ reads $\delta_-=-H_{--}^{-1}(g_-+H_{-+}\delta_+)=-x_-+O(|x_-|^3)+O(|x_-||\delta_+|)$, and $x_-'=x_-+\delta_-$.
+\end{proof}
+
+The gradient and Hessian of $\act_\Omega$ restricted to finitely many modes and discretised by the trapezoidal rule at the nodes $2\pi j/M$, $N\mid M$, satisfy the hypotheses for every $\sigma$ of the form $\sigma q=Rq$ with $R\in\Orth(d)$ an involution and $R\Omega R^{\mathsf T}=\Omega$, because the discretised functional is exactly $R$-invariant. When $\Omega=0$ this includes the reflection in every coordinate subspace $\R^r\subset\R^d$, whose fixed loops are the loops in $\R^r$. Such a stratum can be entered by a descent or Newton iteration (in floating point, once the transversal component falls below the working precision) but never left, and near it Newton's method damps the transversal coordinate whatever the transversal inertia, whereas a gradient descent is repelled by a transversally unstable critical point. In our experiments roughly half of the starting loops in general position in $\R^d$ were still $d$-dimensional after the descent phase and well under one percent after the Newton phase, and perturbing a converged low-dimensional solution along soft or unstable directions of its Hessian and iterating again never produced a solution of higher span dimension in several thousand trials. The starting loops decide the span dimension of what is found.
+
+\subsection{The rotating regular \texorpdfstring{$N$}{N}-gon}
+Let the $N$ bodies form a regular $N$-gon of radius $R$ in a plane, rotating uniformly at unit angular velocity, so that the period is $2\pi$. With $d_p=2R\sin(\pi p/N)$ the distance between bodies $p$ apart, put
+\[
+g_p=\frac{\alpha}{d_p^{\alpha+2}},\qquad C_k=\sum_{p=1}^{N-1}g_p\cos\frac{2\pi kp}{N}\quad(k\in\Z),
+\]
+so that $C_k=C_{-k}=C_{N-k}$. The equilibrium condition, centripetal force equal to attraction, is
+\begin{equation}\label{eq:radius}
+C_0-C_1=1,\qquad\text{equivalently}\qquad R^{\alpha+2}=\sum_{p=1}^{N-1}\frac{\alpha\sin(\pi p/N)}{(2\sin(\pi p/N))^{\alpha+1}} .
+\end{equation}
+The following linear analysis is classical: part (1) is the vertical variational equation of~\cite{ChencinerFejoz2005,ChencinerFejoz2009}, and part (2) is the ring analysis of Maxwell~\cite{Maxwell1859} in the form given by Moeckel~\cite{Moeckel1995} for the polygon without a central mass. We include the short derivation because the search is built on the numbers it produces.
+
+\begin{proposition}\label{prop:ngon}
+Linearise the equations of motion about the $N$-gon in the frame rotating with it, and decompose the perturbation of body $j$ into components along $e^{2\pi ikj/N}$, $k\in\Z/N\Z$.
+\begin{enumerate}
+\item Each direction orthogonal to the plane of the polygon carries, for every $k$, a harmonic oscillator of frequency $\omega_k$ with
+\[
+\omega_k^2=C_0-C_k;\qquad\omega_0=0,\ \omega_1=1,\ \omega_k=\omega_{N-k}.
+\]
+\item In the plane, the frequencies $\nu$ of the pattern $k$ are the real roots of
+\begin{equation}\label{eq:quartic}
+(\nu^2+2\nu+A_k)(\nu^2-2\nu+B_k)-b_k^2=0,
+\end{equation}
+where $A_k=1+\tfrac\alpha2(C_0-C_{k+1})$, $B_k=1+\tfrac\alpha2(C_0-C_{k-1})$ and $b_k=\tfrac{\alpha+2}2(C_1-C_k)$. For $k=0$ the roots are $0,0,\pm\sqrt{2-\alpha}$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+Let $Q_j=e^{tJ}q_j$ with $J$ the rotation generator of the plane, so that $\ddot q_j+2J\dot q_j-q_j=\partial U/\partial q_j$ in the rotating frame; identify the plane with $\C$, so that $J$ is multiplication by $i$, and let $q_j=Re^{i\theta_j}$, $\theta_j=2\pi j/N$, be the equilibrium. Write $\partial U/\partial q_j=\sum_{l\ne j}f(q_j-q_l)$ with $f(r)=-\alpha|r|^{-\alpha-2}r$, whose derivative is $Df(r)\,z=-\alpha|r|^{-\alpha-2}\big(z-(\alpha+2)\hat r\langle\hat r,z\rangle\big)$, $\hat r=r/|r|$.
+
+Out of the plane, a perturbation $\zeta_j$ along a fixed unit vector orthogonal to the plane obeys $\ddot\zeta_j=-\sum_{l\ne j}g_{l-j}(\zeta_j-\zeta_l)$: the transversal component of $f(r+\zeta)$ is $-\alpha|r|^{-\alpha-2}\zeta$ to first order, and the Coriolis and centrifugal terms act in the plane. Substituting $\zeta_j=\zeta e^{ik\theta_j}$ gives $\ddot\zeta=-\zeta\sum_{p\ne0}g_p(1-e^{2\pi ikp/N})=-(C_0-C_k)\zeta$, the sine part cancelling by the symmetry $p\leftrightarrow N-p$. The values $\omega_0=0$ and $\omega_1^2=C_0-C_1=1$ are the transversal translation and the tilt of the plane.
+
+In the plane, write the perturbation of body $j$ in its own radial--tangential frame, $\delta q_j=e^{i\theta_j}\eta_j$ with $\eta_j\in\C$. For a unit complex number $\hat r$, $\langle\hat r,z\rangle=\operatorname{Re}(\bar{\hat r}z)$, so $Df(r)z=g\big(\tfrac\alpha2 z+\tfrac{\alpha+2}2\hat r^2\bar z\big)$ with $g=\alpha|r|^{-\alpha-2}$. For the $N$-gon, $q_j-q_l=-2iR\,e^{i(\theta_j+\theta_l)/2}\sin\frac{\theta_l-\theta_j}2$, hence $\hat r^2=-e^{i(\theta_j+\theta_l)}$. With $\varphi_p=2\pi p/N$ and $l=j+p$ the linearised equation in the local frame is
+\[
+\ddot\eta_j+2i\dot\eta_j-\eta_j=\sum_{p\ne0}g_p\Big(\tfrac\alpha2\big(\eta_j-e^{i\varphi_p}\eta_{j+p}\big)-\tfrac{\alpha+2}2\big(e^{i\varphi_p}\bar\eta_j-\bar\eta_{j+p}\big)\Big).
+\]
+It couples $\eta$ and $\bar\eta$, so substitute $\eta_j=e^{ik\theta_j}\xi_1+e^{-ik\theta_j}\xi_2$. Collecting the coefficients of $e^{ik\theta_j}$ and of $e^{-ik\theta_j}$, with $\sum_pg_pe^{im\varphi_p}=C_m$, gives for $x=\xi_1$ and $y=\bar\xi_2$
+\[
+\ddot x+2i\dot x-x=\tfrac\alpha2(C_0-C_{k+1})x-b_k\,y,\qquad \ddot y-2i\dot y-y=\tfrac\alpha2(C_0-C_{k-1})y-b_k\,x .
+\]
+With $x,y\propto e^{i\nu t}$ this is $(\nu^2+2\nu+A_k)x=b_ky$, $(\nu^2-2\nu+B_k)y=b_kx$, whose determinant is~\eqref{eq:quartic}. For $k=0$, $A_0=B_0=1+\alpha/2$ and $b_0=-(\alpha+2)/2$ by~\eqref{eq:radius}, and~\eqref{eq:quartic} becomes $\nu^2(\nu^2+\alpha-2)=0$.
+\end{proof}
+
+The roots for $k=0$ are the two zero modes of the rotation and the radial Kepler frequency, $\pm1$ for $\alpha=1$; the patterns $k=1$ and $k=N-1$ carry the free translations, $\nu=1$ and $\nu=-1$. Replacing $k$ by $-k$ replaces $\nu$ by $-\nu$. For $\alpha=1$ and $2\le k\le\lfloor N/2\rfloor$, \eqref{eq:quartic} has a pair of non-real roots for every $N\le24$, the instability of the ring of equal masses~\cite{Maxwell1859,Moeckel1995}, and a pair of real roots as well at $N=6$, $k=3$, at $N=7$, $k=2,3$, and for every such $k$ when $8\le N\le24$; each real root is a resonance on which a starting loop can be built.
+
+\begin{corollary}\label{cor:resonance}
+Let $m_1\ge1$ be coprime to $N$ and let $q(t)=\rho(\cos m_1t,\sin m_1t,0,\dots)$ with $\rho=Rm_1^{-2/(\alpha+2)}$ be the $m_1$-fold cover of the $N$-gon, a choreography of period $2\pi$. On the transversal modes $c_m\cos mt+s_m\sin mt$, $m\not\equiv0\pmod N$, with $c_m,s_m$ orthogonal to the plane, the Hessian of $\act_0$ is diagonal with eigenvalues $\pi\big(m^2-m_1^2\omega_k^2\big)$, where $k\equiv m\,m_1^{-1}\pmod N$.
+\end{corollary}
+
+\begin{proof}
+The scaling of Section~\ref{sec:setting} takes the $N$-gon of angular velocity $1$ to that of angular velocity $m_1$, whose transversal oscillators have frequencies $m_1\omega_k$. On the cover, body $j$ sits at polygon angle $2\pi jm_1/N$, so a transversal loop mode $\cos m(t+2\pi j/N)$ assigns to the body at polygon position $l\equiv jm_1$ the phase $2\pi l\,m_1^{-1}m/N$, i.e.\ the pattern $k\equiv mm_1^{-1}$. The second variation of $\frac12\int(\dot\zeta^2-m_1^2\omega_k^2\zeta^2)$ on $\cos mt$ is $\pi(m^2-m_1^2\omega_k^2)$.
+\end{proof}
+
+A transversal eigenvalue near zero is the bifurcation of a vertical Lyapunov family off the cover, the situation of~\cite{ChencinerFejoz2005,ChencinerFejoz2009,GarciaAzpeitiaIze2013,CDG2018}. The condition $m/m_1\approx\omega_k$ with $m\equiv km_1\pmod N$ is what the \emph{vertical} starting loops of Section~\ref{sec:search} realise in the Fourier basis, and $m/m_1\approx1\pm\nu$ with $k\equiv mm_1^{-1}-1$ the \emph{in-plane} ones. Two consequences shaped the computation. Since $m$ must lie in a residue class modulo $N$, a resonance can be sharpened only by deep covers, $|m/m_1-\omega_k|\le N/2m_1$, which cost many Fourier modes. And a loop mode $c_m\cos mt+s_m\sin mt$ spans at most a plane of transversal directions, however many are available, so a loop assembled from the $N$-gon and one resonant transversal mode for each of $j$ patterns has span dimension at most $2+2j$; with the $\lfloor N/2\rfloor-1$ patterns $k=2,\dots,\lfloor N/2\rfloor$ this gives $2\lfloor N/2\rfloor$ for starting loops of this type. The catalogue respects this bound at every $N\ge4$, though we know no reason why it should hold for solutions not of this type; at $N=3$ it is violated by the non-planar three-body choreographies of Theorem~\ref{thm:main}, which do not arise from the $N$-gon in this way.
+
+\subsection{Rotating frames}\label{sec:frames}
+Corollary~\ref{cor:resonance} is stated for $\Omega=0$. In a frame $\Omega$ with rate $w_p$ on the plane $p$, the same computation replaces $m^2$ by $(m\pm w_p)^2$ for the circularly polarised modes of that plane: the frame shifts the resonance targets continuously, so several resonances can be made sharp at small $m_1$ where the inertial problem would need a deep cover. This is why the searches in dimension seven and above were run in rotating frames. The twisted, rotating basis was the author's suggestion, and it is what opened those dimensions: an inertial search in $\R^8$ found nothing in $6\cdot10^4$ trials, a rotating frame six solutions in $9\cdot10^3$. Frames with the same multiset of rates are conjugate under $\Orth(d)$, and so are their functionals; the starting loops, built in coordinate planes, are not conjugated with them, so the choice among such frames was made by experiment, and the frames used are listed in Section~\ref{sec:catalogue}. In dimension $d\ge7$ they were taken in the maximal torus of the stabiliser $\mathfrak g_2\oplus\so(d-7)$ of the associative $3$-form $\varphi$ of $\R^7$~\cite{HarveyLawson1982}, extended by zero to $\R^d$: rates $(p,q,p+q)$ on the three planes of the Fourier decomposition of the $7$-cycle $e_i\mapsto e_{i+1}$ of $\R^7$, and one free rate on each further coordinate plane. Such a frame preserves $\varphi$, so the invariant of the next paragraph is constant along the frame's action. The choice is a heuristic; the theorems do not depend on it, and the frame of Theorem~\ref{thm:main}(4) is described by its rates $(1,2,3,4,5)$ alone.
+
+\subsection{Moments of a loop}
+For a smooth loop $q\colon\R/2\pi\Z\to\R^d$ and $1\le k\le d$ define
+\[
+A_k[q]=\frac1{2\pi}\oint q\wedge q'\wedge\dots\wedge q^{(k-1)}\dd t\ \in\ \Lambda^k\R^d .
+\]
+It is $\Orth(d)$-equivariant, $A_k[Rq]=(\Lambda^kR)A_k[q]$, invariant under time shifts, and zero when $q$ takes values in a $(k-1)$-dimensional subspace. Write $q(t)=\sum_{n\in\Z\setminus\{0\}}z_ne^{int}$ with $z_{-n}=\bar z_n\in\C^d$ (the constant term vanishes for a loop with centre of mass at the origin).
+
+\begin{proposition}\label{prop:jet}
+\[
+A_k[q]=i^{k(k-1)/2}\sum_{\substack{n_1<\dots<n_k\\ n_1+\dots+n_k=0}}V(n_1,\dots,n_k)\;z_{n_1}\wedge\dots\wedge z_{n_k},\qquad V(n)=\prod_{r<s}(n_s-n_r).
+\]
+In particular $A_k[q]=0$ unless $q$ carries $k$ distinct frequencies (positive or negative) summing to zero. If moreover $q(-t+\theta)=Rq(t)$ for some $\theta$ and $R\in\Orth(d)$, then $(\Lambda^kR)A_k[q]=(-1)^{k(k-1)/2}A_k[q]$.
+\end{proposition}
+
+\begin{proof}
+Since $q^{(r)}=\sum_n(in)^rz_ne^{int}$,
+\[
+A_k[q]=\sum_{n_1,\dots,n_k}\Big(\prod_{r=1}^k(in_r)^{r-1}\Big)\frac1{2\pi}\oint e^{i(n_1+\dots+n_k)t}\dd t\; z_{n_1}\wedge\dots\wedge z_{n_k},
+\]
+and the integral is $1$ if $\sum n_r=0$ and $0$ otherwise. A tuple with a repeated entry contributes nothing, the same vector appearing twice in the wedge. Group the remaining tuples by their underlying set $\{n_1<\dots<n_k\}$: the permutation $\pi$ of that set contributes $\sgn(\pi)\prod_r(in_{\pi(r)})^{r-1}\,z_{n_1}\wedge\dots\wedge z_{n_k}$, and $\sum_\pi\sgn(\pi)\prod_rn_{\pi(r)}^{r-1}=\det(n_j^{r-1})_{r,j}=V(n)$. The powers of $i$ multiply to $i^{0+1+\dots+(k-1)}$. For the last statement, $t\mapsto q(-t+\theta)$ has coefficients $\bar z_ne^{-in\theta}$ and $Rq$ has coefficients $Rz_n$, so $Rz_n=\bar z_ne^{-in\theta}$ for all $n$. Applying $\Lambda^kR$ to the formula and using $\sum n_r=0$ gives $(\Lambda^kR)A_k=i^{k(k-1)/2}\,\overline W$ with $W=\sum V(n)z_{n_1}\wedge\dots\wedge z_{n_k}$, while $A_k$ is real, so $A_k=\overline{A_k}=(-i)^{k(k-1)/2}\overline W$; hence $(\Lambda^kR)A_k=i^{k(k-1)}A_k$.
+\end{proof}
+
+For a relative equilibrium in a frame with generic rates the loop carries one pair of frequencies $\pm w_p$ per plane, and no odd number of them sums to zero, so $A_k=0$ for odd $k$; for $k=3$ a time-reversal symmetry whose $R$ fixes $A_3$ also forces $A_3=0$, whereas for $k=4$ it costs nothing. Given a $k$-form $\psi$ on $\R^d$ whose stabiliser is a proper subgroup of $\SO(d)$ (the associative $3$-form for $d=7$, the Cayley $4$-form for $d=8$, $\operatorname{Re}(dz_1\wedge\dots\wedge dz_{d/2})$ for even $d$), the number
+\[
+\chi^*_\psi[q]=\max_{R\in\Orth(d)}\big\langle A_k[q],(\Lambda^kR)\psi\big\rangle
+\]
+is an invariant of the solution under the whole equivalence of Section~\ref{sec:setting}, vanishes when $\deff<k$, and, unlike an $\Orth(d)$-invariant of $A_k$ alone, sees whether the moment is aligned with $\psi$. It is not invariant under the frame gauge of Definition~\ref{def:chor}, and the catalogue stores it as a ranking aid within a frame only.
+
+\section{The search and the certification}\label{sec:search}
+
+\subsection{Discretisation and critical points}
+A loop is represented by its Fourier coefficients $x=(c_m,s_m)_{m\le K,\,m\not\equiv0\,(N)}\in\R^n$, $n=2d\,\#\{m\}$. The potential term of $\act_\Omega$ is integrated by the trapezoidal rule with $M$ nodes, $N\mid M$, $M\approx8K$, so that the shifts $t\mapsto t+kT/N$ are node shifts. The value, gradient, Hessian--vector product and full Hessian of the discretised functional $\act_{\Omega,M}$ are computed in closed form; the full Hessian, which dominates the cost in high dimension, is assembled from $d(d+1)/2$ discrete Fourier transforms of length $M$ by the identity of Appendix~\ref{app:hessian}.
+
+Every trial starts from a loop chosen by one of the recipes below, rescaled to the size at which $\act$ is stationary under dilation ($\lambda^{\alpha+2}=\alpha\,\mathcal U/2\mathcal K$ in terms of its kinetic part $\mathcal K$ and potential part $\mathcal U$). It then runs a limited-memory BFGS descent~\cite{LiuNocedal1989} of random length on $\act_{\Omega,M}$ or on $\frac12|\nabla\act_{\Omega,M}|^2$, followed by a Levenberg--Marquardt iteration~\cite{Marquardt1963} on $\nabla\act_{\Omega,M}=0$ with the exact Hessian $H$ in its eigenbasis,
+\[
+\delta=-\sum_k\frac{\lambda_k}{\lambda_k^2+\mu}\,\langle u_k,\nabla\act\rangle\,u_k,\qquad Hu_k=\lambda_ku_k ,
+\]
+with $\mu$ adapted to the decrease of $|\nabla\act|$. It converges quadratically to critical points of any Morse index, and the gauge directions, which have $\lambda_k\approx0$, receive no step. A symmetry group of the loop can be imposed by restricting $x$ to a fixed subspace.
+
+The starting loops are, in the notation of Corollary~\ref{cor:resonance}: (i) random loops with few modes; (ii) \emph{torus}: circular motions at distinct modes in $\lfloor d/2\rfloor$ orthogonal planes; (iii) \emph{vertical}: the $m_1$-fold cover of the $N$-gon plus one transversal mode at a resonance $m\approx m_1\omega_k$; (iv) \emph{hyper}: the cover plus one circularly polarised transversal mode for each of several distinct patterns $k$; (v) \emph{in-plane}: the cover plus an in-plane mode at $m\approx m_1(1\pm\nu_k)$ with its partner $|2m_1-m|$. Family (iv) produced every solution of span dimension at least five.
+
+\subsection{Certification}\label{sec:cert}
+A converged Fourier critical point solves the discretised variational problem, not the equations of motion, and each is certified as follows. The initial state $Z=(Q(0),\dot Q(0))\in\R^{2Nd}$ of all $N$ bodies is read off the loop, $Q_j(0)=q(jT/N)$, $\dot Q_j(0)=\dot q(jT/N)+\Omega q(jT/N)$, and the \emph{shooting map}
+\begin{equation}\label{eq:shooting}
+F(Z)=\Phi_{T/N}(Z)-GSZ,\qquad (SZ)_j=Z_{j+1},
+\end{equation}
+is evaluated, where $\Phi_\tau$ is the flow of the $N$-body problem and $G$ acts diagonally on positions and velocities. The reduction to one $N$-th of the period is standard, cf.~\cite{KapelaZgliczynski2003}; $F(Z)=0$ exactly when $Z$ is the initial state of a relative choreography with frame $\Omega$ (Lemma~\ref{lem:shooting}). The flow is computed by a Taylor method of order $22$ with local tolerance $10^{-16}$~\cite{JorbaZou2005}, and $F(Z)=0$ is solved by a Levenberg--Marquardt Newton method with central-difference Jacobian to a relative residual $\max|F|/\max|Z|\le10^{-12}$; a candidate that fails is discarded. The map over $T/N$ rather than over the full period is used because the derivative of the flow over $T/N$ is roughly the $N$-th root of the monodromy, and most of the solutions found are strongly unstable.
+
+From the certified state, one segment $[0,T/N]$ of the orbit of all $N$ bodies is integrated and reassembled, by $q(t+jT/N)=e^{-t\Omega}Q_j(t)$, into the loop $q$ over a full period; its Fourier coefficients, action, energy, angular momentum and minimal separation are recomputed from this segment, and the identity~\eqref{eq:virial} is checked. The loop is then brought to a canonical form: a $k$-fold traversal, detected as a common divisor of the significant modes, is unwound; the coordinates are rotated to the principal axes of $\int q\,q^{\mathsf T}$; and the span dimension is computed from $\spn\{e^{t\Omega}q(t+jT/N)\}$, which for a rotating frame differs from the rank of the loop itself. A solution whose mutual distances are constant to a relative precision better than $10^{-4}$ is taken to be a relative equilibrium and is discarded; the observed defects fall in two clusters, below $4\cdot10^{-6}$ and above $1.7\cdot10^{-2}$, so the threshold is not delicate.
+
+Two solutions are identified when their actions, energies and root-mean-square radii agree to $10^{-4}$ and the Procrustes distance between the loops, minimised over time shifts, time reversal and $\Orth(d)$, is below $10^{-3}$. In a rotating frame the search sometimes lands on a continuous family of solutions, along which the action is constant; members of a family are folded into one record when their actions and energies agree to $10^{-8}$ and their minimal separations to $10^{-3}$, a heuristic. Finally the Morse index and nullity of the Hessian of $\act_\Omega$ at the solution are computed after the gauge directions, the time shift and those rotations commuting with $\Omega$ that move the loop, have been removed from the spectrum exactly, so that only the remaining eigenvalues are classified by a tolerance; the nullity recorded is the number of gauge directions plus the number of remaining eigenvalues below the tolerance, and it exceeds the gauge dimension only on a continuous family.
+
+\begin{lemma}\label{lem:shooting}
+Let $Z$ be a state whose solution exists on $[0,T/N]$ and satisfies $F(Z)=0$, and let $Q(t)=\Phi_t(Z)$. Then $Q$ is a relative choreography with frame $\Omega$, defined and collision-free for all time, with loop $q(t)=e^{-t\Omega}Q_0(t)$.
+\end{lemma}
+
+\begin{proof}
+The flow commutes with the linear map $GS$, since the equations of motion are invariant under rotations and relabellings. Hence $Q(t+T/N)=\Phi_t(GSZ)=GS\,Q(t)$, i.e.\ $Q_j(t+T/N)=GQ_{j+1}(t)$, for all $t$ at which the solution exists; the solution exists on $[0,T/N]$ and therefore, by this relation, for all time, without collisions. By induction $Q_j(t)=G^{-j}Q_0(t+jT/N)$, so $Q_j(t)=e^{t\Omega}q(t+jT/N)$, and $j=N$ gives $Q_0(t+T)=G^NQ_0(t)=e^{T\Omega}Q_0(t)$, so $q$ is $T$-periodic.
+\end{proof}
+
+\subsection{Organisation of the search}\label{sec:organisation}
+Every trial is a deterministic function of a seed and a trial index, so a search resumes exactly after an interruption, and catalogues from different computers and seeds are merged by the equivalence test of Section~\ref{sec:cert} without re-running anything. The author asked for this so that the exploration could run on several machines for weeks; every file of Table~\ref{tab:files} grows when the search that produced it is run again.
+
+\section{Existence proofs}\label{sec:proofs}
+
+The proofs verify, in interval arithmetic with outward rounding on top of MPFR~\cite{MPFR2007}, the hypotheses of Proposition~\ref{prop:krawczyk} for the shooting map~\eqref{eq:shooting}. The approach is that of Kapela and Zgliczy\'nski~\cite{KapelaZgliczynski2003} and Kapela and Sim\'o~\cite{KapelaSimo2007}, who proved the existence of planar choreographies by interval Newton and Krawczyk operators on a reduced shooting map; a different route, through the delay equation satisfied by one body, is taken in~\cite{CGLM2021}. What is particular here is the treatment of the continuous symmetries, which are removed by a slice and recovered from the conservation laws so that one argument serves every $N$, $d$ and frame, and the validated integrator, which is the Taylor recurrence itself evaluated on intervals.
+
+\subsection{The criterion}
+Let $n=2Nd$ and let $Z_0\in\R^n$ be an approximate zero of $F$. The zero set of $F$ is invariant under the group generated by the translations $Z\mapsto Z+(c,\dots,c;0,\dots,0)$ with $Gc=c$, the time shift $Z\mapsto\Phi_s(Z)$, and the rotations $Z\mapsto RZ$ with $R\in\SO(d)$ commuting with $G$: indeed $F(Z+(c;0))=F(Z)+((1-G)c;0)=F(Z)$, $F(RZ)=RF(Z)$, and $F(\Phi_sZ)=\Phi_s(\Phi_{T/N}Z)-\Phi_s(GSZ)$ vanishes if and only if $F(Z)$ does. The tangent space at $Z_0$ of the orbit of $Z_0$ under this group is spanned by the vectors $(c;0)$, the vector field $(\dot Q;\ddot Q)(Z_0)$, and the vectors $(\xi Q;\xi\dot Q)(Z_0)$ for $\xi$ in the commutant of $G$ in $\so(d)$; let $\gamma_1,\dots,\gamma_k$ be a basis of it taken from these vectors, and let $\mathcal C=(\mathcal C_1,\dots,\mathcal C_k)$ consist of the corresponding conserved quantities: the momentum $P_c=\langle c,P\rangle$ for $(c;0)$, the energy $E$ for the vector field, and the angular momentum $\Lambda_\xi=\sum_j\langle\xi Q_j,\dot Q_j\rangle$ for $(\xi Q;\xi\dot Q)$. Each is conserved by the flow and invariant under $GS$: $E(GSZ)=E(Z)$, $P_c(GSZ)=\langle c,GP\rangle=\langle G^{\mathsf T}c,P\rangle=P_c(Z)$ because $Gc=c$, and $\Lambda_\xi(GSZ)=\Lambda_{G^{\mathsf T}\xi G}(Z)=\Lambda_\xi(Z)$ because $\xi$ commutes with $G$. Let $\mathcal Q\in\R^{n\times m}$, $m=n-k$, have orthonormal columns spanning the orthogonal complement of $\spn\{\gamma_i\}$, the \emph{slice}; choose a set $D$ of $k$ coordinate indices, with complement $D'$; and for $r>0$ let $B_y=[-r,r]^m\subset\R^m$ and $B=Z_0+\mathcal QB_y\subset\R^n$.
+
+\begin{proposition}\label{prop:krawczyk}
+Let $f(y)=\big(F(Z_0+\mathcal Qy)\big)_{D'}$, $y\in\R^m$. Suppose:
+\begin{enumerate}
+\item[(K)] there are a real $m\times m$ matrix $Y$ and an interval matrix $\intv{J}$ containing $\{f'(y):y\in B_y\}$ such that
+\[
+-Yf(0)+\big(I-Y\intv{J}\big)B_y\ \subset\ \intr B_y ;
+\]
+\item[(C)] with $y^*$ the zero of $f$ in $B_y$ given by (K), $Z^*=Z_0+\mathcal Qy^*$, and $\intv{H}$ a collision-free box containing both $\Phi_{T/N}(Z^*)$ and $GSZ^*$, every matrix in the interval matrix $\big[\partial\mathcal C/\partial Z_D\big](\intv{H})$ is nonsingular.
+\end{enumerate}
+Then $F$ has exactly one zero $Z^*$ in $B$, and $Z^*$ is the initial state of a relative choreography with frame $\Omega$.
+\end{proposition}
+
+\begin{proof}
+(K) is Krawczyk's test~\cite{Krawczyk1969,Neumaier1990,Tucker2011}; we include the argument. Write $[-r,r]^m$ for $B_y$ and $\|\cdot\|$ for the maximum norm. Reading the inclusion row by row, $|(Yf(0))_i|+r\sum_j|I-Y\intv{J}|_{ij}<r$ for every $i$, where $|\cdot|$ is the entrywise magnitude of an interval; hence $\|I-YA\|<1$ for every $A\in\intv{J}$, so $Y$ and every such $A$ are invertible. Put $g(y)=y-Yf(y)$. For $y,y'\in B_y$ the mean value theorem, applied to each component, gives $f(y)-f(y')=A(y-y')$ with $A$ a matrix whose rows are rows of $f'$ at points of the segment $[y,y']$, so $A\in\intv{J}$; with $y'=0$ this shows $g(y)\in-Yf(0)+(I-Y\intv{J})B_y\subset B_y$, so $g$ maps $B_y$ into itself and has a fixed point $y^*$ by Brouwer's theorem, at which $Yf(y^*)=0$, i.e.\ $f(y^*)=0$. If also $f(y')=0$ then $y^*-y'=g(y^*)-g(y')=(I-YA)(y^*-y')$ with $A\in\intv{J}$, so $YA(y^*-y')=0$ and $y'=y^*$.
+
+Put $Z_1=\Phi_{T/N}(Z^*)$ and $Z_2=GSZ^*$; then $(Z_1)_{D'}=(Z_2)_{D'}$ because $f(y^*)=0$, and $\mathcal C(Z_1)=\mathcal C(Z^*)=\mathcal C(Z_2)$ by conservation and $GS$-invariance. Let $h(u)=\mathcal C(Z)$ where $Z$ has the components $D'$ of $Z_1$ and the components $D$ equal to $u\in\R^k$. The segment between $u_1=(Z_1)_D$ and $u_2=(Z_2)_D$ lies in the box $\intv{H}$, on which $\mathcal C$ is smooth, so by the mean value theorem applied to each component $h(u_1)-h(u_2)=M(u_1-u_2)$ for a matrix $M$ whose rows are rows of $\partial\mathcal C/\partial Z_D$ at points of the segment; $M$ belongs to the interval matrix of (C), hence is nonsingular, and $h(u_1)=h(u_2)$ forces $u_1=u_2$. Thus $Z_1=Z_2$, i.e.\ $F(Z^*)=0$. Any zero of $F$ in $B$ is a zero of $f$, so it equals $Z^*$. Lemma~\ref{lem:shooting} concludes.
+\end{proof}
+
+Nonsingularity of every matrix in an interval matrix $\intv{M}$ is verified by exhibiting a real matrix $Y_M$ with $\|I-Y_M\intv{M}\|_\infty<1$, as in the proof. The interval Jacobian $\intv{J}$ comes from a single validated integration of the interval hull $\hat B\supseteq B$ of the parallelotope $B$, with the $m$ columns of $\mathcal Q$ as tangent vectors,
+\[
+\intv{J}=\big(\intv{D\Phi_{T/N}}(\hat B)\,\mathcal Q-GS\mathcal Q\big)_{D'},
+\]
+and $f(0)$ from a validated integration of the point $Z_0$. The matrix $Y$ is an approximate inverse of the midpoint of $\intv{J}$, and $D$ is chosen greedily, column by column, as the coordinates on which the conserved quantities are most sensitive. Every proof below is carried out in the ambient dimension $\deff$ of the solution, in which no rotation fixes the orbit; a rotation that did would contribute no vector to the basis $\gamma_1,\dots,\gamma_k$ and no row to $\mathcal C$.
+
+\subsection{Validated integration}
+The $N$-body vector field is real-analytic away from collisions, so the Taylor coefficients $z_k(z)$ of the solution through $z$ are analytic functions of $z$, computed by the standard recurrences: for each pair, $s=|\Delta|^2$ with $\Delta$ the difference of positions, $w=s^{-(\alpha+2)/2}$ from $s\,w'=-\frac{\alpha+2}2s'w$, and the acceleration $-\alpha\sum w\Delta$. Evaluated on intervals with outward rounding, the same recurrences enclose the coefficient functions on a box~\cite{Moore1966,Lohner1987}. The following lemma is the a-priori enclosure of~\cite{NedialkovJacksonCorliss1999}, with its short proof.
+
+\begin{lemma}\label{lem:enclosure}
+Let $\dot z=f(z)$ with $f$ analytic on an open set $\mathcal U\subset\R^n$, let $Z\subset W\subset\mathcal U$ be boxes with $W$ compact, let $h>0$, $\ell\ge1$, and let $\intv{z_k}(Z)$, $\intv{z_\ell}(W)$ be boxes enclosing the ranges of the coefficient functions. If
+\[
+\sum_{k=0}^{\ell-1}[0,h]^k\,\intv{z_k}(Z)+[0,h]^\ell\,\intv{z_\ell}(W)\ \subset\ \intr W,
+\]
+then for every $z_0\in Z$ the solution exists on $[0,h]$ and stays in $W$, and for every $p\ge1$ and $\tau\in[0,h]$,
+\[
+z(\tau)\in\sum_{k=0}^{p-1}\tau^k z_k(z_0)+\tau^p\,\intv{z_p}(W).
+\]
+\end{lemma}
+
+\begin{proof}
+For an autonomous equation the $p$-th derivative of the solution at time $\xi$ is $p!\,z_p(z(\xi))$, so Taylor's formula with Lagrange remainder gives, componentwise, $z_i(\tau)=\sum_{k<p}\tau^kz_{k,i}(z_0)+\tau^pz_{p,i}(z(\xi_i))$ with $\xi_i\in(0,\tau)$, as long as the solution exists on $[0,\tau]$ with values in $W$. The hypothesis with $\tau=0$ gives $Z\subset\intr W$. Let $\tau^*$ be the supremum of the $\tau\le h$ such that the solution exists on $[0,\tau]$ with values in $W$; $\tau^*>0$. On $[0,\tau^*)$ the formula with $p=\ell$ places $z(\tau)$ in the compact box on the left of the hypothesis, which lies in $\intr W$. A solution confined to a compact subset of $\mathcal U$ extends beyond $\tau^*$ and by continuity stays in $\intr W$ a little longer, contradicting the definition of $\tau^*$ unless $\tau^*=h$. The last assertion is the formula with $z(\xi_i)\in W$.
+\end{proof}
+
+A step of size $h$ from a box $Z$ consists of finding $W$ by iterating the hypothesis, starting from the Taylor polynomial of low order $\ell=\min(p,6)$ inflated slightly, and then evaluating the polynomial of order $p-1$ on $Z$ plus the remainder $h^p\intv{z_p}(W)$. The remainder computed by interval arithmetic on $W$ overestimates the true one by many orders of magnitude at the orders used ($p\approx50$), and the step size is controlled by it. The variational equation $\dot\psi=Df(z)\psi$ is handled by the same lemma applied to the pair $(z,\psi)$: the coefficients $\psi_k(z,\psi)$ follow from the differentiated recurrences, and an a-priori box for $\psi$ on the step is $\psi(0)+[-\rho,\rho]^n$ with $\rho=ah\,e^{ah}\|\psi(0)\|_\infty$, where $a\ge\sup_W\|Df\|_\infty$, since $\|\psi(\tau)-\psi(0)\|_\infty\le\|\psi(0)\|_\infty(e^{a\tau}-1)$ by Gronwall's inequality. The action of the segment, $\int_0^{T/N}L\dd t$, is accumulated in the same way from the coefficients of $L$ along the solution, and the energy is evaluated on the initial box. No coordinate change is applied against the wrapping effect~\cite{Lohner1987,Zgliczynski2002}; the boxes are propagated as they are and the loss is paid in precision. All proofs below request $40$ digits, which sets $388$ bits of working precision, the slice radius $r=10^{-20}$ and the local tolerance $10^{-44}$.
+
+\subsection{Rotating frames}
+For a frame $\Omega$ the state is rotated into an orthonormal basis of $\R^d$ adapted to $\Omega$, in which $G$ is block diagonal with $2\times2$ rotation blocks of angles $2\pi w_p/N$ and $1\times1$ blocks on the fixed axes. Rates within $10^{-9}$ of making an angle exactly $0$ or $\pi$, or two angles exactly equal or opposite, are snapped to those values, and the theorem is stated for the snapped frame. Blocks with angle $0$ or $\pi$ are exact; for the others the cosine and sine are enclosed by evaluating them at the endpoints of the (thin) interval angle and hulling in $\pm1$ only when an extremum lies inside, so that a quarter turn, whose cosine is a zero crossing, stays sharp. The commutant of $G$ in $\so(d)$ is read off the angle classes: the rotation within each plane, all rotations among the fixed axes, all rotations among the axes turned by $\pi$, and for two planes with equal or opposite angles the two-dimensional family of rotations mixing them. The translations fixed by $G$ are those along the fixed axes.
+
+\subsection{The qualifiers}
+Two open conditions are verified on the same run so that they belong to the theorem rather than to the numerics.
+
+\begin{lemma}\label{lem:qualifiers}
+Let $Z^{(0)},\dots,Z^{(s)}$ be the boxes enclosing the state at the times $0=t_0<\dots<t_s=T/N$ of the validated integration of $\hat B$, let $\intv{Q_j^{(i)}}$ be their position components, $\intv{c^{(i)}}=\frac1N\sum_j\intv{Q_j^{(i)}}$, and
+\[
+\intv{\Gamma}=\sum_{i,j}\big(\intv{Q_j^{(i)}}-\intv{c^{(i)}}\big)\big(\intv{Q_j^{(i)}}-\intv{c^{(i)}}\big)^{\mathsf T}.
+\]
+\begin{enumerate}
+\item If Gaussian elimination without pivoting on $\intv{\Gamma}$ produces $d$ pivots that are positive intervals, then the solution through $Z^*$ has span dimension $d$.
+\item If for some pair $(j,l)$ and two times $t_i\ne t_{i'}$ the enclosures of $|Q_j-Q_l|^2$ are disjoint, the solution is not a rigid motion, hence not a relative equilibrium.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+With $c(t)$ the centre of mass, $Q_j(t)-c(t)=\frac1N\sum_l(Q_j(t)-Q_l(t))$ lies in the span $V$ of the solution. The Gram matrix $\Gamma$ of the vectors $Q_j(t_i)-c(t_i)$ lies in $\intv{\Gamma}$, and the same eliminations on $\Gamma$ produce pivots inside the interval pivots, hence positive; a symmetric matrix with an $LDL^{\mathsf T}$ factorisation whose diagonal factor is positive is positive definite, so $\Gamma$ has rank $d$, the vectors span $\R^d$, and $V=\R^d$. For (2), a relative equilibrium is a rigid motion.
+\end{proof}
+
+For three bodies the positions at any single time span at most a plane, and the span dimension $3$ of the solutions in Theorem~\ref{thm:main}(1) is established by the accumulation over the step times.
+
+\subsection{Results}
+Table~\ref{tab:proven} lists the proofs. Each is preceded by a Newton refinement of the catalogued double-precision state to $40$ digits, which moves it by at most $2.2\cdot10^{-12}$ in maximum norm and leaves a residual far below the slice radius. That radius is $r=10^{-20}$, except for \texttt{d3\_n10}:7, whose first Krawczyk attempt at that radius failed (contraction $32$) and which the automatic retry proved at $r=1.5\cdot10^{-23}$. The hull half-width $r\max_i\sum_c|\mathcal Q_{ic}|$ of the box, the ``within'' of Theorem~\ref{thm:main}, lies between $9.2\cdot10^{-23}$ and $1.3\cdot10^{-19}$. The table gives the Krawczyk contraction $\|I-Y\intv{J}\|_\infty$ and the closure norm $\|I-Y_M\intv{M}\|_\infty$; the qualifiers of Lemma~\ref{lem:qualifiers} hold in every case. The enclosures of the energy determine 16 to 20 significant digits. The action accumulates a remainder at every step, and its enclosures determine between 9 and 17 significant digits, the fewest for solutions whose integration takes a couple of hundred steps and the most for the twelve-body solution, which takes seven. The cost is that of the validated integration of the box with its $m$ tangent columns: seconds for three bodies, minutes for eight and ten, ten minutes for the twelve-body solution in $\R^{11}$, whose slice has dimension $257$, and an hour and a half for the retried proof.
+
+\begin{table}[ht]
+\caption{The proven solutions. $d$ is the dimension the proof is carried out in, the span dimension of the solution; $m$ the slice dimension; $k$ the number of gauge generators; ind the Morse index of the record in the catalogue, computed in the ambient dimension of the search (Table~\ref{tab:files}); $\kappa$ the Krawczyk contraction; $c$ the closure norm. The action is per body for the period $2\pi$, the energy that of the whole system; both are printed to the digits on which the two ends of their enclosures agree. All solutions are choreographies except the last, whose frame has rates $(1,2,3,4,5)$. The first column is the catalogue file and record.}\label{tab:proven}
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrrllll@{}}
+\toprule
+record & $N$ & $d$ & $m$ & $k$ & ind & action & energy & $\kappa$ & $c$\\
+\midrule
+\texttt{d2-3\_n3}:0 & 3 & 2 & 8 & 4 & 1 & 8.12397549208093 & $-1.292970857122094043$ & 1.04e-13 & 9.62e-16\\
+\texttt{d2-3\_n3}:1 & 3 & 2 & 8 & 4 & 1 & 11.1520801260 & $-1.77490867781453208$ & 3.99e-10 & 2.57e-12\\
+\texttt{d2-3\_n3}:2 & 3 & 3 & 11 & 7 & 9 & 18.4349834 & $-2.93401874232892410$ & 3.77e-05 & 1.96e-08\\
+\texttt{d2-3\_n3}:3 & 3 & 3 & 11 & 7 & 8 & 17.2971886 & $-2.75293307472440716$ & 2.35e-04 & 2.43e-08\\
+\texttt{d2-3\_n3}:4 & 3 & 3 & 11 & 7 & 7 & 16.98058421 & $-2.70254391460059899$ & 8.66e-06 & 5.42e-09\\
+\texttt{d3\_n10}:0 & 10 & 3 & 53 & 7 & 11 & 47.618613966379 & $-25.2624593197803114$ & 9.07e-12 & 3.19e-15\\
+\texttt{d3\_n10}:1 & 10 & 3 & 53 & 7 & 23 & 83.816710437 & $-44.4661459329604716$ & 1.20e-05 & 5.19e-11\\
+\texttt{d3\_n10}:2 & 10 & 3 & 53 & 7 & 9 & 47.6834700336791 & $-25.2968665321143360$ & 7.01e-12 & 5.21e-15\\
+\texttt{d3\_n10}:3 & 10 & 3 & 53 & 7 & 34 & 84.89851370 & $-45.0400603928673426$ & 2.36e-02 & 3.25e-09\\
+\texttt{d3\_n10}:4 & 10 & 3 & 53 & 7 & 23 & 81.6372579311 & $-43.309910467357366$ & 3.67e-07 & 1.45e-11\\
+\texttt{d3\_n10}:5 & 10 & 3 & 53 & 7 & 4 & 39.53179518861948 & $-20.9722687118839849$ & 3.69e-13 & 1.50e-15\\
+\texttt{d3\_n10}:6 & 10 & 3 & 53 & 7 & 17 & 73.6172514976 & $-39.0551649089576412$ & 2.81e-07 & 1.97e-12\\
+\texttt{d3\_n10}:7 & 10 & 3 & 53 & 7 & 44 & 100.386000867 & $-53.256427517651557669$ & 5.00e-02 & 6.23e-10\\
+\texttt{d7\_n8}:0 & 8 & 6 & 74 & 22 & 33 & 47.841443792442 & $-20.304539371254090$ & 1.08e-10 & 1.75e-13\\
+\texttt{d7\_n8}:1 & 8 & 6 & 74 & 22 & 73 & 75.97989977 & $-32.246870999588577$ & 5.44e-05 & 2.54e-08\\
+\texttt{d7\_n8}:2 & 8 & 6 & 74 & 22 & 76 & 68.4251062 & $-29.0405170604267412$ & 7.02e-04 & 3.70e-08\\
+\texttt{d7\_n8}:3 & 8 & 6 & 74 & 22 & 32 & 43.0153547637850 & $-18.25628357202106$ & 5.06e-11 & 7.79e-14\\
+\texttt{d7\_n8}:4 & 8 & 5 & 64 & 16 & 47 & 53.31382782818 & $-22.627091290681132$ & 8.89e-09 & 2.00e-12\\
+\texttt{d11\_n12\_g2}:13 & 12 & 11 & 257 & 7 & 11 & 22.745582769848982 & $-14.4802877253092393$ & 6.08e-12 & 6.70e-16\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{The catalogue}\label{sec:catalogue}
+
+The catalogue consists of $1800$ records in $21$ binary files, one per range of ambient dimensions and number of bodies (Table~\ref{tab:files}). Each record stores the certified initial state of all bodies, the frame $\Omega$, the Fourier coefficients of the loop in its principal axes, the action, energy, angular momentum, minimal separation, span dimension, Morse index and nullity, the rigidity defect, the invariant $\chi^*$ where defined, and the radius of the proven box where a proof exists. The state is the authoritative object; the coefficients are a rendering of it whose own residual is stored separately.
+
+\begin{table}[ht]
+\caption{Records by span dimension $\deff$ and number of bodies $N$; the last column counts the records that are choreographies in an inertial frame. A solution can appear in two files, since files are indexed by the ambient dimension of the search; the records have $1771$ distinct pairs (action, $N$).}\label{tab:counts}
+\centering\small
+\begin{tabular}{@{}r rrrrrrrrrr r r@{}}
+\toprule
+$\deff\backslash N$ & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & 11 & 12 & total & inertial\\
+\midrule
+2  & 2 & 10 & 21 & 33 & 72 & & & & & & 138 & 138\\
+3  & 3 & 6 & 16 & 25 & 34 & 14 & 36 & 8 & 10 & & 152 & 152\\
+4  & & 1 & 5 & 116 & 74 & 69 & 16 & & & & 281 & 134\\
+5  & & & & 73 & 70 & 92 & & & & & 235 & 37\\
+6  & & & & 28 & 59 & 45 & & 67 & 187 & 94 & 480 & 13\\
+7  & & & & & & & & 87 & 149 & 125 & 361 & 2\\
+8  & & & & & & & & 18 & & & 18 & 0\\
+9  & & & & & & & & 13 & & 76 & 89 & 0\\
+10 & & & & & & & & & & 8 & 8 & 0\\
+11 & & & & & & & & & & 38 & 38 & 0\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\caption{The catalogue files and the frames they were computed in. A frame ``$(w_1,w_2,\dots)$'' rotates the successive coordinate planes at the given rates; ``$\mathfrak g_2{:}\,p,q,r_1,\dots$'' is the torus frame of Section~\ref{sec:frames}, with rates $p,q,p{+}q$ on the three planes of the $7$-cycle and $r_i$ on the remaining coordinate planes.}\label{tab:files}
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}llrl@{}}
+\toprule
+file & $d$, $N$ & records & frame\\
+\midrule
+\texttt{d2-3\_n3}, \texttt{d2-4\_n4}, \texttt{d2-4\_n5}, \texttt{d3-4\_n6} & $2$--$4$, $3$--$6$ & 126 & inertial\\
+\texttt{d2\_n7}, \texttt{d3-4\_n7}, \texttt{d3-4\_n8}, \texttt{d3-4\_n9}, \texttt{d3\_n10}, \texttt{d3\_n11} & $2$--$4$, $7$--$11$ & 256 & inertial\\
+\texttt{d5-6\_n6}, \texttt{d5-6\_n7}, \texttt{d5-6\_n8} & $5$--$6$, $6$--$8$ & 551 & inertial, $(1,2)$, $(1,2,-3)$, $(1,3,-4)$\\
+\texttt{d7\_n8}, \texttt{d7\_n10} & $7$, $8$ and $10$ & 8 & inertial\\
+\texttt{d7\_n10\_g2}, \texttt{d7\_n10\_g2\_16} & $7$, $10$ & 151 & $\mathfrak g_2{:}1,2$ and $\mathfrak g_2{:}1,6$\\
+\texttt{d7\_n11\_g2}, \texttt{d7\_n12\_g2} & $7$, $11$ and $12$ & 555 & $\mathfrak g_2{:}2,3$\\
+\texttt{d9\_n10\_g2} & $9$, $10$ & 31 & $\mathfrak g_2{:}1,3,2$\\
+\texttt{d11\_n12\_g2} & $11$, $12$ & 122 & $\mathfrak g_2{:}1,2,4,5$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Below span dimension four every record is an inertial choreography, and the classical solutions are recovered: the figure eight and the other three-body choreographies, the planar families of Sim\'o, and the four-body hip-hop and its five-body counterpart in $\R^3$, which arise from the vertical starts at the resonances $m/m_1=6/5$ for $N=4$ and $9/7$ for $N=5$. Inertial choreographies of span dimension five and six were found for $N=6,7,8$ and of span dimension seven for $N=10$; from span dimension eight on, only relative choreographies were found. Only $76$ of the $1800$ records are local minima of the action, and the median Morse index is $20$. Several continuous families of solutions were met in the rotating frames of dimension seven, and three more among the records of span nine and ten in dimension eleven (nullity exceeding the gauge dimension by two); none among the records of full span in dimensions nine and eleven. Table~\ref{tab:values} gives a few reference values, per body for the period $2\pi$; the energy is that of the whole system.
+
+\begin{table}[ht]
+\caption{Reference values from the double-precision certification. The Lagrange circle is a relative equilibrium and not a catalogue record; the figure eight, the non-planar three-body row and the last row are among the proven solutions.}\label{tab:values}
+\centering\small
+\begin{tabular}{@{}rrlrr@{}}
+\toprule
+$\deff$ & $N$ & solution & action & energy\\
+\midrule
+2 & 3 & Lagrange circle & 6.534776057 & $-1.0400419$\\
+2 & 3 & figure eight & 8.123975492 & $-1.2929709$\\
+3 & 3 & non-planar three-body choreography, symmetry of order 16 & 18.434983453 & $-2.9340187$\\
+3 & 4 & hip-hop, resonance $(5,6)$ & 26.761760441 & $-5.6790219$\\
+3 & 5 & counterpart of the hip-hop, resonance $(7,9)$ & 42.644345524 & $-11.311764$\\
+6 & 6 & inertial, span $\R^6$ & 31.844962204 & $-10.136566$\\
+7 & 10 & inertial, span $\R^7$ & 61.724155215 & $-32.745681$\\
+11 & 12 & frame $(1,2,3,4,5)$, span $\R^{11}$ & 22.745582770 & $-14.480288$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Questions}\label{sec:questions}
+
+The catalogue is a sample, not a census: every search was still producing records when it was stopped, most ran for an hour or less on one to three seeds, one or two frames were tried per dimension above six, and $\alpha\ne1$, $N\ge13$ and $d\ge12$ were hardly explored. The programs are built to run for long periods on many computers, and we expect the approach to carry much of the exploration that remains.
+
+\begin{enumerate}
+\item Do inertial choreographies exist whose configurations span $\R^d$ for $d\ge8$? For every rotating-frame solution that we continued in the frame back to $\Omega=0$, the branch either stalled or ended at a relative equilibrium.
+\item Is the span dimension of a choreography of $N\ge4$ bodies bounded by $2\lfloor N/2\rfloor$? The bound holds throughout the catalogue and has the heuristic explanation of Section~\ref{sec:structure}, but it fails at $N=3$.
+\item The three non-planar three-body choreographies of Theorem~\ref{thm:main} have symmetry groups of orders $16$, $4$ and $10$, generated by $q(t+2\pi/8)=Rq(t)$ with $R\in\SO(3)$ of order $8$, by $q(t+\pi)=\operatorname{diag}(1,1,-1)\,q(t)$, and by $q(t+2\pi/5)=Rq(t)$ with $R$ of order $5$, each together with a time reversal. We expect them to be members of the families of~\cite{Marchal2000,CFM2005,ChencinerFejoz2009,Ferrario2006} at rotation rates commensurable with the period, but have not verified this.
+\item The continuous families of relative choreographies met in dimension seven have nullity two above the gauge dimension and constant action; their nature is unexplained.
+\item The linear stability of the catalogued solutions is not known. The reduced monodromy $(GS)^{-1}D\Phi_{T/N}(Z^*)$, whose $N$-th power is the monodromy over the period up to the factor $(GS)^N=e^{T\Omega}$, is the object to compute.
+\end{enumerate}
+
+\appendix
+
+\section{Assembly of the Hessian}\label{app:hessian}
+
+Let $u_i(t)$ denote the basis functions $\cos mt$ and $\sin mt$, and let $\zeta_m=1-e^{im\varphi}$ for a shift $\varphi=2\pi k/N$, so that $u_i(t)-u_i(t+\varphi)$ is the real, respectively imaginary, part of $\zeta_me^{imt}$. The second derivative of the potential term of $\act$ with respect to the coefficients $(i,a)$ and $(i',b)$ is a sum over shifts, with weights $\varpi_k\in\{1,\tfrac12\}$, of
+\[
+\varpi_k\int_0^{2\pi}\big(u_i(t)-u_i(t+\varphi)\big)\,B^{(k)}_{ab}(t)\,\big(u_{i'}(t)-u_{i'}(t+\varphi)\big)\dd t,
+\]
+with $B^{(k)}=\alpha(\alpha+2)\rho^{-\alpha-4}\,r\,r^{\mathsf T}-\alpha\rho^{-\alpha-2}I$, $r=q(t)-q(t+\varphi)$, $\rho=|r|$. Writing $\hat B(\nu)=\int_0^{2\pi}B_{ab}(t)e^{i\nu t}\dd t$ and using $\operatorname{Re}a\operatorname{Re}b=\frac12\operatorname{Re}(ab+a\bar b)$ and its companions, the four entries (cos--cos, sin--sin, cos--sin, sin--cos) for the pair of modes $m,m'$ are
+\[
+\tfrac12\operatorname{Re}(\mathcal E+\mathcal G),\quad \tfrac12\operatorname{Re}(\mathcal G-\mathcal E),\quad \tfrac12\operatorname{Im}(\mathcal E-\mathcal G),\quad \tfrac12\operatorname{Im}(\mathcal E+\mathcal G),
+\]
+where $\mathcal E=\zeta_m\zeta_{m'}\hat B(m+m')$ and $\mathcal G=\zeta_m\bar\zeta_{m'}\hat B(m-m')$. The whole Hessian is thus determined by the Fourier coefficients of the $d(d+1)/2$ functions $B_{ab}$ at the frequencies $0,\dots,2K$, which the trapezoidal rule delivers as discrete Fourier transforms. This replaces an assembly costing $O(K^2d^2M)$ operations by one costing $O(Kd^2M)$ plus an $O(n^2)$ table-driven fill.
+
+\section{Reproduction}\label{app:repro}
+
+The programs are written in C++20 and depend on MPFR and GMP for the multiple-precision and interval parts. In the repository,
+\begin{verbatim}
+make && make test
+./hyperchoreography prove catalog/d2-3_n3.bin --digits 40 --force
+./hyperchoreography prove catalog/d3_n10.bin --digits 40 --force
+./hyperchoreography prove catalog/d7_n8.bin --digits 40 --force
+./hyperchoreography prove catalog/d11_n12_g2.bin --id 13 --digits 40 --force
+\end{verbatim}
+re-run every proof of Theorem~\ref{thm:main} and print the certificates: the hull half-width, the slice radius and dimension, the number of gauge generators, the Krawczyk and closure norms, the two qualifiers of Lemma~\ref{lem:qualifiers}, and the enclosures of the energy and the action. The certificates are also kept in \texttt{paper/certificates/}. The command \texttt{verify} re-integrates any record in double precision and reports its shift residual and its full-period return; \texttt{refine} produces the initial state of any record to a requested number of digits, for verification with independent interval software.
+
+\bibliographystyle{abbrv}
+\bibliography{refs}
+
+\end{document}

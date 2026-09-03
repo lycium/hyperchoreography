@@ -24,8 +24,9 @@ class WhatIsAChoreography(ExpoScene):
                 size=0.52)
         eq = VGroup(law, rhs).arrange(RIGHT, buff=0.12).move_to(UP * 0.9)
 
-        self.say_with("We start where everyone starts: N point masses, each one "
-                      "accelerated by the pull of all the others.",
+        self.say_with("All N-body simulations start with the same definition: "
+                      "N point masses, each one accelerated by the pull of all the "
+                      "others.",
                       FadeIn(eq, shift=UP * 0.15), run_time=1.6)
 
         note = B("N unknown curves, coupled to each other", size=T.SZ_SMALL,

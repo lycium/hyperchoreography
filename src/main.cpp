@@ -1,4 +1,3 @@
-// CLI: search | continue | list | show | export | verify | refine | merge | extras | symmetry | bench
 #include "search.hpp"
 #include "continue.hpp"
 #ifdef HAVE_MPFR
@@ -94,7 +93,7 @@ static int cmd_search(const Args& a) {
       if (!o.ok) { failed++; reasons[o.why]++; continue; }
       double dist; long dup = cat.find_duplicate(o.rec, cfg.tol_inv, cfg.tol_dist, &dist);
       if (dup >= 0) { if (cat.absorb((size_t)dup, o.rec)) record_extras(cfg, cat.recs[dup], ctx); dups++; continue; }
-      record_extras(cfg, o.rec, ctx);                      // new records only
+      record_extras(cfg, o.rec, ctx);
       o.rec.h.id = -1; size_t idx = cat.push(o.rec); found++; const Record& r = cat.recs[idx];
       std::printf("+ id=%lld d=%d/%d N=%d K=%d A=%.9f E=%.6f morse=%d null=%d minsep=%.3f ret=%.1e cover=%d sym=\"%s\" (trial %llu, %.2fs)\n", (long long)r.h.id, r.h.deff, r.h.d, r.h.N, r.h.K, r.h.action, r.h.energy, r.h.morse, r.h.nullity, r.h.minsep, r.h.ret_err, r.h.cover, r.sym.c_str(), (unsigned long long)tr, r.h.secs);
       std::fflush(stdout);
@@ -133,7 +132,7 @@ static int cmd_export(const Args& a) {
   Catalog cat = load_cat(a.pos.at(0)); const Record& r = rec_by_id(cat, (long)a.num("id", 0)); int S = (int)a.num("samples", 720);
   std::string out = a.get("out", "curve_" + std::to_string(r.h.id) + ".csv"); FILE* f = std::fopen(out.c_str(), "w"); if (!f) throw std::runtime_error("cannot write " + out);
   const int N = r.h.N, d = r.h.d; std::fprintf(f, "t");
-  for (int k = 0; k < N; k++) for (int c = 0; c < d; c++)                       // x,y,z,w then x4…
+  for (int k = 0; k < N; k++) for (int c = 0; c < d; c++)
     if (c < 4) std::fprintf(f, ",q%d_%c", k, "xyzw"[c]); else std::fprintf(f, ",q%d_x%d", k, c);
   std::fprintf(f, "\n");
   const double* om = r.omega(); std::vector<double> Rt, Ai;
@@ -141,14 +140,13 @@ static int cmd_export(const Args& a) {
     if (om) { Ai.assign(om, om + (size_t)d * d); for (double& e : Ai) e *= t; la::expm_skew(d, Ai, Rt); }
     for (int k = 0; k < N; k++) { double tk = t + 2 * PI * k / N; std::vector<double> q(d, 0.0);
       for (size_t mu = 0; mu < r.modes.size(); mu++) { double c = std::cos(r.modes[mu] * tk), s = std::sin(r.modes[mu] * tk); for (int c2 = 0; c2 < d; c2++) q[c2] += c * r.coef[mu * 2 * d + c2] + s * r.coef[mu * 2 * d + d + c2]; }
-      if (om) { std::vector<double> qi(d, 0.0);                                   // inertial: exp(Ωt) q(t + 2πk/N)
+      if (om) { std::vector<double> qi(d, 0.0);
         for (int a = 0; a < d; a++) for (int b = 0; b < d; b++) qi[a] += Rt[(size_t)a * d + b] * q[b]; q.swap(qi); }
       for (int c2 = 0; c2 < d; c2++) std::fprintf(f, ",%.12f", q[c2]); }
     std::fprintf(f, "\n"); }
   std::fclose(f); std::printf("wrote %s (%d samples, %d bodies, %dD)\n", out.c_str(), S, N, d); return 0;
 }
 
-// the record's two residuals, state and coefficients, both relative to the state scale like h.ret_err
 static void record_residuals(const Record& r, double& state_res, double& coef_res, double* period_ret = nullptr) {
   const int N = r.h.N, d = r.h.d, nd = N * d;
   const double* om = r.omega();
@@ -162,7 +160,7 @@ static void record_residuals(const Record& r, double& state_res, double& coef_re
   const double* z = r.state();
   if (z) { sp.assign(z, z + nd); sv.assign(z + nd, z + 2 * nd); }
   state_res = z ? chore_residual(nb, sp, sv, 1e-16, Gp) / sc : coef_res;
-  if (period_ret) {                                     // after one period a twisted orbit closes up to exp(2πΩ)
+  if (period_ret) {
     std::vector<double> p = sp, v = sv; nb.integrate(p, v, 2 * PI, 1e-16);
     if (om) { A.assign(om, om + (size_t)d * d); for (double& e : A) e *= 2 * PI; la::expm_skew(d, A, GN); }
     double ret = 0;
@@ -172,7 +170,6 @@ static void record_residuals(const Record& r, double& state_res, double& coef_re
     *period_ret = ret / sc; }
 }
 
-// no --id: sweep the whole file
 static int cmd_verify_all(const Args& a) {
   Catalog cat = load_cat(a.pos.at(0)); double gate = a.num("gate", 1e-9);
   std::printf("%5s %2s/%-2s %2s %4s %10s %10s %10s %10s\n", "id", "de", "d", "N", "K", "ret_err", "state", "coef", "period");
@@ -213,7 +210,6 @@ static int cmd_verify(const Args& a) {
   return 0;
 }
 
-// --min-rigid/--min-deff re-apply a gate to catalogues already on disk; extra[4] is the stored defect.
 static int cmd_merge(const Args& a) {
   if (a.pos.size() < 2) { usage(); return 1; }
   Catalog out; try { out.load(a.pos[0]); } catch (...) {}
@@ -224,7 +220,7 @@ static int cmd_merge(const Args& a) {
     if (r.h.deff < min_deff) return false;
     if (min_rigid > 0 && (int)r.extra.size() > 4 && r.extra[4] < min_rigid) return false;
     return true; };
-  if (min_rigid > 0 || min_deff > 0) {                       // re-gate what is already in the destination
+  if (min_rigid > 0 || min_deff > 0) {
     std::vector<Record> kept; for (auto& r : out.recs) { if (keep(r)) kept.push_back(r); else dropped++; }
     if (dropped) { Catalog re; for (auto& r : kept) { Record c = r; c.h.id = -1; re.push(c); } out = std::move(re); } }
   for (size_t i = 1; i < a.pos.size(); i++) { Catalog in = load_cat(a.pos[i]);
@@ -237,9 +233,9 @@ static int cmd_merge(const Args& a) {
 static int cmd_extras(const Args& a) {
   Catalog cat = load_cat(a.pos.at(0)); const int Ki = (int)a.num("K-index", 48); long n = 0;
   for (auto& r : cat.recs) {
-    if (r.extra.empty()) r.extra.assign(Record::NEX, 0.0);                 // legacy record, no extras yet
+    if (r.extra.empty()) r.extra.assign(Record::NEX, 0.0);
     Config cfg; cfg.N = r.h.N; cfg.d = r.h.d; cfg.K = r.h.K; cfg.K_index = Ki; cfg.minsep = 0;
-    Ctx ctx;                                  // fresh: Ctx caches problems by K alone, and (N, d) vary here
+    Ctx ctx;
     record_extras(cfg, r, ctx); n++;
   }
   cat.save(a.pos[0]); std::printf("recomputed extras for %ld records -> %s\n", n, a.pos[0].c_str()); return 0;
@@ -253,13 +249,13 @@ static int cmd_symmetry(const Args& a) {
     int cont = 0;
     auto g = detect_symmetry(r.h.N, r.mode_list(), r.h.d, r.h.deff, r.coef.data(), &cont, tol);
     const LoopSym *gen = nullptr, *rev = nullptr;
-    int nsh = (cont & 1) ? 0 : 1, nrv = 0;                        // the identity is always among the shifts
+    int nsh = (cont & 1) ? 0 : 1, nrv = 0;
     for (auto& e : g) {
       if (e.eps > 0) { if (e.p == 0) continue; nsh++; if (!gen || (double)e.p / e.q < (double)gen->p / gen->q) gen = &e; }
       else { nrv++; if (!rev) rev = &e; }
     }
     std::string t = gen ? gen->text : "";
-    if (rev) { size_t sp = rev->text.find(' ');                   // theta is a time origin; re-origin it to 0
+    if (rev) { size_t sp = rev->text.find(' ');
       t += (t.empty() ? "" : "; ") + std::string("t-0/1") + (sp == std::string::npos ? "" : rev->text.substr(sp)); }
     if (cont & 2) t += (t.empty() ? "" : "; ") + std::string("t-* (a circle of reversals)");
     std::string sh = (cont & 1) ? "S1" : std::to_string(nsh), go = cont ? "inf" : std::to_string(nsh + nrv);
@@ -282,16 +278,15 @@ static int cmd_continue(const Args& a) {
     x[0] = R; x[P.d + 1] = R; roots.emplace_back(x, "circle"); roms.emplace_back();
   } else {
     for (auto& r : cat.recs) { if (a.has("id") && r.h.id != (long)a.num("id", 0)) continue; if (r.h.N != cfg.N || r.h.d > cfg.d) continue;
-      const double* om = r.omega();                                             // Ω-mode relaxes a frame; α-mode must not silently drop one
+      const double* om = r.omega();
       if (omode ? !om : om != nullptr) { skipped++; continue; }
       const Problem& P = ctx.problem(cfg, cfg.K); std::vector<double> x(P.n, 0.0);
       for (size_t k = 0; k < r.modes.size(); k++) { int m = r.modes[k]; if (m > P.K) break; auto it = std::lower_bound(P.modes.begin(), P.modes.end(), m); if (it == P.modes.end() || *it != m) continue; int mu = (int)(it - P.modes.begin());
         for (int c = 0; c < r.h.d; c++) { x[(2 * mu) * P.d + c] = r.coef[k * 2 * r.h.d + c]; x[(2 * mu + 1) * P.d + c] = r.coef[k * 2 * r.h.d + r.h.d + c]; } }
-      std::vector<double> O; if (omode) { O.assign((size_t)cfg.d * cfg.d, 0.0);      // the record's frame, embedded in d
+      std::vector<double> O; if (omode) { O.assign((size_t)cfg.d * cfg.d, 0.0);
         for (int i = 0; i < r.h.d; i++) for (int j = 0; j < r.h.d; j++) O[(size_t)i * cfg.d + j] = om[(size_t)i * r.h.d + j]; }
       roots.emplace_back(x, "id" + std::to_string(r.h.id)); roms.push_back(O); }
   }
-  // k-fold covers of the roots (the transverse resonances live on the covers)
   int covers = (int)a.num("covers", 1); const Problem& P0 = ctx.problem(cfg, cfg.K); size_t nroots = roots.size();
   for (int k = 2; k <= covers; k++) { if (la::gcd(k, cfg.N) != 1) continue;
     for (size_t r0 = 0; r0 < nroots; r0++) { std::vector<double> x(P0.n, 0.0); double lam = std::pow((double)k, -2.0 / 3.0); bool ok = true;
@@ -337,8 +332,6 @@ static int cmd_bench(const Args& a) {
 
 #ifdef HAVE_MPFR
 
-// Existence proof of one record (or every record): refine the certified state, then the Krawczyk test of
-// prove.hpp. On success the proven box radius goes into extra[7] with --write.
 static int cmd_prove(const Args& a) {
   const std::string path = a.pos.at(0); Catalog cat = load_cat(path);
   const int digits = (int)a.num("digits", 40); int threads = (int)a.num("threads", (double)std::thread::hardware_concurrency()); if (threads < 1) threads = 1;
@@ -358,7 +351,6 @@ static int cmd_prove(const Args& a) {
     if (r.omega()) { fr = frame_of(N, d, r.omega()); std::vector<double> Zr; fr.apply(N, Zd.data(), Zr); Zd.swap(Zr);
       if (verbose) { std::printf("\n  frame: %d planes, rates", fr.nplanes()); for (int i = 0; i < fr.nplanes(); i++) std::printf(" %.12g%s", fr.rate[i], fr.cls[i] == 0 ? "(fixed)" : fr.cls[i] == 1 ? "(pi)" : ""); std::printf("; %zu translations, %zu commuting rotations\n", fr.trans.size(), fr.rots.size()); } }
     else {
-      // the orbit lives in its leading canonical axes; coordinates it does not use are dropped exactly
       double sc = 0; for (double v : Zd) sc = std::max(sc, std::fabs(v));
       std::vector<int> axes; for (int c = 0; c < d; c++) { double amp = 0; for (int k = 0; k < N; k++) amp = std::max(amp, std::max(std::fabs(pos[k * d + c]), std::fabs(vel[k * d + c]))); if (amp > 1e-7 * sc) axes.push_back(c); }
       dp = (int)axes.size(); Zd.assign(2 * (size_t)N * dp, 0.0);
@@ -371,11 +363,13 @@ static int cmd_prove(const Args& a) {
     Proof P = prove_state(N, dp, 1.0, Z, fr, radius, tol, order, threads, verbose);
     if (!P.ok) { std::printf(" NOT PROVEN (%s; Newton %.1e/%.1e, contraction %.2e, closure %.2e)\n", P.why.c_str(), P.newton, radius, P.kappa, P.closure); continue; }
     proven++;
-    std::printf(" PROVEN in %.1fs\n  a choreography of N=%d bodies in R^%d, period 2pi%s, exists with initial state within %.1e (max norm) of the refined state;\n"
-                "  unique there up to time shift, translation and rotation. Krawczyk: |Y F| = %.1e, contraction %.2e, closure %.2e;\n"
-                "  slice dim %d, %d gauge generators; %ld validated Taylor steps (%ld rejected), h in [%.1e, %.1e], state width <= %.1e\n"
-                "  energy in %s\n  action in %s\n", P.seconds, N, dp, fr.rotating() ? " in the rotating frame" : "", P.radius, P.newton, P.kappa, P.closure, P.m, P.k, P.steps, P.rejects, P.hmin, P.hmax, P.maxwid, P.energy.str(digits / 2 + 4).c_str(), P.action.str(digits / 2 + 4).c_str());
-    if (write && r.extra.size() > 7) { r.extra[7] = P.radius; cat.save(path); }   // saved per record: a killed sweep resumes
+    std::printf(" PROVEN in %.1fs\n  a choreography of N=%d bodies in R^%d, period 2pi%s, exists with initial state within %.1e (max norm) of the refined state,\n"
+                "  the only zero of the shooting map in the slice box Z0 + Q[-r, r]^m, r = %.1e; the bodies span R^%d: %s; not a relative equilibrium: %s.\n"
+                "  Krawczyk: |Y F| = %.1e, contraction %.2e, closure %.2e; slice dim %d, %d gauge generators;\n"
+                "  %ld validated Taylor steps (%ld rejected), h in [%.1e, %.1e], state width <= %.1e\n"
+                "  energy in %s\n  action in %s\n", P.seconds, N, dp, fr.rotating() ? " in the rotating frame" : "", P.hull, P.radius, dp, P.span ? "verified" : "NOT verified",
+                P.nonrigid ? "verified" : "NOT verified", P.newton, P.kappa, P.closure, P.m, P.k, P.steps, P.rejects, P.hmin, P.hmax, P.maxwid, P.energy.str(digits / 2 + 4).c_str(), P.action.str(digits / 2 + 4).c_str());
+    if (write && r.extra.size() > 7) { r.extra[7] = P.radius; cat.save(path); }
   }
   if (write) std::printf("%d proven, catalogue saved\n", proven); else std::printf("%d of %zu proven\n", proven, recs.size());
   return 0;
@@ -389,11 +383,10 @@ static int cmd_refine(const Args& a) {
 
   std::vector<double> pos0, vel0; initial_state(P, x.data(), pos0, vel0);
   NBody<double> nbd(N, d, P.alpha, 22);
-  if (const double* z = r.state()) { pos0.assign(z, z + nd); vel0.assign(z + nd, z + 2 * nd); }   // certified, not rendered
+  if (const double* z = r.state()) { pos0.assign(z, z + nd); vel0.assign(z + nd, z + 2 * nd); }
   double sc0 = 1.0; for (double v : pos0) sc0 = std::max(sc0, std::fabs(v)); for (double v : vel0) sc0 = std::max(sc0, std::fabs(v));
-  double stored = chore_residual(nbd, pos0, vel0, 1e-16, P.gshift());   // where the record starts
+  double stored = chore_residual(nbd, pos0, vel0, 1e-16, P.gshift());
 
-  // a double Newton first: a thousandth of one MPFR iteration, and removes two or three of them
   std::vector<double> Zd(pos0); Zd.insert(Zd.end(), vel0.begin(), vel0.end());
   ShootWork<double> Wd;
   double dres = shoot_newton(nbd, Zd, 1e-16, 20, 1e-13 * sc0, -18, -40, Wd, false, P.gshift(), threads);
@@ -408,14 +401,11 @@ static int cmd_refine(const Args& a) {
   std::printf("refine record %lld (N=%d d=%d%s) to %d digits: %ld bits, Taylor order %d, %d threads\n",
               (long long)r.h.id, N, d, om ? ", rotating frame" : "", digits, (long)bits, order, threads);
   std::printf("  stored state %.3e (record claims ret_err %.1e), coefficients %.1e\n  after the double Newton: %.3e\n", stored, r.h.ret_err, r.coef_err(), dres);
-  // mu must still swamp the gauge directions (time shift, rotations commuting with Ω); letting it track the
-  // working precision down stops damping them and the Newton crawls sideways
   ShootWork<mpreal> W;
   double maxF = shoot_newton(nb, Z, itol, 25, std::pow(10.0, -digits), -(long)(bits / 3),
                              -(long)std::min<mpfr_prec_t>(bits / 2, 96), W, true, Gp, threads, 0.9, 24);
 
   mpreal E = nbody_energy(N, d, P.alpha, Z.data(), Z.data() + nd);
-  // instability probe: the shift residual amplified through N shifts, so it measures the orbit, not Z
   double fullret = 0;
   { std::vector<mpreal> pf(Z.begin(), Z.begin() + nd), vf(Z.begin() + nd, Z.end()); nb.integrate(pf, vf, twopi, itol);
     for (int k = 0; k < N; k++) for (int c = 0; c < d; c++) {
@@ -424,20 +414,17 @@ static int cmd_refine(const Args& a) {
         for (int b = 0; b < d; b++) { tp += GN[(size_t)c * d + b] * Z[k * d + b]; tv += GN[(size_t)c * d + b] * Z[nd + k * d + b]; } }
       fullret = std::max(fullret, std::max(std::fabs(to_double(pf[k * d + c] - tp)), std::fabs(to_double(vf[k * d + c] - tv)))); } }
 
-  // one T/N segment assembled from all N bodies, q(t_i + 2πj/N) = exp(−Ω t_i) Q_j(t_i), as the catalogue
-  // builds it; a whole period folds the orbit's instability in — at N = 11 that put the action out by 1 %
   const int Mseg = std::max(8, (std::max(64, 16 * Kout) + N - 1) / N), Ms = Mseg * N;
   std::vector<mpreal> ts(Mseg); for (int i = 0; i < Mseg; i++) ts[i] = twopi * i / Ms;
   std::vector<mpreal> ps(Z.begin(), Z.begin() + nd), vs(Z.begin() + nd, Z.end()), seg;
   nb.integrate(ps, vs, twopi / N, itol, &ts, &seg);
-  mpreal A(0);                                    // action per body: summing all N bodies over the segment
+  mpreal A(0);
   for (int i = 0; i < Mseg; i++) { const mpreal* sp = &seg[(size_t)i * 2 * nd];
     for (int b = 0; b < N; b++) { mpreal ke(0); for (int c = 0; c < d; c++) ke += sp[nd + b * d + c] * sp[nd + b * d + c]; A += ke * 0.5; }
     for (int b = 0; b < N; b++) for (int l = b + 1; l < N; l++) { mpreal r2(0);
       for (int c = 0; c < d; c++) { mpreal df = sp[b * d + c] - sp[l * d + c]; r2 += df * df; }
       A += P.alpha == 1.0 ? 1 / sqrt(r2) : pow(r2, mpreal(-P.alpha / 2)); } }
   A = A * twopi / Ms;
-  // N·A + 6π·E = 0 for a 1/r potential: an independent check on the re-extraction
   double virial = P.alpha == 1.0 ? std::fabs(to_double(A) * N + 6 * PI * to_double(E)) : 0.0;
   std::vector<mpreal> qs((size_t)Ms * d), Rj, Rs, Rn;
   if (om) { omega_exp(d, om, -twopi / Ms, Rs); Rj.assign((size_t)d * d, mpreal(0)); Rn.assign((size_t)d * d, mpreal(0));
@@ -455,8 +442,6 @@ static int cmd_refine(const Args& a) {
   for (int m = 0; m <= Kout; m++) for (int c = 0; c < d; c++) { mpreal sc(0), ss(0);
     for (int j = 0; j < Ms; j++) { int idx = (int)(((long)m * j) % Ms); sc += qs[(size_t)j * d + c] * cosj[idx]; ss += qs[(size_t)j * d + c] * sinj[idx]; }
     cm[(size_t)m * d + c] = sc * (m ? 2 : 1) / Ms; sm[(size_t)m * d + c] = ss * (m ? 2 : 1) / Ms; }
-  // how much of the loop K modes actually hold: the tail of the spectrum, and the residual a K-mode
-  // Fourier record rebuilt from these coefficients would have — the quantity the catalogue should store
   double amax = 0, atail = 0;
   for (int m = 1; m <= Kout; m++) { double mg = 0;
     for (int c = 0; c < d; c++) mg = std::max(mg, std::max(std::fabs(to_double(cm[(size_t)m * d + c])), std::fabs(to_double(sm[(size_t)m * d + c]))));
@@ -489,7 +474,7 @@ int main(int argc, char** argv) {
   if (argc < 2) { usage(); return 1; }
   std::string cmd = argv[1]; Args a(argc, argv);
 #ifdef HAVE_MPFR
-  mpreal::set_default_prec((mpfr_prec_t)(MP_DIGITS * 3.3219280948873626 + 96));   // static: set before threads
+  mpreal::set_default_prec((mpfr_prec_t)(MP_DIGITS * 3.3219280948873626 + 96));
 #endif
   try {
     if (cmd == "search") return cmd_search(a);

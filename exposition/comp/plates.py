@@ -1,15 +1,7 @@
-"""Static plates for the Allura Studio comp: the title card and the end card.
-
-Each scene is one full-frame transparent PNG, rendered by `make_plates.sh` with
-manim's `-s -t` (last frame, alpha kept). Everything is set in the film's own
-faces and palette, and the orbit art is drawn by the same OrbitView the film
-uses, so the cards read as part of the picture rather than as a wrapper around
-it. Positioning happens HERE, not in the comp: Allura stacks the plates at
-identity and owns only their timing, fades and processing.
-"""
+"""Plates for the Allura Studio comp: the end card, and the title art it kept."""
 
 import numpy as np
-from manim import Scene, VGroup, ORIGIN, UP, DOWN, PI
+from manim import Scene, VGroup, ORIGIN, UP, DOWN, PI, linear
 
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,10 +13,7 @@ from expo.viz import OrbitView, Projector
 
 def glow_orbit(name: str, radius: float, center, alpha: float, turn=(),
                show_bodies=False, samples=2000):
-    """The loop drawn through the film's own view, with a baked halo: the same
-    curve restated at falling widths and opacities underneath a bright core.
-    `turn` mixes principal axes into the camera — the film's own gesture for
-    showing that a high-deff orbit is not a circle seen edge-on."""
+    """The loop drawn through the film's own view, with a baked halo: the same"""
     orbit = catalog.load(name)
     proj = Projector(orbit.d, orbit.principal_frame())
     for i, j, angle in turn:
@@ -54,14 +43,39 @@ class TitleName(Scene):
 
 
 class EndOrbit(Scene):
-    """A spatial three-body choreography, faint behind the closing text: the
-    film opens on three bodies tracing the planar eight and closes on the same
-    three somewhere richer. (The d = 11 champion was auditioned and declined —
-    every two-axis shadow of it is an ellipse, radial spread 0.1% on the leading
-    pair, which is exactly the edge-on-circle trap s11 warns about.)"""
+    """A spatial three-body choreography, faint behind the closing text: the"""
     def construct(self):
         self.add(glow_orbit("n3_spatial", radius=3.4, center=ORIGIN, alpha=0.32,
                             samples=3000))
+
+
+class EndOrbitTurning(Scene):
+    """EndOrbit, turning: the same curve, the same baked halo, the same faintness,"""
+
+    SECONDS = 14.6
+    SWEEP = PI
+
+    def construct(self):
+        from manim import UpdateFromAlphaFunc
+        from expo.viz import default_tumble_planes
+
+        self.camera.background_color = T.BG
+        g = glow_orbit("n3_spatial", radius=3.4, center=ORIGIN, alpha=0.32,
+                       samples=3000)
+        self.add(g)
+        orbit = catalog.load("n3_spatial")
+        base = Projector(orbit.d, orbit.principal_frame())
+        planes = default_tumble_planes(orbit.d)
+
+        def turn(m, a):
+            p = base
+            for i, (u, v) in enumerate(planes):
+                p = p.rotated(u, v, self.SWEEP * a / (i + 1))
+            for view in m:
+                view.set_projector(p)
+
+        self.play(UpdateFromAlphaFunc(g, turn), run_time=self.SECONDS,
+                  rate_func=linear)
 
 
 class EndSubscribe(Scene):
@@ -86,7 +100,12 @@ class EndCode(Scene):
         self.add(g)
 
 
-class EndAllura(Scene):
+class EndCredits(Scene):
+    """Who made it and what with, quiet under the links. Replaces the older single"""
     def construct(self):
-        self.add(B("composed with allura studio", size=T.SZ_SMALL, color=T.INK_DIM)
-                 .move_to(DOWN * 3.0))
+        g = VGroup(B("direction: thomas ludwig / lycium", size=T.SZ_SMALL, color=T.INK),
+                   B("heavy lifting: claude code", size=T.SZ_SMALL, color=T.INK),
+                   B("rendered with manim and allura studio", size=T.SZ_SMALL,
+                     color=T.INK_DIM))
+        g.arrange(DOWN, buff=0.20).move_to(DOWN * 2.95)
+        self.add(g)

@@ -6,7 +6,7 @@ from manim import (VGroup, FadeIn, FadeOut, Create, UP, DOWN, LEFT, RIGHT,
 
 from expo import catalog, nbody, optim, targets, theme as T
 from expo.base import ExpoScene
-from expo.mathtext import B, M, C, sb, sp
+from expo.mathtext import B, M, C, sb, sp, var
 from expo.plots import Plot
 from expo.surface import scaled_directions
 from expo.viz import OrbitView, Projector, spin
@@ -17,28 +17,28 @@ class TheActionPrinciple(ExpoScene):
     section_title = "the action"
 
     def story(self):
-        # ------------------------------------------------------------------
         self.say("Newton's law has a second life as a statement about whole paths "
                  "rather than about instants.")
 
-        act = M("<i>A</i>[<i>q</i>]  =  ∫ ( kinetic energy  −  potential energy ) "
-                "d<i>t</i>", size=0.50).move_to(UP * 1.9)
+        act = VGroup(
+            M("<i>A</i>[<i>q</i>]  =  ∫ <i>L</i> d<i>t</i>,     "
+              "<i>L</i>  =  <i>T</i>  −  <i>V</i>", size=0.52),
+            B("the Lagrangian: the kinetic energy less the potential energy",
+              size=T.SZ_SMALL, color=T.INK_DIM),
+        ).arrange(DOWN, buff=0.36).move_to(UP * 1.9)
         self.play(FadeIn(act, shift=UP * 0.15), run_time=1.2)
 
-        self.say("Give a path a single number, its action: the kinetic energy minus "
-                 "the potential energy, added up over the whole motion.")
+        self.say("Give a path a single number, its action: the integral over the whole "
+                 "motion of one quantity, the Lagrangian — the kinetic energy less the "
+                 "potential energy.")
 
         self.say("A path is a solution of Newton's equations exactly when that number "
                  "is stationary: nudge the path a little, and the action does not "
                  "change to first order.")
 
-        # — the real thing: A along a perturbation of the eight ----------
         rec = catalog.load("eight")
         P = nbody.Action(rec.N, 2, 24)
         x = P.flat(targets.embed(rec, P))
-        # The direction is the gentlest uphill one at the orbit, not a random vector:
-        # a random vector puts as much into mode fifty as into mode one, and the
-        # picture is then a scribble rather than a recognisable nudge.
         (eta, _lam, _span) = scaled_directions(P.hessian(x), x, kind=("pos",))[0]
         eta *= 0.26 * np.linalg.norm(x) / np.linalg.norm(eta)
 
@@ -67,7 +67,6 @@ class TheActionPrinciple(ExpoScene):
         self.play(FadeOut(act), run_time=0.7)
         self.play(FadeIn(view), FadeIn(ghost), FadeIn(plot), FadeIn(lab), run_time=1.2)
 
-        # wobble the loop and walk the marker along the parabola
         def wobble(m, a):
             e = 0.92 * np.sin(2 * PI * a * 2.0)
             xa = x + e * eta
@@ -91,39 +90,67 @@ class TheActionPrinciple(ExpoScene):
 
         self.wipe(run_time=0.9)
 
-        # ------------------------------------------------------------------
+        tv = VGroup(
+            M("<i>T</i>  =  ½ ∑%s |<i>q̇</i>%s|%s"
+              % (sb(var("j")), sb(var("j")), sp("2")), size=0.50),
+            M("<i>V</i>  =  − ∑%s |<i>q</i>%s − <i>q</i>%s|%s"
+              % (sb(var("i") + " &lt; " + var("j")), sb(var("i")), sb(var("j")),
+                 sp("−α")), size=0.50),
+        ).arrange(DOWN, buff=0.46, aligned_edge=LEFT).move_to(UP * 1.7)
+        sign = B("the potential is negative — the bodies pull on each other — so "
+                 "subtracting it puts a plus in the action",
+                 size=T.SZ_SMALL, color=T.INK_DIM).move_to(UP * 0.35)
+        self.play(FadeIn(tv), run_time=1.2)
+        self.say("Written out for N bodies: the kinetic energy is a sum over the "
+                 "bodies, and the potential energy a sum over the pairs of them.")
+        self.play(FadeIn(sign), run_time=0.8)
+        self.say("The potential is negative, because the bodies pull on each other. So "
+                 "subtracting it puts a plus sign in the action.")
+
+        self.play(FadeOut(tv), FadeOut(sign), run_time=0.7)
         self.say("Now put the choreography constraint in.")
 
-        full = M("<i>A</i>  =  ∫ [ %s ∑%s |<i>q̇</i>%s|%s  +  ∑%s "
-                 "1 / |<i>q</i>%s − <i>q</i>%s| ] d<i>t</i>"
-                 % ("½", sb("k"), sb("k"), sp("2"), sb("i &lt; j"), sb("i"), sb("j")),
-                 size=0.44).move_to(UP * 1.55)
+        full = M("<i>A</i>  =  ∫ [ ½ ∑%s |<i>q̇</i>%s|%s  +  ∑%s "
+                 "|<i>q</i>%s − <i>q</i>%s|%s ] d<i>t</i>"
+                 % (sb(var("j")), sb(var("j")), sp("2"),
+                    sb(var("i") + " &lt; " + var("j")), sb(var("i")), sb(var("j")),
+                    sp("−α")),
+                 size=0.46).move_to(UP * 1.9)
         self.play(FadeIn(full), run_time=1.2)
         self.say("Every body is the same curve at a different time, so every term in "
                  "these sums is the same integral written N times over.")
 
         red = M("<i>A</i>[<i>q</i>]  =  ½ ∫ |<i>q̇</i>|%s d<i>t</i>  +  ½ ∑%s "
                 "∫ |<i>q</i>(<i>t</i>) − <i>q</i>(<i>t</i> + 2π<i>k</i>/<i>N</i>)|%s "
-                "d<i>t</i>" % (sp("2"), sb("k = 1..N−1"), sp("−α")),
-                size=0.44, color=T.GOLD).move_to(DOWN * 0.15)
+                "d<i>t</i>"
+                % (sp("2"), sb(var("k") + " = 1 … <i>N</i>−1"), sp("−α")),
+                size=0.46, color=T.GOLD).move_to(UP * 0.6)
         self.play(FadeIn(red, shift=UP * 0.12), run_time=1.4)
 
         self.say("What is left is a functional of one closed curve. The first term is "
                  "its kinetic energy; the second is how close it comes to its own "
                  "time-shifted copies.")
 
-        note = B("α = 1 is Newtonian gravity; the program takes any α",
-                 size=T.SZ_SMALL, color=T.INK_DIM).next_to(red, DOWN, buff=0.75)
-        self.play(FadeIn(note), run_time=0.8)
-        self.say("The exponent is left free. Newtonian gravity is α equal to one, and "
-                 "other values are useful as a way of walking from an easier problem "
-                 "to this one.")
+        gloss = VGroup(
+            VGroup(M("here <i>k</i> counts the time shifts, not the bodies;",
+                     size=T.SZ_SMALL, color=T.INK_DIM),
+                   M("the <i>N</i> bodies contribute the same integral, so this is "
+                     "the action per body", size=T.SZ_SMALL, color=T.INK_DIM),
+                   ).arrange(DOWN, buff=0.22),
+            M("α = 1 is Newtonian gravity; the program takes any α",
+              size=T.SZ_SMALL, color=T.INK_DIM),
+        ).arrange(DOWN, buff=0.40).move_to(DOWN * 0.60)
+        self.play(FadeIn(gloss[0]), run_time=0.8)
+        self.say("The index k there counts the shifts in time, not the bodies — and "
+                 "since the N bodies all contribute the same integral, this is the "
+                 "action of a single one of them.")
+        self.play(FadeIn(gloss[1]), run_time=0.8)
+        self.say("The exponent is left free. Newtonian gravity is alpha equal to one, "
+                 "and other values are useful as a way of walking from an easier "
+                 "problem to this one.")
 
-        # the narration band clears with the note: the next block arrives near the
-        # band's top, and fading in beside a stale caption reads as leftover text
-        self.play(FadeOut(note), *self.caption_anims(None), run_time=0.6)
+        self.play(FadeOut(gloss), *self.caption_anims(None), run_time=0.6)
 
-        # — Palais --------------------------------------------------------
         palais = B("Palais' principle of symmetric criticality", size=T.SZ_BODY,
                    color=T.INK).move_to(DOWN * 1.35)
         sub = B("a critical point of the reduced functional is a genuine solution, "

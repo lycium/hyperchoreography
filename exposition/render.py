@@ -1,16 +1,4 @@
-#!/usr/bin/env python3
-"""Render the presentation.
-
-    ./render.py                          # every scene, 1080p30, 4x temporal supersampling
-    ./render.py --res 4k --ss 8          # 2160p30, eight renders per output frame
-    ./render.py s05_lbfgs --preview      # one scene, fast and small
-    ./render.py --list                   # what the scenes are
-
-Each scene is rendered at fps * ss frames per second and reduced to fps by a
-tent-weighted average over overlapping windows of 2*ss - 1 frames, and at
-ssaa times the output resolution and scaled back down with Lanczos. Nothing is
-encoded lossily on the way: manim's frames go straight into ffmpeg as raw RGBA.
-"""
+"""Render the presentation."""
 
 from __future__ import annotations
 
@@ -28,12 +16,7 @@ from expo.pipeline import CODECS, RESOLUTIONS, ffmpeg_binary
 
 
 def write_manifest(parts, out_dir, name, width, height, fps, codec):
-    """One file describing the assets, for whatever assembles them next.
-
-    Every scene opens and closes on black, so a cross-dissolve between two of them
-    reads as a dip rather than a true overlap; that is recorded here rather than
-    left to be rediscovered.
-    """
+    """One file describing the assets, for whatever assembles them next."""
     import json
     from expo import narrate
     scenes = []
@@ -68,11 +51,7 @@ def write_manifest(parts, out_dir, name, width, height, fps, codec):
 
 
 def write_script(parts, out_dir, name):
-    """Collect the cue files into one readable narration script.
-
-    Timestamps are within each scene, so a recorded line can be dropped straight
-    into `narration/cache/` or laid over the finished video by hand.
-    """
+    """Collect the cue files into one readable narration script."""
     import json
     lines = ["# " + name, "",
              "The spoken text, in order, with the time within each scene at which "
@@ -98,6 +77,37 @@ def write_script(parts, out_dir, name):
     with open(path, "w") as f:
         f.write("\n".join(lines) + "\n")
     return path
+
+
+def scene_seconds(out_dir, mod, default=120.0):
+    """How long this scene ran last time, so the long ones can be started first."""
+    import json
+    try:
+        with open(os.path.join(out_dir, mod + ".mkv.cues.json")) as f:
+            return float(json.load(f)["duration"])
+    except (OSError, ValueError, KeyError):
+        return default
+
+
+def run_jobs(todo, jobs: int, out_dir: str) -> int:
+    """Render the scenes, `jobs` at a time, longest first."""
+    order = sorted(todo, key=lambda t: -scene_seconds(out_dir, t[0]))
+    running, failed = {}, []
+    while order or running:
+        while order and len(running) < jobs:
+            mod, dst, cmd = order.pop(0)
+            print("  %-16s -> %s" % (mod, os.path.basename(dst)), flush=True)
+            running[subprocess.Popen(cmd, cwd=HERE)] = mod
+        done = [p for p in running if p.poll() is not None]
+        if not done:
+            time.sleep(0.5)
+            continue
+        for p in done:
+            mod = running.pop(p)
+            if p.returncode != 0:
+                print("  ** %s failed (%d)" % (mod, p.returncode))
+                failed.append(mod)
+    return 1 if failed else 0
 
 
 def concat(parts, out_path):
@@ -129,6 +139,8 @@ def main() -> int:
     ap.add_argument("--fps", type=float, default=30.0, help="output frame rate")
     ap.add_argument("--ss", type=int, default=4,
                     help="temporal supersampling: manim renders at fps*ss (default 4)")
+    ap.add_argument("--jobs", "-j", type=int, default=1,
+                    help="scenes to render at once (default 1)")
     ap.add_argument("--ssaa", type=int, default=1,
                     help="spatial supersampling: render at ssaa times the resolution")
     ap.add_argument("--shape", default="tent", choices=("tent", "box"),
@@ -172,18 +184,21 @@ def main() -> int:
     os.makedirs(a.out, exist_ok=True)
 
     print("%d scene(s) at %dx%d %.0f fps; rendering %dx%d at %.0f fps, %s filter over %d"
-          % (len(wanted), W, H, a.fps, RW, RH, a.fps * a.ss, a.shape, 2 * a.ss - 1))
+          "%s"
+          % (len(wanted), W, H, a.fps, RW, RH, a.fps * a.ss, a.shape,
+             2 * a.ss - 1 if a.shape == "tent" else a.ss,
+             ", %d at a time" % a.jobs if a.jobs > 1 else ""))
 
     parts, t0 = [], time.time()
+    todo = []
     for mod, cls in wanted:
         dst = os.path.join(a.out, "%s%s" % (mod, suffix))
+        parts.append(dst)
         if a.concat_only:
-            if os.path.exists(dst):
-                parts.append(dst)
-            else:
+            if not os.path.exists(dst):
                 print("  %-16s missing" % mod)
+                parts.pop()
             continue
-        print("  %-16s -> %s" % (mod, os.path.basename(dst)))
         cmd = [sys.executable, "-m", "expo.renderone", mod, cls,
                "--out", dst, "--width", str(W), "--height", str(H),
                "--render-width", str(RW), "--render-height", str(RH),
@@ -193,11 +208,12 @@ def main() -> int:
             cmd.append("--linear-light")
         if a.no_narrate:
             cmd.append("--no-narrate")
-        r = subprocess.run(cmd, cwd=HERE)
-        if r.returncode != 0:
-            print("  ** %s failed" % mod)
-            return r.returncode
-        parts.append(dst)
+        todo.append((mod, dst, cmd))
+
+    if todo:
+        rc = run_jobs(todo, max(1, a.jobs), a.out)
+        if rc:
+            return rc
 
     if parts:
         print("  script -> %s" % os.path.basename(write_script(parts, a.out, a.name)))

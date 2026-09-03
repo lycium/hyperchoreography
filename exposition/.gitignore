@@ -6,6 +6,9 @@ __pycache__/
 *.pyc
 *.allura.journal
 comp/.media/
+# The end card's turning orbit is a 210 MB FFV1 render, not an input: `make plates`
+# builds it from plates.py, exactly as `render.py` builds the scenes into out/.
+comp/plates/*.mkv
 .venv-tts/
 comp/audition/
 narration/durations.json.lock

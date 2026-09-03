@@ -1,17 +1,17 @@
 0:00 Opening: three bodies on one curve
-1:03 The choreography constraint
-2:45 Least action
-4:32 The Fourier basis
-6:07 The landscape and the Morse index
-7:39 Phase one: L-BFGS
-9:16 Phase two: the damped Newton step
-11:38 Three hard orbits
-14:22 Certification: the shooting Newton
-16:34 Existence: the interval proof
-20:19 Covers, frames and the rigidity gate
-22:46 Where to start: the N-gon spectrum
-24:43 The rotating frame
-26:23 The command line and a record
-28:23 Redundancy, budgets and the twist
-32:05 What is in the catalogue
-33:58 The catalogue, and what is open
+0:57 The choreography constraint
+2:40 Least action
+4:58 The Fourier basis
+6:33 The landscape and the Morse index
+8:05 Phase one: L-BFGS
+9:42 Phase two: the damped Newton step
+12:04 Three hard orbits
+14:48 Certification: the shooting Newton
+17:00 Existence: the interval proof
+20:44 Covers, frames and the rigidity gate
+23:11 Where to start: the N-gon spectrum
+25:08 The rotating frame
+26:48 The command line and a record
+28:48 Redundancy, budgets and the twist
+32:29 What is in the catalogue
+34:23 The catalogue, and what is open

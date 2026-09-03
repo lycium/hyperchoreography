@@ -1,8 +1,4 @@
-"""Render one scene straight into ffmpeg. Invoked by render.py as a subprocess.
-
-A subprocess per scene, because manim's configuration is global and a long deck
-should not accumulate one scene's state into the next.
-"""
+"""Render one scene straight into ffmpeg. Invoked by render.py as a subprocess."""
 
 from __future__ import annotations
 
@@ -48,10 +44,9 @@ def main() -> int:
     fps_hi = a.fps * a.ss
     silent = a.out + ".silent" + os.path.splitext(a.out)[1]
     proc = pipeline.open_encoder(
-        silent, a.render_width, a.render_height, fps_hi, a.ss, a.fps,
-        a.width, a.height, codec=a.codec, depth=a.depth,
-        linear_light=a.linear_light, shape=a.shape)
-    state = pipeline.attach(proc)
+        silent, a.render_width, a.render_height, a.fps, a.width, a.height,
+        codec=a.codec, depth=a.depth)
+    state = pipeline.attach(proc, a.ss, a.shape, a.linear_light)
 
     settings = dict(
         pixel_width=a.render_width,
@@ -59,11 +54,11 @@ def main() -> int:
         frame_rate=fps_hi,
         format="mp4",
         write_to_movie=True,
-        disable_caching=True,          # every animation must actually produce frames
+        disable_caching=True,
         save_last_frame=False,
         preview=False,
         verbosity="ERROR",
-        media_dir=os.path.join(ROOT, "media"),
+        media_dir=os.path.join(ROOT, "media", a.module),
         progress_bar="none",
     )
 
@@ -77,16 +72,14 @@ def main() -> int:
 
     dt = time.time() - t0
     n = state["frames"]
-    total = n / fps_hi
+    total = state["out"] / a.fps
 
     cues = getattr(scene, "cues", [])
-    with open(a.out + ".cues.json", "w") as f:               # for the spoken script
+    with open(a.out + ".cues.json", "w") as f:
         json.dump({"scene": a.scene, "module": a.module,
                    "duration": total, "cues": cues}, f, indent=1)
     voiced = False
     if cues and not a.no_narrate and narrate.enabled():
-        # kept, not deleted: a comp wants the speech as its own layer rather than
-        # cross-faded along with the picture
         wav = os.path.splitext(a.out)[0] + ".narration.wav"
         if narrate.build_track(cues, total, wav):
             lossless = a.codec in ("ffv1", "x264rgb", "utvideo", "prores")
@@ -96,8 +89,9 @@ def main() -> int:
     else:
         os.replace(silent, a.out)
 
-    print("    %s: %d supersampled frames -> %.1f s%s in %.0f s (%.0f fps)"
-          % (a.scene, n, total, " with %d narration cues" % len(cues) if voiced else "",
+    print("    %s: %d supersampled frames -> %d frames, %.1f s%s in %.0f s (%.0f fps)"
+          % (a.scene, n, state["out"], total,
+             " with %d narration cues" % len(cues) if voiced else "",
              dt, n / max(dt, 1e-9)))
     return 0
 

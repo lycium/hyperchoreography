@@ -6,7 +6,7 @@ from manim import (VGroup, FadeIn, FadeOut, Create, UP, DOWN, LEFT, RIGHT,
 
 from expo import nbody, optim, targets, theme as T
 from expo.base import ExpoScene
-from expo.mathtext import B, M, C, sb, sp, Crow
+from expo.mathtext import B, M, C, sb, sp, table
 from expo.plots import Plot, growing_line
 from expo.readout import Field, sci
 from expo.viz import OrbitView, Projector, eigen_strip
@@ -36,7 +36,6 @@ class PhaseTwo(ExpoScene):
         self.say("Linearise, solve for the step, repeat. H is the matrix of second "
                  "derivatives, which this program has in closed form.")
 
-        # — the eigenbasis picture -----------------------------------------
         self.play(FadeOut(VGroup(eq, sub)), newton.animate.move_to(UP * 2.5).scale(0.8),
                   run_time=1.0)
 
@@ -49,9 +48,6 @@ class PhaseTwo(ExpoScene):
                  "independent pieces: one number per direction, each scaled by that "
                  "direction's own curvature.")
 
-        # gain curve — sized so its axis label stays above the narration band, whose
-        # three-line top reaches y = -2.2 (expo/base.py); the first cut of this scene
-        # ran the plot to -2.7 and pushed the annotations below the frame edge
         lam = np.linspace(-3.0, 3.0, 601)
         mu = 0.25
         plot = Plot((-3, 3), (-2.4, 2.4), width=5.2, height=2.0,
@@ -84,7 +80,6 @@ class PhaseTwo(ExpoScene):
 
         self.wipe(run_time=1.0)
 
-        # — the directions that cost nothing -------------------------------
         x = feat.x
         frame = targets.principal_frame(P, x)
         view = OrbitView(lambda ts: P.bodies(x, ts), P.N, radius=1.85,
@@ -132,7 +127,6 @@ class PhaseTwo(ExpoScene):
 
         self.wipe(run_time=1.0)
 
-        # — quadratic convergence -------------------------------------------
         g = tr.gnorm
         plot2 = Plot((0, len(g) - 1), (1e-13, 10.0), width=5.6, height=3.0,
                      center=RIGHT * 2.9 + DOWN * 0.2, log_y=True,
@@ -141,13 +135,14 @@ class PhaseTwo(ExpoScene):
         line = plot2.line(range(len(g)), g, color=T.COOL, width=3.0, smooth=False)
         dots = VGroup(*[plot2.marker(i, v, color=T.CURVE, r=0.06)
                         for i, v in enumerate(g)])
-        rows = VGroup(*[Crow("%d    %s" % (i, sci(v, 2)), size=T.SZ_SMALL,
-                          color=T.INK if i else T.INK_DIM)
-                        for i, v in enumerate(g)])
-        rows.arrange(DOWN, buff=0.20, aligned_edge=LEFT)
-        rows.move_to(LEFT * 4.3 + DOWN * 0.2)
-        head = Crow("step   size of the gradient", size=T.SZ_TINY, color=T.INK_DIM)
-        head.next_to(rows, UP, buff=0.30).align_to(rows, LEFT)
+        tab = table([("step", "size of the gradient")]
+                    + [("%d" % i, sci(v, 2)) for i, v in enumerate(g)],
+                    align="rr", sizes=[T.SZ_TINY] + [T.SZ_SMALL] * len(g),
+                    colors=[T.INK_DIM] + [T.INK_DIM if i == 0 else T.INK
+                                          for i in range(len(g))],
+                    col_buff=0.55, row_buff=0.20, head_buff=0.14)
+        tab.move_to(LEFT * 4.3 + DOWN * 0.1)
+        head, rows = tab.rows[0], tab.rows[1:]
 
         self.play(FadeIn(plot2), FadeIn(head), run_time=1.0)
         self.say_with("This is the real thing, finishing the figure eight off.",

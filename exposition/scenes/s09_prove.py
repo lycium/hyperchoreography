@@ -1,10 +1,4 @@
-"""From a certified orbit to a theorem: interval arithmetic, the validated flow, Krawczyk's test.
-
-Nothing here is drawn from imagination. The corridor of pale rectangles is the rough enclosure
-the prover laid down at every step of its own run on the eight (`data/prove_eight.json`, from
-`hyperchoreography prove --verbose`); the box widths are the widths it measured; the ellipse is
-the flow of `shoot.py` differentiated; the certificate is the prover's own printout.
-"""
+"""From a certified orbit to a theorem: interval arithmetic, the validated flow, Krawczyk's test."""
 
 import json
 import os
@@ -15,7 +9,7 @@ from manim import (VGroup, VMobject, FadeIn, FadeOut, Create, Square, Polygon, L
                    Arrow, DashedLine, UpdateFromAlphaFunc, Transform,
                    UP, DOWN, LEFT, RIGHT, ORIGIN, PI, linear, rate_functions)
 
-from expo import catalog, nbody, shoot, theme as T
+from expo import catalog, nbody, shoot, theme as T, viz
 from expo.base import ExpoScene
 from expo.mathtext import B, M, C, sb, sp, Crow
 from expo.plots import Plot, growing_line
@@ -31,8 +25,7 @@ def load_proof(name):
 
 
 def prepare_ellipse():
-    """Body 0's position over one T/N, and how it moves with its own starting position:
-    the 2x2 block of the flow's Jacobian, by central differences of the RK4 flow."""
+    """Body 0's position over one T/N, and how it moves with its own starting position:"""
     rec = catalog.load("eight")
     P = nbody.Action(rec.N, 2, int(rec.modes.max()), modes=rec.modes)
     x = np.array(rec.coef[:, :, :2])
@@ -66,8 +59,7 @@ def prepare_ellipse():
 
 
 def interval_markup(lo: str, hi: str, places: int, tail_color: str):
-    """[lo, hi] printed to `places` decimals, rounded outward so the printed interval still
-    contains the true value, the digits the two ends share in ink and the rest in colour."""
+    """[lo, hi] printed to `places` decimals, rounded outward so the printed interval still"""
     q = Decimal(1).scaleb(-places)
     a = format(Decimal(lo).quantize(q, rounding=ROUND_FLOOR), "f")
     b = format(Decimal(hi).quantize(q, rounding=ROUND_CEILING), "f")
@@ -79,28 +71,32 @@ def interval_markup(lo: str, hi: str, places: int, tail_color: str):
 
 
 class GlowSquare(VGroup):
-    """A box with a soft halo, resizable in place."""
+    """A box inside a soft halo, resizable in place."""
 
-    def __init__(self, color, side: float, layers: int = 6):
+    REACH = 1.2
+
+    def __init__(self, color, side: float, layers: int = viz.HALO_LAYERS):
         super().__init__()
         self.layers = layers
-        for i in range(layers, 0, -1):
-            s = Square(side_length=side * (1 + 0.5 * i / layers), stroke_width=0,
-                       fill_color=color, fill_opacity=0.05)
+        self.side = side
+        alphas = viz.halo_alphas(layers)
+        for k in range(layers, 0, -1):
+            s = Square(side_length=side * self._span(k / layers), stroke_width=0,
+                       fill_color=color, fill_opacity=alphas[k - 1])
             self.add(s)
         self.core = Square(side_length=side, stroke_width=1.8, stroke_color=color,
                            fill_color=color, fill_opacity=0.30)
         self.add(self.core)
 
+    def _span(self, f: float) -> float:
+        return 1.0 + self.REACH * f
+
     def resize(self, side: float, at):
-        for i, s in enumerate(self.submobjects[:-1]):
-            k = self.layers - i
-            s.stretch_to_fit_width(side * (1 + 0.5 * k / self.layers))
-            s.stretch_to_fit_height(side * (1 + 0.5 * k / self.layers))
-            s.move_to(at)
-        self.core.stretch_to_fit_width(side)
-        self.core.stretch_to_fit_height(side)
-        self.core.move_to(at)
+        """Scale the whole stack at once rather than stretching each layer."""
+        if side != self.side:
+            self.scale(side / self.side)
+            self.side = side
+        self.move_to(at)
         return self
 
 
@@ -114,8 +110,6 @@ class TheProof(ExpoScene):
         rec, ell = prepare_ellipse()
         cool, gold, zero = T.COOL.to_hex(), T.GOLD.to_hex(), T.ZERO.to_hex()
 
-        # ------------------------------------------------------------------
-        # from a measurement to a theorem
         row1 = VGroup(M("|Φ%s(<i>Z</i>) − <i>S</i> <i>Z</i>|  ≤  1.2·10%s" % (sb("<i>T</i>/<i>N</i>"), sp("−15")),
                         size=0.50, color=T.COOL),
                       B("a measurement, in floating point", size=T.SZ_SMALL, color=T.INK_DIM)
@@ -135,8 +129,6 @@ class TheProof(ExpoScene):
                       "to change.", Create(arrow), FadeIn(row2), run_time=1.1)
         self.wipe(run_time=0.9)
 
-        # ------------------------------------------------------------------
-        # intervals
         axis_y = 1.35
         axis = Line(LEFT * 5.2 + UP * axis_y, RIGHT * 5.2 + UP * axis_y, stroke_width=1.2,
                     color=T.RULE)
@@ -166,7 +158,6 @@ class TheProof(ExpoScene):
         self.play(FadeIn(ib), FadeIn(lb), run_time=0.7)
         y2 = -0.55
         axis2 = Line(LEFT * 5.2 + UP * y2, RIGHT * 5.2 + UP * y2, stroke_width=1.2, color=T.RULE)
-        # [a] + [b] = [a.lo + b.lo, a.hi + b.hi], and one more unit in the last place each way
         eps = 0.09
         isum = bar(-2.6 + 1.1 - eps, -0.4 + 2.4 + eps, y2, T.CURVE)
         lsum = C("[a] + [b]", size=T.SZ_SMALL, color=T.CURVE).next_to(isum, UP, buff=0.18)
@@ -182,8 +173,6 @@ class TheProof(ExpoScene):
                  "only arithmetic a theorem can be built on.")
         self.wipe(run_time=0.9)
 
-        # ------------------------------------------------------------------
-        # the validated flow: the corridor of enclosures along the eight
         view = OrbitView(rec.bodies, rec.N, radius=2.05, center=LEFT * 3.4 + DOWN * 0.3,
                          projector=Projector(rec.d, rec.principal_frame()), samples=720,
                          curve_width=2.4, dot_radius=0.07)
@@ -192,14 +181,14 @@ class TheProof(ExpoScene):
             return view._screen(np.array([[xy[0], xy[1], 0.0]]))[0]
 
         rects = VGroup()
-        wb = np.array(pf["wbox"])                            # t0, h, xlo, xhi, ylo, yhi
+        wb = np.array(pf["wbox"])
         for t0, h, xlo, xhi, ylo, yhi in wb:
             poly = Polygon(screen((xlo, ylo)), screen((xhi, ylo)), screen((xhi, yhi)),
                            screen((xlo, yhi)), stroke_width=1.2, stroke_color=T.COOL,
                            fill_color=T.COOL, fill_opacity=0.0)
             poly.set_stroke(opacity=0.0)
             rects.add(poly)
-        trace = np.array(pf["box"])                          # t, h, width
+        trace = np.array(pf["box"])
         tt, ww = trace[:, 0], trace[:, 2]
         lw0, lw1 = np.log10(ww.min()), np.log10(ww.max())
 
@@ -250,14 +239,12 @@ class TheProof(ExpoScene):
                  "eighty-eight bits, so that a box which starts at ten to the minus twenty "
                  "can afford to.")
 
-        # ------------------------------------------------------------------
-        # why it grows: the uncertainty ellipse against the box that must hold it
         self.play(FadeOut(rects), FadeOut(glow), FadeOut(plot), FadeOut(gline), FadeOut(fw),
                   run_time=0.9)
         view.set_time(0.0)
         r0 = 0.10
         th = np.linspace(0, 2 * PI, 72, endpoint=False)
-        unit = np.stack([np.cos(th), np.sin(th)]) * r0            # (2, 72)
+        unit = np.stack([np.cos(th), np.sin(th)]) * r0
         ets, epos, eJ = ell["ts"], ell["pos"], ell["J"]
 
         def ellipse_pts(t):
@@ -265,7 +252,7 @@ class TheProof(ExpoScene):
             a = (t - ets[i - 1]) / (ets[i] - ets[i - 1])
             J = (1 - a) * eJ[i - 1] + a * eJ[i]
             c = (1 - a) * epos[i - 1] + a * epos[i]
-            return (c[:, None] + J @ unit).T                       # (72, 2), orbit coordinates
+            return (c[:, None] + J @ unit).T
 
         disc = VMobject(stroke_width=1.6)
         disc.set_stroke(T.ZERO, opacity=0.95)
@@ -340,8 +327,6 @@ class TheProof(ExpoScene):
                  "in code.")
         self.wipe(run_time=0.9)
 
-        # ------------------------------------------------------------------
-        # Krawczyk
         formula = M("<i>K</i>(<i>B</i>)  =  <i>Z</i>%s − <i>Y</i> <i>F</i>(<i>Z</i>%s) + (<i>I</i> − <i>Y</i> <i>DF</i>(<i>B</i>)) (<i>B</i> − <i>Z</i>%s)"
                     % (sb("0"), sb("0"), sb("0")), size=0.46, color=T.INK).move_to(UP * 2.45)
         self.say_with("The same recurrence, differentiated term by term, encloses the "
@@ -385,8 +370,6 @@ class TheProof(ExpoScene):
                  "too large.")
         self.wipe(run_time=0.9)
 
-        # ------------------------------------------------------------------
-        # the gauge, closed by the conservation laws
         left = ["time shift", "translation, twice", "rotation"]
         right = ["energy", "momentum, twice", "angular momentum"]
         hl = B("flat directions", size=T.SZ_SMALL, color=T.INK_DIM).move_to(LEFT * 3.2 + UP * 2.15)
@@ -415,8 +398,6 @@ class TheProof(ExpoScene):
                  "too.")
         self.wipe(run_time=0.9)
 
-        # ------------------------------------------------------------------
-        # the certificate
         head = Crow("PROVEN    N = %d    d = %d    period 2π" % (pf["N"], pf["d"]),
                  size=T.SZ_BODY, color=T.GOOD)
         e_lo, e_hi = pf["energy"]
@@ -437,7 +418,6 @@ class TheProof(ExpoScene):
                       FadeIn(cert[1], shift=RIGHT * 0.08), FadeIn(cert[2], shift=RIGHT * 0.08),
                       FadeIn(cert[3]), run_time=1.8, lag=0.3)
 
-        # the finale: the eleven-dimensional orbit from the end of the film, as a theorem
         fr = pg["frame"] or {}
         rates = fr.get("rates", [])
         try:
@@ -471,7 +451,7 @@ class TheProof(ExpoScene):
         self.say_with("In a turning frame the same argument goes through: the frame's rotation "
                       "becomes an interval matrix, and its commuting rotations are the gauge. "
                       "The eleven-dimensional orbit that closes this film is a theorem: "
-                      "%s on eighteen cores." % spoken,
+                      "%s." % spoken,
                       FadeIn(view11), FadeIn(cert11, shift=RIGHT * 0.08),
                       tumble(view11, turns=1.0, sweep=2 * PI), run_time=10.0, rate_func=linear)
         self.say_with("Every record this has been run on has passed. Proving the rest of the "

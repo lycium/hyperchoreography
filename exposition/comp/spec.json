@@ -1,52 +1,10 @@
 {
  "comps": [
   {
-   "name": "title",
-   "size": [
-    1920,
-    1080
-   ],
-   "fps": [
-    30,
-    1
-   ],
-   "duration": 6.0,
-   "layers": [
-    {
-     "footage": "plates/Backdrop.png",
-     "name": "backdrop",
-     "at": 0.0,
-     "until": 6.0,
-     "hold": true,
-     "transfer": "linear"
-    },
-    {
-     "footage": "plates/TitleOrbit.png",
-     "name": "orbit",
-     "at": 0.0,
-     "until": 6.0,
-     "hold": true,
-     "transfer": "linear",
-     "fade_in": 1.8,
-     "fade_out": 1.3
-    },
-    {
-     "footage": "plates/TitleName.png",
-     "name": "name",
-     "at": 0.9,
-     "until": 5.6,
-     "hold": true,
-     "transfer": "linear",
-     "fade_in": 1.2,
-     "fade_out": 1.0
-    }
-   ]
-  },
-  {
    "name": "endcard",
    "size": [
-    1920,
-    1080
+    3840,
+    2160
    ],
    "fps": [
     30,
@@ -63,11 +21,10 @@
      "transfer": "linear"
     },
     {
-     "footage": "plates/EndOrbit.png",
+     "footage": "plates/EndOrbit.mkv",
      "name": "orbit",
      "at": 0.3,
      "until": 13.6,
-     "hold": true,
      "transfer": "linear",
      "fade_in": 1.8,
      "fade_out": 1.6
@@ -103,8 +60,8 @@
      "fade_out": 1.1
     },
     {
-     "footage": "plates/EndAllura.png",
-     "name": "endallura",
+     "footage": "plates/EndCredits.png",
+     "name": "endcredits",
      "at": 2.8,
      "until": 13.2,
      "hold": true,
@@ -117,336 +74,330 @@
   {
    "name": "hyperchoreography",
    "size": [
-    1920,
-    1080
+    3840,
+    2160
    ],
    "fps": [
     30,
     1
    ],
-   "duration": 2052.4333333333334,
+   "duration": 2077.2,
    "markers": [
     {
      "t": 0.0,
      "text": "Opening: three bodies on one curve"
     },
     {
-     "t": 62.93333333333333,
+     "t": 56.93333333333333,
      "text": "The choreography constraint"
     },
     {
-     "t": 164.56666666666666,
+     "t": 160.16666666666666,
      "text": "Least action"
     },
     {
-     "t": 271.6666666666667,
+     "t": 298.1333333333333,
      "text": "The Fourier basis"
     },
     {
-     "t": 366.6666666666667,
+     "t": 393.1,
      "text": "The landscape and the Morse index"
     },
     {
-     "t": 459.0,
+     "t": 485.4,
      "text": "Phase one: L-BFGS"
     },
     {
-     "t": 555.6333333333333,
+     "t": 582.0,
      "text": "Phase two: the damped Newton step"
     },
     {
-     "t": 697.6666666666666,
+     "t": 723.9333333333333,
      "text": "Three hard orbits"
     },
     {
-     "t": 861.5666666666667,
+     "t": 887.8333333333334,
      "text": "Certification: the shooting Newton"
     },
     {
-     "t": 993.9333333333333,
+     "t": 1020.1,
      "text": "Existence: the interval proof"
     },
     {
-     "t": 1218.9666666666667,
+     "t": 1244.1666666666667,
      "text": "Covers, frames and the rigidity gate"
     },
     {
-     "t": 1365.9666666666667,
+     "t": 1391.1333333333334,
      "text": "Where to start: the N-gon spectrum"
     },
     {
-     "t": 1482.8333333333333,
+     "t": 1507.9333333333334,
      "text": "The rotating frame"
     },
     {
-     "t": 1582.8,
+     "t": 1607.8333333333333,
      "text": "The command line and a record"
     },
     {
-     "t": 1703.3,
+     "t": 1728.2333333333333,
      "text": "Redundancy, budgets and the twist"
     },
     {
-     "t": 1924.6666666666667,
+     "t": 1949.4666666666667,
      "text": "What is in the catalogue"
     },
     {
-     "t": 2038.4333333333334,
+     "t": 2063.2,
      "text": "The catalogue, and what is open"
     }
    ],
    "layers": [
     {
-     "comp": "title",
-     "name": "title",
-     "at": 0.0,
-     "until": 6.0
-    },
-    {
      "footage": "../out/s00_open.mkv",
      "name": "s00_open",
-     "at": 6.0,
-     "until": 62.93333333333333,
+     "at": 0.0,
+     "until": 56.93333333333333,
      "transfer": "linear",
      "gain": 0.0
     },
     {
      "footage": "../out/s01_choreo.mkv",
      "name": "s01_choreo",
-     "at": 62.93333333333333,
-     "until": 164.56666666666666,
+     "at": 56.93333333333333,
+     "until": 160.16666666666666,
      "transfer": "linear",
      "gain": 0.0
     },
     {
      "footage": "../out/s02_action.mkv",
      "name": "s02_action",
-     "at": 164.56666666666666,
-     "until": 271.6666666666667,
+     "at": 160.16666666666666,
+     "until": 298.1333333333333,
      "transfer": "linear",
      "gain": 0.0
     },
     {
      "footage": "../out/s03_fourier.mkv",
      "name": "s03_fourier",
-     "at": 271.6666666666667,
-     "until": 366.6666666666667,
+     "at": 298.1333333333333,
+     "until": 393.1,
      "transfer": "linear",
      "gain": 0.0
     },
     {
      "footage": "../out/s04_landscape.mkv",
      "name": "s04_landscape",
-     "at": 366.6666666666667,
-     "until": 459.0,
+     "at": 393.1,
+     "until": 485.4,
      "transfer": "linear",
      "gain": 0.0
     },
     {
      "footage": "../out/s05_lbfgs.mkv",
      "name": "s05_lbfgs",
-     "at": 459.0,
-     "until": 555.6333333333333,
+     "at": 485.4,
+     "until": 582.0,
      "transfer": "linear",
      "gain": 0.0
     },
     {
      "footage": "../out/s06_newton.mkv",
      "name": "s06_newton",
-     "at": 555.6333333333333,
-     "until": 697.6666666666666,
+     "at": 582.0,
+     "until": 723.9333333333333,
      "transfer": "linear",
      "gain": 0.0
     },
     {
      "footage": "../out/s07_hard.mkv",
      "name": "s07_hard",
-     "at": 697.6666666666666,
-     "until": 861.5666666666667,
+     "at": 723.9333333333333,
+     "until": 887.8333333333334,
      "transfer": "linear",
      "gain": 0.0
     },
     {
      "footage": "../out/s08_certify.mkv",
      "name": "s08_certify",
-     "at": 861.5666666666667,
-     "until": 993.9333333333333,
+     "at": 887.8333333333334,
+     "until": 1020.1,
      "transfer": "linear",
      "gain": 0.0
     },
     {
      "footage": "../out/s09_prove.mkv",
      "name": "s09_prove",
-     "at": 993.9333333333333,
-     "until": 1218.9666666666667,
+     "at": 1020.1,
+     "until": 1244.1666666666667,
      "transfer": "linear",
      "gain": 0.0
     },
     {
      "footage": "../out/s10_sameorbit.mkv",
      "name": "s10_sameorbit",
-     "at": 1218.9666666666667,
-     "until": 1365.9666666666667,
+     "at": 1244.1666666666667,
+     "until": 1391.1333333333334,
      "transfer": "linear",
      "gain": 0.0
     },
     {
      "footage": "../out/s11_starts.mkv",
      "name": "s11_starts",
-     "at": 1365.9666666666667,
-     "until": 1482.8333333333333,
+     "at": 1391.1333333333334,
+     "until": 1507.9333333333334,
      "transfer": "linear",
      "gain": 0.0
     },
     {
      "footage": "../out/s12_frame.mkv",
      "name": "s12_frame",
-     "at": 1482.8333333333333,
-     "until": 1582.8,
+     "at": 1507.9333333333334,
+     "until": 1607.8333333333333,
      "transfer": "linear",
      "gain": 0.0
     },
     {
      "footage": "../out/s13_usage.mkv",
      "name": "s13_usage",
-     "at": 1582.8,
-     "until": 1703.3,
+     "at": 1607.8333333333333,
+     "until": 1728.2333333333333,
      "transfer": "linear",
      "gain": 0.0
     },
     {
      "footage": "../out/s14_structure.mkv",
      "name": "s14_structure",
-     "at": 1703.3,
-     "until": 1924.6666666666667,
+     "at": 1728.2333333333333,
+     "until": 1949.4666666666667,
      "transfer": "linear",
      "gain": 0.0
     },
     {
      "footage": "../out/s15_close.mkv",
      "name": "s15_close",
-     "at": 1924.6666666666667,
-     "until": 2038.4333333333334,
+     "at": 1949.4666666666667,
+     "until": 2063.2,
      "transfer": "linear",
      "gain": 0.0
     },
     {
      "footage": "../out/s00_open.narration.wav",
      "name": "s00_open.voice",
-     "at": 6.0,
-     "until": 62.96670833333334,
+     "at": 0.0,
+     "until": 56.93329166666667,
      "gain": 1.476
     },
     {
      "footage": "../out/s01_choreo.narration.wav",
      "name": "s01_choreo.voice",
-     "at": 62.93333333333333,
-     "until": 164.616625,
+     "at": 56.93333333333333,
+     "until": 160.166625,
      "gain": 1.476
     },
     {
      "footage": "../out/s02_action.narration.wav",
      "name": "s02_action.voice",
-     "at": 164.56666666666666,
-     "until": 271.69166666666666,
+     "at": 160.16666666666666,
+     "until": 298.133375,
      "gain": 1.476
     },
     {
      "footage": "../out/s03_fourier.narration.wav",
      "name": "s03_fourier.voice",
-     "at": 271.6666666666667,
-     "until": 366.7166666666667,
+     "at": 298.1333333333333,
+     "until": 393.10004166666664,
      "gain": 1.476
     },
     {
      "footage": "../out/s04_landscape.narration.wav",
      "name": "s04_landscape.voice",
-     "at": 366.6666666666667,
-     "until": 459.04995833333334,
+     "at": 393.1,
+     "until": 485.40000000000003,
      "gain": 1.476
     },
     {
      "footage": "../out/s05_lbfgs.narration.wav",
      "name": "s05_lbfgs.voice",
-     "at": 459.0,
-     "until": 555.6832916666667,
+     "at": 485.4,
+     "until": 582.0,
      "gain": 1.476
     },
     {
      "footage": "../out/s06_newton.narration.wav",
      "name": "s06_newton.voice",
-     "at": 555.6333333333333,
-     "until": 697.6916249999999,
+     "at": 582.0,
+     "until": 723.9332916666667,
      "gain": 1.476
     },
     {
      "footage": "../out/s07_hard.narration.wav",
      "name": "s07_hard.voice",
-     "at": 697.6666666666666,
-     "until": 861.6166666666666,
+     "at": 723.9333333333333,
+     "until": 887.8333333333333,
      "gain": 1.476
     },
     {
      "footage": "../out/s08_certify.narration.wav",
      "name": "s08_certify.voice",
-     "at": 861.5666666666667,
-     "until": 993.9666666666667,
+     "at": 887.8333333333334,
+     "until": 1020.1000416666667,
      "gain": 1.476
     },
     {
      "footage": "../out/s09_prove.narration.wav",
      "name": "s09_prove.voice",
-     "at": 993.9333333333333,
-     "until": 1219.0083333333332,
+     "at": 1020.1,
+     "until": 1244.1667083333334,
      "gain": 1.476
     },
     {
      "footage": "../out/s10_sameorbit.narration.wav",
      "name": "s10_sameorbit.voice",
-     "at": 1218.9666666666667,
-     "until": 1365.9999583333333,
+     "at": 1244.1666666666667,
+     "until": 1391.1333750000001,
      "gain": 1.476
     },
     {
      "footage": "../out/s11_starts.narration.wav",
      "name": "s11_starts.voice",
-     "at": 1365.9666666666667,
-     "until": 1482.8666666666668,
+     "at": 1391.1333333333334,
+     "until": 1507.9333333333334,
      "gain": 1.476
     },
     {
      "footage": "../out/s12_frame.narration.wav",
      "name": "s12_frame.voice",
-     "at": 1482.8333333333333,
-     "until": 1582.8333333333333,
+     "at": 1507.9333333333334,
+     "until": 1607.8333333333335,
      "gain": 1.476
     },
     {
      "footage": "../out/s13_usage.narration.wav",
      "name": "s13_usage.voice",
-     "at": 1582.8,
-     "until": 1703.3332916666666,
+     "at": 1607.8333333333333,
+     "until": 1728.2333333333333,
      "gain": 1.476
     },
     {
      "footage": "../out/s14_structure.narration.wav",
      "name": "s14_structure.voice",
-     "at": 1703.3,
-     "until": 1924.6917083333333,
+     "at": 1728.2333333333333,
+     "until": 1949.466625,
      "gain": 1.476
     },
     {
      "footage": "../out/s15_close.narration.wav",
      "name": "s15_close.voice",
-     "at": 1924.6666666666667,
-     "until": 2038.4666666666667,
+     "at": 1949.4666666666667,
+     "until": 2063.1999583333336,
      "gain": 1.476
     },
     {
      "comp": "endcard",
      "name": "endcard",
-     "at": 2038.4333333333334,
-     "until": 2052.4333333333334
+     "at": 2063.2,
+     "until": 2077.2
     }
    ]
   }

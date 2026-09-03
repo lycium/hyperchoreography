@@ -1,14 +1,4 @@
-#!/usr/bin/env python3
-"""Checks that the film is telling the truth.
-
-Three things could go wrong quietly. The numerics could drift from the solver's,
-and every number on screen would be subtly wrong. The Morse index could be
-computed the naive way, and the counts would disagree with the catalogue. Or the
-time filter could stop being a tent, and the motion blur would be wrong in a way
-nobody would notice by eye.
-
-    .venv/bin/python selftest.py
-"""
+"""Checks that the film is telling the truth."""
 
 import subprocess
 import sys
@@ -20,7 +10,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from expo import catalog, nbody, optim, shoot, targets
-from expo.pipeline import filter_chain, tent_weights
+from expo.pipeline import TimeFilter, tent_weights
 
 fails = []
 
@@ -103,24 +93,24 @@ check("shift residual of the stored coefficients", 1e-11 < res < 1e-10,
 
 print("the time filter is exactly a tent over overlapping windows")
 check("tent weights", tent_weights(4) == [1, 2, 3, 4, 3, 2, 1], str(tent_weights(4)))
-with tempfile.TemporaryDirectory() as d:
-    from PIL import Image
-    for i in range(8):                       # a ramp, so the answer is checkable
-        Image.fromarray(np.full((16, 16, 3), i * 36, np.uint8)).save(
-            os.path.join(d, "f%02d.png" % i))
-    out = os.path.join(d, "out.mkv")
-    got = os.path.join(d, "got.png")
-    vf = filter_chain(4, 30, 16, 16, 16, 16)
-    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-                    "-framerate", "120", "-i", os.path.join(d, "f%02d.png"),
-                    "-vf", vf, "-r", "30", "-c:v", "ffv1", out], check=True)
-    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-                    "-i", out, "-frames:v", "1", got], check=True)
-    v = float(np.array(Image.open(got))[0, 0, 0])
-    w = tent_weights(4)
-    want = sum(a * b for a, b in zip(w, [i * 36 for i in range(7)])) / sum(w)
-    check("first output frame is the tent mean", abs(v - want) < 0.5,
-          "%g, want %g" % (v, want))
+for ss in (4, 16):
+    tf = TimeFilter(ss, "tent")
+    w = tent_weights(ss)
+    n = 3 * ss + len(w)
+    got = []
+    for i in range(n):
+        got += tf.push(np.full((4, 4, 4), (i * 7) % 256, np.uint8))
+    want_n = (n - len(w)) // ss + 1
+    check("ss %d: %d supersampled frames make %d" % (ss, n, want_n),
+          len(got) == want_n, "%d" % len(got))
+    worst = 0.0
+    for k, data in enumerate(got):
+        v = float(np.frombuffer(data, np.uint16)[0]) * 255.0 / 65535.0
+        want = sum(a * ((i + k * ss) * 7 % 256)
+                   for a, i in zip(w, range(len(w)))) / sum(w)
+        worst = max(worst, abs(v - want))
+    check("ss %d: every window is the tent mean of its frames" % ss, worst < 0.02,
+          "worst %.4f code values" % worst)
 
 print()
 if fails:

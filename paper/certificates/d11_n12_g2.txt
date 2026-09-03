@@ -1,0 +1,14 @@
+record 13 (N=12 d=11 deff=11 action=22.745582769849):
+  frame: 5 planes, rates 1 2 3 4 5; 1 translations, 5 commuting rotations
+  refined to residual 1.32e-49 in 89.6s (388 bits, order 54, radius 1.0e-20, tol 1e-44)
+  conservation rows (1 translations, energy, 5 rotations), max entries: 1 0.816 0.747 0.801 0.731 0.814 0.402
+  point run: 7 steps, 1 rejected, h in [5.26e-02, 8.26e-02], |F(Z0)| <= 3.16e-31
+  box run:   7 steps, 1 rejected, h in [5.26e-02, 8.26e-02], max state width 1.49e-18 (radius 1.0e-20)
+ PROVEN in 615.8s
+  a choreography of N=12 bodies in R^11, period 2pi in the rotating frame, exists with initial state within 1.3e-19 (max norm) of the refined state,
+  the only zero of the shooting map in the slice box Z0 + Q[-r, r]^m, r = 1.0e-20; the bodies span R^11: verified; not a relative equilibrium: verified.
+  Krawczyk: |Y F| = 1.7e-29, contraction 6.08e-12, closure 6.70e-16; slice dim 257, 7 gauge generators;
+  7 validated Taylor steps (1 rejected), h in [5.3e-02, 8.3e-02], state width <= 1.5e-18
+  energy in [-1.44802877253092393810238e+01, -1.44802877253092393590673e+01]
+  action in [2.27455827698489821389546e+01, 2.27455827698489822103799e+01]
+1 of 1 proven

@@ -1,26 +1,10 @@
-"""The narration track.
-
-The captions are written to be read aloud, so the deck is paced by how long a
-reading actually takes rather than by a guess. Two synthesisers are wired in:
-
-* macOS `say` (the default) — instant, dependency-free, robotic; the original
-  stand-in.
-* Kokoro, a small neural TTS that runs locally — set EXPO_VOICE to
-  `kokoro:<voice>` (e.g. `kokoro:bm_george`), with an optional speed suffix
-  (`kokoro:bm_george@1.05`). First use downloads the model; en-GB voices are
-  bm_daniel, bm_fable, bm_george, bm_lewis.
-
-Either way the clips are ordinary audio files, so a real recording can still be
-dropped in later by replacing them. Each line is synthesised once and cached by
-the hash of (voice, rate, text), so a re-render costs nothing and the timing
-never moves under you — and CHANGING the voice re-times the whole film, which is
-the point: the film is paced by the reading it actually carries.
-"""
+"""The narration track."""
 
 from __future__ import annotations
 
 import hashlib
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -35,10 +19,6 @@ RATE = int(os.environ.get("EXPO_RATE", "168"))
 
 _durations = None
 
-# Kokoro lives in its OWN venv on an older interpreter (torch and spacy have no
-# wheels for the film venv's Python yet), so synthesis is a subprocess exactly as
-# `say` is. The model loads per invocation (~3 s); every line is cached forever,
-# so the cost is paid once per line ever.
 TTS_PY = os.path.join(ROOT, "narration", ".venv-tts", "bin", "python")
 _KOKORO_SNIPPET = """\
 import sys
@@ -61,14 +41,10 @@ def _kokoro_spec() -> tuple[str, float] | None:
     return voice, float(speed) if speed else 1.0
 
 
-def _kokoro_synth(text: str, path: str) -> bool:
-    voice, speed = _kokoro_spec()
+def _kokoro_synth(text: str, path: str, speed: float | None = None) -> bool:
+    voice, voice_speed = _kokoro_spec()
+    speed = voice_speed if speed is None else voice_speed * speed
     env = dict(os.environ)
-    # This network re-signs TLS with a CA that macOS trusts and Python's bundle does
-    # not, and hf-xet (the hub's Rust transfer backend) reads neither REQUESTS_CA_BUNDLE
-    # nor the keychain — so the model download runs on the plain backend with a bundle
-    # exported from the system keychain (built beside the venv). Both are inert on a
-    # network with honest certificates.
     ca = os.path.join(os.path.dirname(TTS_PY), "..", "ca-bundle.pem")
     if os.path.exists(ca):
         env.setdefault("REQUESTS_CA_BUNDLE", os.path.abspath(ca))
@@ -105,9 +81,7 @@ def _load_index() -> dict:
 
 
 def _save_index():
-    """Merge into the file on disk under a lock and replace it atomically, so several
-    scenes rendering at once neither lose each other's lines nor read a half-written index
-    (which would look empty and re-synthesise every line)."""
+    """Merge into the file on disk under a lock and replace it atomically, so several"""
     import fcntl
     os.makedirs(os.path.dirname(INDEX), exist_ok=True)
     with open(INDEX + ".lock", "w") as lf:
@@ -126,25 +100,61 @@ def _save_index():
         os.replace(tmp, INDEX)
 
 
+SAID_AS = [
+    (re.compile(r"\bKrawczyk\b"), "[Krawczyk](/k\u0279\u02c8avt\u0283\u026ak/)"),
+    (re.compile(r"\bFourier\b"), "[Fourier](/f\u02c8\u028a\u0279ie\u026a/)"),
+    (re.compile(r"\bChenciner\b"), "[Chenciner](/\u0283\u0252nsi\u02c8ne\u026a/)"),
+    (re.compile(r"\bLagrangian\b"), "[Lagrangian](/l\u0250\u02c8\u0261\u0279\u0251\u02d0n\u0292i\u0259n/)"),
+    (re.compile(r"\bindex\b"), "[index](/\u02c8\u026and\u0259ks/)"),
+    (re.compile(r"\barithmetic\b(?!\s+resonance)"),
+     "[arithmetic](/\u0250\u0279\u02c8\u026a\u03b8m\u0259t\u026ak/)"),
+    # Two words: misaki joins the hyphen into one, and the n then assimilates into
+    # the b with no closure between them -- "embody".
+    (re.compile(r"\bN-body\b"), "[N-body](/\u02c8\u025b\u02d0n b\u02c8\u0252di/)"),
+]
+
+
+PACE = [
+    (re.compile(r"^This film is about a program\b"), 0.94),
+]
+
+
+def pace_of(text: str) -> float:
+    for pat, speed in PACE:
+        if pat.search(text):
+            return speed
+    return 1.0
+
+
+def said_as(text: str) -> str:
+    """The line as the synthesiser should hear it; the caption is left alone."""
+    for pat, rep in SAID_AS:
+        text = pat.sub(rep, text)
+    return text
+
+
 def key(text: str) -> str:
     return hashlib.sha1(("%s|%d|%s" % (VOICE, RATE, text)).encode()).hexdigest()[:16]
 
 
-def clip(text: str) -> str | None:
-    """The audio file for one line, synthesised if it is not already cached.
+def _key(text: str, speed: float) -> str:
+    """Keys that carry the pace only when it is not the default, so adding PACE to one"""
+    return key(text if speed == 1.0 else "%s|%g" % (text, speed))
 
-    The two backends cache under different extensions, and the sample rate need
-    not match the mix: build_track resamples every clip to the 48 kHz bed.
-    """
+
+def clip(text: str) -> str | None:
+    """The audio file for one line, synthesised if it is not already cached."""
     if not available():
         return None
-    k = key(text)
+    speed = pace_of(text)
+    text = said_as(text)
+    k = _key(text, speed)
     kokoro = _kokoro_spec() is not None
     path = os.path.join(CACHE, k + (".wav" if kokoro else ".aiff"))
     if not os.path.exists(path):
         os.makedirs(CACHE, exist_ok=True)
         if kokoro:
-            if not _kokoro_synth(text, path):
+            if not _kokoro_synth(text, path, speed):
                 return None
         else:
             r = subprocess.run(["say", "-v", VOICE, "-r", str(RATE), "-o", path,
@@ -154,12 +164,17 @@ def clip(text: str) -> str | None:
     return path
 
 
+def measured(text: str) -> bool:
+    """Whether the line's length is already known, without synthesising it."""
+    return enabled() and _key(text, pace_of(text)) in _load_index()
+
+
 def duration(text: str) -> float | None:
     """How long the line takes to say, in seconds."""
     if not enabled():
         return None
     idx = _load_index()
-    k = key(text)
+    k = _key(text, pace_of(text))
     if k in idx:
         return float(idx[k])
     path = clip(text)
@@ -178,12 +193,7 @@ def duration(text: str) -> float | None:
 
 
 def build_track(cues, total: float, out_path: str) -> bool:
-    """One WAV holding every line at its own start time.
-
-    `cues` are {"t": seconds, "text": line}. Each clip is delayed to its cue and the
-    lot are mixed over a silent bed of the right length, so the track lines up with
-    the video without any further trimming.
-    """
+    """One WAV holding every line at its own start time."""
     if not cues or not available():
         return False
     items = [(c["t"], clip(c["text"])) for c in cues]

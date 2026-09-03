@@ -1,10 +1,3 @@
-// Existence proof by interval arithmetic. A choreography is a zero of F(Z) = Φ_{2π/N}(Z) − S Z on the 2Nd
-// state (S shifts the bodies). The proof is Krawczyk's test on a box around the refined state: the flow and its
-// derivative over the whole box are enclosed by an interval Taylor method (the series recurrence of taylor.hpp
-// run on intervals, its linearisation for the variational flow, Lagrange remainders from a Picard enclosure of
-// the step). Time shift, translation and rotation make DF singular, so the test runs on a slice transverse to
-// the group orbit with as many equations dropped as generators; the dropped ones follow from the conservation of
-// energy, momentum and angular momentum, closed by a second, tiny interval Newton argument.
 #pragma once
 #ifdef HAVE_MPFR
 #include "interval.hpp"
@@ -17,8 +10,6 @@
 
 template <> inline ival PI_T<ival>() { return ival::pi(); }
 
-// Linearisation of NBody<T>::series along one direction: the same recurrences, differentiated. δ-quantities
-// share the coefficient layout of the primal series they are read from.
 template <class T>
 struct Tangent {
   int N, d, order, np, nd; double alpha, aexp;
@@ -32,7 +23,6 @@ struct Tangent {
   T& dd(int k, int p, int a) { return D[((size_t)k * np + p) * d + a]; }
   T& s(int k, int p) { return S[(size_t)k * np + p]; }
   T& w(int k, int p) { return W[(size_t)k * np + p]; }
-  // nb holds a computed series; (dpos, dvel) is the direction at t = 0
   void series(NBody<T>& nb, const T* dpos, const T* dvel) {
     const size_t K = order + 1;
     for (int i = 0; i < nd; i++) { set(X[i], dpos[i]); set(V[i], dvel[i]); }
@@ -40,11 +30,11 @@ struct Tangent {
       int p = 0;
       for (int i = 0; i < N; i++) for (int l = i + 1; l < N; l++, p++) {
         for (int a = 0; a < d; a++) sub(dd(k, p, a), x(k, i, a), x(k, l, a));
-        set_zero(acc);                                                          // δs_k = 2 Σ_j D_j·δD_{k−j}
+        set_zero(acc);
         for (int j = 0; j <= k; j++) for (int a = 0; a < d; a++) fma_add(acc, nb.dd(j, p, a), dd(k - j, p, a));
         mul_d(s(k, p), acc, 2.0);
-        if (k == 0) { div(tmp, nb.w(0, p), nb.s(0, p)); mul_d(tmp, tmp, aexp); mul(w(0, p), tmp, s(0, p)); }   // δw₀ = a w₀/s₀ δs₀
-        else {                                                                  // δw_k = (δA_k − k w_k δs₀)/(k s₀)
+        if (k == 0) { div(tmp, nb.w(0, p), nb.s(0, p)); mul_d(tmp, tmp, aexp); mul(w(0, p), tmp, s(0, p)); }
+        else {
           set_zero(acc);
           for (int j = 0; j < k; j++) { mul(tmp, s(k - j, p), nb.w(j, p)); fma_add(tmp, nb.s(k - j, p), w(j, p)); fma_add(acc, tmp, nb.cw[(size_t)k * K + j]); }
           mul(tmp, nb.w(k, p), s(0, p)); mul_d(tmp, tmp, (double)k); sub_inplace(acc, tmp);
@@ -64,21 +54,29 @@ struct Tangent {
   }
 };
 
-// Σ_{k<p} h^k c_k by Horner; c_k at coef[k·stride + i]
 template <class T>
 inline void horner(const std::vector<T>& coef, size_t stride, int p, const T& h, T* out, T& px) {
   for (size_t i = 0; i < stride; i++) { set(px, coef[(size_t)(p - 1) * stride + i]);
     for (int k = p - 2; k >= 0; k--) { mul(px, px, h); add_inplace(px, coef[(size_t)k * stride + i]); } set(out[i], px); }
 }
 
-// Validated flow of the N-body problem: state box Z (2Nd), m tangent columns Psi (directions of the box),
-// and the action integral. Each step: order-p Taylor polynomial on the tight box, Lagrange remainder h^p c_p
-// on a rough enclosure W of the step (first-order Picard for the state, Gronwall for the tangents).
 struct Verified {
   int N, d, nd, n2, order, m, threads; double alpha;
   NBody<ival> nb, nbw, nbq; Tangent<ival> tg1; std::vector<std::unique_ptr<Tangent<ival>>> tg;
   std::vector<ival> Z, Psi, Zn, Psin, Wz, Wpsi, tmpv; ival A, t, px, hI, hp, coefp;
   double log2tol, hprev = 0; long steps = 0, rejects = 0; double maxwid = 0, hmin = INFINITY, hmax = 0; bool debug = false, took_last = false;
+  bool track = false; std::vector<ival> Gram; std::vector<double> plo, phi;
+  void observe() {
+    if (!track) return; ival c, r2; std::vector<ival> rel((size_t)nd, ival(0));
+    if (Gram.empty()) { Gram.assign((size_t)d * d, ival(0)); plo.assign(nb.np, -INFINITY); phi.assign(nb.np, INFINITY); }
+    for (int a = 0; a < d; a++) { set_zero(c); for (int j = 0; j < N; j++) add_inplace(c, Z[j * d + a]); div_ui(c, c, (unsigned)N);
+      for (int j = 0; j < N; j++) sub(rel[j * d + a], Z[j * d + a], c); }
+    for (int j = 0; j < N; j++) for (int a = 0; a < d; a++) for (int b = a; b < d; b++) fma_add(Gram[(size_t)a * d + b], rel[j * d + a], rel[j * d + b]);
+    int p = 0;
+    for (int i = 0; i < N; i++) for (int l = i + 1; l < N; l++, p++) { set_zero(r2);
+      for (int a = 0; a < d; a++) { sub(c, Z[i * d + a], Z[l * d + a]); fma_add(r2, c, c); }
+      plo[p] = std::max(plo[p], mpfr_get_d(r2.lo, MPFR_RNDD)); phi[p] = std::min(phi[p], mpfr_get_d(r2.hi, MPFR_RNDU)); }
+  }
   Verified(int N_, int d_, double alpha_, int order_, int m_, int threads_, double tol)
     : N(N_), d(d_), nd(N_ * d_), n2(2 * N_ * d_), order(order_), m(m_), threads(std::max(1, threads_)), alpha(alpha_),
       nb(N_, d_, alpha_, order_), nbw(N_, d_, alpha_, order_), nbq(N_, d_, alpha_, std::min(order_, 6)), tg1(N_, d_, alpha_, 1), log2tol(std::log2(tol)) {
@@ -86,12 +84,9 @@ struct Verified {
     Z.assign(n2, ival(0)); Psi.assign((size_t)m * n2, ival(0)); Zn = Z; Psin = Psi; Wz = Z; Wpsi = Psi; tmpv.assign(n2, ival(0));
   }
   ival* psi(int j) { return &Psi[(size_t)j * n2]; }
-  // rough enclosure W of the step: z(τ) ∈ Σ_{k<q} [0,h]^k Z_k(Z) + [0,h]^q Z_q(W) ⊂ int W for τ ∈ [0,h] (Taylor with
-  // Lagrange remainder, closed by continuation). The operator contracts like (h/ρ)^q, so the step is set by the
-  // tolerance, not by h‖Df‖ < 1. Leaves nbq holding the order-q series on the final W.
   bool picard(double h) {
     const ival span(0.0, h); const int q = nbq.order; ival sq(ipow(span, q)), c;
-    horner(nb.X, nd, q, span, tmpv.data(), px); horner(nb.V, nd, q, span, tmpv.data() + nd, px);      // the fixed part
+    horner(nb.X, nd, q, span, tmpv.data(), px); horner(nb.V, nd, q, span, tmpv.data() + nd, px);
     for (int i = 0; i < n2; i++) { mul(c, sq, i < nd ? nb.X[(size_t)q * nd + i] : nb.V[(size_t)q * nd + i - nd]); add(Wz[i], tmpv[i], c); Wz[i].inflate(0.0, 0.1 * Wz[i].wid() + 1e-3 * h * (1 + nb.V[i].mag())); }
     for (int it = 0; it < 20; it++) {
       nbq.series(Wz.data(), Wz.data() + nd);
@@ -103,36 +98,30 @@ struct Verified {
     }
     return false;
   }
-  // ‖Df(W)‖_∞ from the order-1 tangent series on W with unit directions
   double lipschitz() {
     std::vector<double> row(nd, 0.0); std::vector<ival> e(n2, ival(0));
     for (int j = 0; j < nd; j++) { set_d(e[j], 1.0); tg1.series(nbq, e.data(), e.data() + nd); set_zero(e[j]);
       for (int i = 0; i < nd; i++) row[i] += tg1.v(1, i / d, i % d).mag(); }
     double a = 1.0; for (double r : row) a = std::max(a, r); return a;
   }
-  // one step of size ≤ h; returns the step taken (0 on failure)
-  double step(double h, bool last, const ival& hlast) {   // nb holds the series on Z
+  double step(double h, bool last, const ival& hlast) {
     const int p = order;
-    if (hprev > 0 && h > hprev) { h = hprev; last = false; }      // hprev: the controller's prediction
+    if (hprev > 0 && h > hprev) { h = hprev; last = false; }
     double scale = 1.0; for (int i = 0; i < n2; i++) scale = std::max(scale, Z[i].mag());
     for (int attempt = 0; attempt < 40; attempt++, rejects++) {
       if (!last) set_d(hI, h); else set(hI, hlast);
       if (!picard(h)) { if (debug) std::printf("    step %ld: picard failed at h=%.3e\n", steps, h); h *= 0.5; last = false; continue; }
       nbw.series(Wz.data(), Wz.data() + nd);
-      // the step is set by the remainder as the intervals see it on W, which dependency inflates far beyond
-      // the tight-box estimate: shrink to land it at the tolerance
       set(hp, ipow(hI, p)); double rem = 0;
       for (int i = 0; i < n2; i++) { mul(coefp, hp, i < nd ? nbw.X[(size_t)p * nd + i] : nbw.V[(size_t)p * nd + i - nd]); rem = std::max(rem, coefp.mag()); }
       if (!(rem <= std::exp2(log2tol) * scale)) { const double f = std::isfinite(rem) ? std::max(0.3, 0.8 * std::pow(std::exp2(log2tol) * scale / rem, 1.0 / p)) : 0.5;
         if (debug) std::printf("    step %ld: remainder %.2e at h=%.3e, shrinking by %.2f\n", steps, rem, h, f); h *= f; last = false; continue; }
-      const double a = lipschitz(), gron = 1.001 * std::exp(a * h);                 // Gronwall: |ψ(τ) − ψ(0)| ≤ τ a ‖ψ(0)‖ e^{aτ}
+      const double a = lipschitz(), gron = 1.001 * std::exp(a * h);
       if (a * h > 4.0) { if (debug) std::printf("    step %ld: a h = %.3e at h=%.3e\n", steps, a * h, h); h *= 0.5; last = false; continue; }
-      // state: polynomial on Z, remainder on W
       bool ok = true;
       horner(nb.X, nd, p, hI, Zn.data(), px); horner(nb.V, nd, p, hI, Zn.data() + nd, px);
       for (int i = 0; i < n2 && ok; i++) { mul(coefp, hp, i < nd ? nbw.X[(size_t)p * nd + i] : nbw.V[(size_t)p * nd + i - nd]); add_inplace(Zn[i], coefp); ok = Zn[i].finite(); }
       if (!ok) { if (debug) std::printf("    step %ld: state remainder not finite at h=%.3e\n", steps, h); h *= 0.5; last = false; continue; }
-      // tangents: Gronwall box for the step, then the same polynomial + remainder per column
       std::atomic<int> next{0}; std::atomic<bool> bad{false};
       auto work = [&](int tid) { Tangent<ival>& tg_ = *tg[tid]; ival q, hq(hp), c;
         for (int j = next.fetch_add(1); j < m && !bad.load(); j = next.fetch_add(1)) {
@@ -146,26 +135,23 @@ struct Verified {
         } };
       if (m > 0) { std::vector<std::thread> pool; for (int tid = 1; tid < threads; tid++) pool.emplace_back(work, tid); work(0); for (auto& th : pool) th.join(); }
       if (bad.load()) { if (debug) std::printf("    step %ld: tangent remainder not finite at h=%.3e\n", steps, h); h *= 0.5; last = false; continue; }
-      // action: ∫L = Σ_{k<p} h^{k+1} L_k/(k+1) + h^{p+1} L_p(W)/(p+1), L = ½|v|² + Σ s·w
       for (int k = 0; k <= p; k++) { NBody<ival>& src = k < p ? nb : nbw; set_zero(coefp);
         for (int i = 0; i < nd; i++) for (int j = 0; j <= k; j++) fma_add(coefp, src.V[(size_t)j * nd + i], src.V[(size_t)(k - j) * nd + i]);
         mul_d(coefp, coefp, 0.5);
         for (int q = 0; q < nb.np; q++) for (int j = 0; j <= k; j++) fma_add(coefp, src.s(j, q), src.w(k - j, q));
         mul(coefp, coefp, ipow(hI, k + 1)); div_ui(coefp, coefp, (unsigned)(k + 1)); add_inplace(A, coefp); }
-      Z.swap(Zn); Psi.swap(Psin); add_inplace(t, hI); steps++;
+      Z.swap(Zn); Psi.swap(Psin); add_inplace(t, hI); steps++; observe();
       for (int i = 0; i < n2; i++) maxwid = std::max(maxwid, Z[i].wid());
       hmin = std::min(hmin, h); hmax = std::max(hmax, h);
       took_last = last; hprev = h * std::min(1.25, 0.9 * std::pow(std::exp2(log2tol) * scale / std::max(rem, 1e-300), 1.0 / p));
       if (debug) std::printf("    step %ld: h=%.3e t=%.6f width %.2e\n", steps, h, t.mid(), maxwid);
-      // the step's rough enclosure of body 0's first two coordinates, for anyone drawing the corridor
       if (debug && d >= 2) std::printf("    wbox %.9f %.6e %.9f %.9f %.9f %.9f\n", t.mid() - h, h, mpfr_get_d(Wz[0].lo, MPFR_RNDD), mpfr_get_d(Wz[0].hi, MPFR_RNDU), mpfr_get_d(Wz[1].lo, MPFR_RNDD), mpfr_get_d(Wz[1].hi, MPFR_RNDU));
       return h;
     }
     return 0;
   }
-  // flow to tend; false when a step could not be validated (collision reached, or the box blew up)
   bool integrate(const ival& tend) {
-    set_zero(t); set_zero(A); ival rem;
+    set_zero(t); set_zero(A); ival rem; observe();
     for (;;) {
       sub(rem, tend, t); if (mpfr_sgn(rem.lo) <= 0) return true;
       nb.series(Z.data(), Z.data() + nd);
@@ -178,9 +164,6 @@ struct Verified {
   }
 };
 
-// cos and sin of a thin interval: the endpoint values, outward, and the extreme value hulled in when an
-// extremum (kπ for cos, π/2 + kπ for sin) lies inside or within a hair of the interval — a zero crossing is
-// monotone and needs nothing, so a quarter turn stays sharp
 inline void icos_isin(const ival& th, ival& c, ival& s) {
   mpfr_cos(c.lo, th.lo, MPFR_RNDD); mpfr_cos(c.hi, th.hi, MPFR_RNDU); if (mpfr_cmp(c.lo, c.hi) > 0) mpfr_swap(c.lo, c.hi);
   mpfr_sin(s.lo, th.lo, MPFR_RNDD); mpfr_sin(s.hi, th.hi, MPFR_RNDU); if (mpfr_cmp(s.lo, s.hi) > 0) mpfr_swap(s.lo, s.hi);
@@ -190,17 +173,12 @@ inline void icos_isin(const ival& th, ival& c, ival& s) {
   if (std::fabs(0.5 * (lo + hi) - (PI / 2 + ks * PI)) < tol) s.hull(ival(std::fmod(ks, 2.0) == 0.0 ? 1.0 : -1.0));
 }
 
-// A rotating frame in its own coordinates: planes (2i, 2i+1) turning at rate[i], the remaining axes fixed. The
-// angle classes of G = exp(2πΩ/N) decide the gauge group: translations along axes G fixes, the time shift, and
-// the rotations commuting with G — each paired with a conserved quantity (momentum, energy, angular momentum).
-// Rates are snapped so that coinciding angles coincide exactly; the frame proved is this one.
 struct Frame {
-  int d = 0, N = 0; std::vector<double> R;                 // rows: frame axes in the record's coordinates
-  std::vector<double> rate; std::vector<int> cls;          // per plane; class 0 = angle 0, 1 = π, 2 = generic
-  std::vector<std::vector<double>> trans, rots;            // gauge generators c ∈ R^d and ξ ∈ so(d), exact entries
+  int d = 0, N = 0; std::vector<double> R;
+  std::vector<double> rate; std::vector<int> cls;
+  std::vector<std::vector<double>> trans, rots;
   bool rotating() const { return !rate.empty(); }
   int nplanes() const { return (int)rate.size(); }
-  // G at the working type: block rotations
   template <class T, class Cos> void G(std::vector<T>& G, Cos cs) const {
     G.assign((size_t)d * d, T(0)); for (int a = 0; a < d; a++) set_d(G[(size_t)a * d + a], 1.0);
     for (int i = 0; i < nplanes(); i++) { const int u = 2 * i, v = 2 * i + 1;
@@ -211,7 +189,6 @@ struct Frame {
   }
   void G_ival(std::vector<ival>& Gi) const { G<ival>(Gi, [&](double w, ival& c, ival& s) { ival th = ival(w) * ival::pi() * 2.0 / ival(N); icos_isin(th, c, s); }); }
   void G_mpreal(std::vector<mpreal>& Gm) const { G<mpreal>(Gm, [&](double w, mpreal& c, mpreal& s) { mpreal th = mpreal(w) * mpreal::pi() * 2 / N; c = cos(th); s = sin(th); }); }
-  // rotate a 2Nd state into the frame's axes
   void apply(int N_, const double* Z, std::vector<double>& out) const {
     out.assign(2 * (size_t)N_ * d, 0.0);
     for (int h = 0; h < 2; h++) for (int k = 0; k < N_; k++) for (int a = 0; a < d; a++) { double t = 0; for (int b = 0; b < d; b++) t += R[(size_t)a * d + b] * Z[h * N_ * d + k * d + b]; out[h * N_ * d + k * d + a] = t; }
@@ -220,7 +197,7 @@ struct Frame {
 
 inline Frame frame_of(int N, int d, const double* Om, double snap = 1e-9) {
   Frame fr; fr.d = d; fr.N = N; fr.R.assign((size_t)d * d, 0.0); for (int a = 0; a < d; a++) fr.R[(size_t)a * d + a] = 1.0;
-  std::vector<std::vector<double>> axes;                                       // frame axes in order: u1 v1 u2 v2 … fixed
+  std::vector<std::vector<double>> axes;
   if (Om) {
     std::vector<double> A((size_t)d * d), S((size_t)d * d, 0.0), lam;
     for (int a = 0; a < d; a++) for (int b = 0; b < d; b++) A[(size_t)a * d + b] = 0.5 * (Om[(size_t)a * d + b] - Om[(size_t)b * d + a]);
@@ -243,7 +220,6 @@ inline Frame frame_of(int N, int d, const double* Om, double snap = 1e-9) {
     }
     for (auto& f : fixed) axes.push_back(f);
     for (int a = 0; a < d; a++) for (int b = 0; b < d; b++) fr.R[(size_t)a * d + b] = axes[a][b];
-    // angle classes, with rates snapped to make coincidences exact
     const int np = fr.nplanes(); fr.cls.assign(np, 2);
     for (int i = 0; i < np; i++) { const double k = std::round(fr.rate[i] / N), h = std::round(fr.rate[i] / N - 0.5) + 0.5;
       if (std::fabs(fr.rate[i] - k * N) < snap) { fr.rate[i] = k * N; fr.cls[i] = 0; } else if (std::fabs(fr.rate[i] - h * N) < snap) { fr.rate[i] = h * N; fr.cls[i] = 1; } }
@@ -252,8 +228,7 @@ inline Frame frame_of(int N, int d, const double* Om, double snap = 1e-9) {
       if (std::fabs(fr.rate[j] - fr.rate[i] - ks * N) < snap) fr.rate[j] = fr.rate[i] + ks * N;
       else if (std::fabs(fr.rate[j] + fr.rate[i] - ko * N) < snap) fr.rate[j] = ko * N - fr.rate[i]; }
   }
-  // gauge generators in frame coordinates
-  const int np = fr.nplanes(); std::vector<int> F, P;                             // fixed axes, π axes
+  const int np = fr.nplanes(); std::vector<int> F, P;
   for (int i = 0; i < np; i++) { if (fr.cls[i] == 0) { F.push_back(2 * i); F.push_back(2 * i + 1); } if (fr.cls[i] == 1) { P.push_back(2 * i); P.push_back(2 * i + 1); } }
   for (int a = 2 * np; a < d; a++) F.push_back(a);
   auto skew = [&](int a, int b) { std::vector<double> x((size_t)d * d, 0.0); x[(size_t)a * d + b] = 1.0; x[(size_t)b * d + a] = -1.0; return x; };
@@ -263,7 +238,6 @@ inline Frame frame_of(int N, int d, const double* Om, double snap = 1e-9) {
   for (int i = 0; i < np; i++) for (int j = i + 1; j < np; j++) if (fr.cls[i] == 2 && fr.cls[j] == 2) {
     const int ui = 2 * i, vi = 2 * i + 1, uj = 2 * j, vj = 2 * j + 1;
     const bool same = std::fmod(fr.rate[j] - fr.rate[i], (double)N) == 0.0, opp = std::fmod(fr.rate[j] + fr.rate[i], (double)N) == 0.0;
-    // the block [[0, X], [−Xᵀ, 0]] commutes with R(θ) ⊕ R(±θ) for X ∈ {I, J} (same angle) or the two reflections (opposite)
     auto blk = [&](double x00, double x01, double x10, double x11) { std::vector<double> g((size_t)d * d, 0.0);
       g[(size_t)ui * d + uj] = x00; g[(size_t)ui * d + vj] = x01; g[(size_t)vi * d + uj] = x10; g[(size_t)vi * d + vj] = x11;
       for (int a : {ui, vi}) for (int b : {uj, vj}) g[(size_t)b * d + a] = -g[(size_t)a * d + b]; return g; };
@@ -272,8 +246,6 @@ inline Frame frame_of(int N, int d, const double* Om, double snap = 1e-9) {
   return fr;
 }
 
-// derivative rows of the conserved quantities at state Y: momentum along each c, energy, angular momentum
-// L_ξ = Σ_j ⟨ξ q_j, v_j⟩ for each ξ; rows × 2Nd
 template <class T>
 void conserved_jac(int N, int d, double alpha, const T* Y, const std::vector<std::vector<double>>& trans, const std::vector<std::vector<double>>& rots, std::vector<T>& J) {
   const int nd = N * d, n2 = 2 * nd, rows = (int)trans.size() + 1 + (int)rots.size(); J.assign((size_t)rows * n2, T(0));
@@ -286,13 +258,12 @@ void conserved_jac(int N, int d, double alpha, const T* Y, const std::vector<std
       pow_d(w, s, aexp); mul_d(w, w, alpha);
       for (int a = 0; a < d; a++) { sub(df, Y[i * d + a], Y[l * d + a]); mul(tmp, w, df); add_inplace(E[i * d + a], tmp); sub_inplace(E[l * d + a], tmp); } }
     r++; }
-  for (auto& xi : rots) { T* L = &J[(size_t)r * n2]; T tmp;                          // ∂/∂q = ξᵀv = −ξv, ∂/∂v = ξq
+  for (auto& xi : rots) { T* L = &J[(size_t)r * n2]; T tmp;
     for (int k = 0; k < N; k++) for (int a = 0; a < d; a++) for (int b = 0; b < d; b++) { const double x = xi[(size_t)a * d + b]; if (x == 0.0) continue;
-      mul_d(tmp, Y[nd + k * d + a], -x); add_inplace(L[k * d + b], tmp); mul_d(tmp, Y[k * d + b], x); add_inplace(L[nd + k * d + a], tmp); }
+      mul_d(tmp, Y[nd + k * d + a], x); add_inplace(L[k * d + b], tmp); mul_d(tmp, Y[k * d + b], x); add_inplace(L[nd + k * d + a], tmp); }
     r++; }
 }
 
-// the MPFR shooting Newton of `refine`, as a function: a double Newton first, then to `digits`
 inline double refine_state(int N, int d, double alpha, const std::vector<double>& Zd, const Frame& fr, int digits, int threads, std::vector<mpreal>& Z, bool verbose = false) {
   const int nd = N * d, n2 = 2 * nd;
   NBody<double> nbd(N, d, alpha, 22); std::vector<double> Zc(Zd), Gd; ShootWork<double> Wd;
@@ -307,24 +278,21 @@ inline double refine_state(int N, int d, double alpha, const std::vector<double>
 
 struct Proof {
   bool ok = false; std::string why;
-  int dp = 0, m = 0, k = 0; double radius = 0, newton = 0, kappa = 0, closure = 0, seconds = 0; long steps = 0, rejects = 0; double maxwid = 0, hmin = 0, hmax = 0;
+  int dp = 0, m = 0, k = 0; double radius = 0, hull = 0, newton = 0, kappa = 0, closure = 0, seconds = 0; long steps = 0, rejects = 0; double maxwid = 0, hmin = 0, hmax = 0;
+  bool span = false, nonrigid = false;
   ival energy, action;
 };
 
-// approximate inverse of an n×n matrix given as doubles (columns solved one by one)
 inline bool inverse_d(int n, const std::vector<double>& A, std::vector<double>& Y) {
   Y.assign((size_t)n * n, 0.0); std::vector<double> b(n);
   for (int c = 0; c < n; c++) { std::fill(b.begin(), b.end(), 0.0); b[c] = 1.0; if (!la::lu_solve(n, A, b)) return false; for (int r = 0; r < n; r++) Y[(size_t)r * n + c] = b[r]; }
   return true;
 }
 
-// Z0: the refined state, 2Nd mpreals with |F(Z0)| far below the box radius. Returns the certificate.
 inline Proof prove_state(int N, int d, double alpha, const std::vector<mpreal>& Z0, const Frame& fr, double radius, double tol, int order, int threads, bool verbose = false) {
   Proof pr; auto t0 = std::chrono::steady_clock::now();
   const int nd = N * d, n2 = 2 * nd; pr.dp = d; pr.radius = radius;
   std::vector<double> z(n2); for (int i = 0; i < n2; i++) z[i] = to_double(Z0[i]);
-  // --- generators of the gauge group at Z0: translations G fixes, the time shift, the rotations commuting
-  // with G that move the orbit
   std::vector<std::vector<double>> trans = fr.trans, rots; std::vector<std::vector<double>> gen;
   for (auto& c : trans) { std::vector<double> g(n2, 0.0); for (int k = 0; k < N; k++) for (int a = 0; a < d; a++) g[k * d + a] = c[a]; gen.push_back(g); }
   { NBody<double> nbd(N, d, alpha, 1); nbd.series(z.data(), z.data() + nd); std::vector<double> g(n2);
@@ -333,7 +301,6 @@ inline Proof prove_state(int N, int d, double alpha, const std::vector<mpreal>& 
   for (auto& xi : fr.rots) { std::vector<double> g(n2, 0.0); double nrm = 0;
     for (int h = 0; h < 2; h++) for (int k = 0; k < N; k++) for (int a = 0; a < d; a++) { double t = 0; for (int b = 0; b < d; b++) t += xi[(size_t)a * d + b] * z[h * nd + k * d + b]; g[h * nd + k * d + a] = t; nrm += t * t; }
     if (std::sqrt(nrm) > 1e-9 * scale) { gen.push_back(g); rots.push_back(xi); } }
-  // orthonormalise; a generator that is a combination of the others (a symmetric orbit) is dropped with its law
   std::vector<std::vector<double>> T;
   { size_t gi = 0; std::vector<int> keep;
     for (auto& g : gen) { std::vector<double> u = g; double n0 = 0; for (double v : u) n0 += v * v;
@@ -345,20 +312,17 @@ inline Proof prove_state(int N, int d, double alpha, const std::vector<mpreal>& 
     trans = tr2; rots = ro2; }
   const int k = (int)T.size(), m = n2 - k; pr.k = k; pr.m = m;
   if ((int)trans.size() + 1 + (int)rots.size() != k) { pr.why = "generators and conservation laws do not pair"; return pr; }
-  // the slice: eigenvectors of I − TTᵀ with eigenvalue 1
   std::vector<double> Q((size_t)n2 * m), Pm((size_t)n2 * n2, 0.0), ev;
   for (int i = 0; i < n2; i++) { Pm[(size_t)i * n2 + i] = 1.0; for (auto& t : T) for (int j = 0; j < n2; j++) Pm[(size_t)i * n2 + j] -= t[i] * t[j]; }
   la::sym_eig(n2, Pm, ev);
   { int c = 0; for (int j = 0; j < n2; j++) if (ev[j] > 0.5) { if (c < m) for (int i = 0; i < n2; i++) Q[(size_t)i * m + c] = Pm[(size_t)i * n2 + j]; c++; }
     if (c != m) { pr.why = "slice dimension mismatch"; return pr; } }
   auto shifted = [&](int i) { int h = i / nd, j = (i % nd) / d, a = i % d; return h * nd + ((j + 1) % N) * d + a; };
-  // (G S Z)_i as an interval combination of Z: G S Z_{j,a} = Σ_b G_ab Z_{j+1,b}
   std::vector<ival> Gi; if (fr.rotating()) fr.G_ival(Gi);
   auto gs = [&](const std::vector<ival>& Zv, int i, ival& out) { if (Gi.empty()) { set(out, Zv[shifted(i)]); return; }
     const int h = i / nd, j = (i % nd) / d, a = i % d; set_zero(out); for (int b = 0; b < d; b++) fma_add(out, Gi[(size_t)a * d + b], Zv[h * nd + ((j + 1) % N) * d + b]); };
   auto gs_d = [&](const std::vector<double>& Zv, int i) { if (Gi.empty()) return Zv[shifted(i)];
     const int h = i / nd, j = (i % nd) / d, a = i % d; double t = 0; for (int b = 0; b < d; b++) t += Gi[(size_t)a * d + b].mid() * Zv[h * nd + ((j + 1) % N) * d + b]; return t; };
-  // equations to drop: the columns on which the conserved quantities are most sensitive, greedily
   std::vector<int> D; std::vector<char> dropped(n2, 0);
   { std::vector<double> SZ(n2); for (int i = 0; i < n2; i++) SZ[i] = gs_d(z, i);
     std::vector<double> Jq; conserved_jac<double>(N, d, alpha, SZ.data(), trans, rots, Jq);
@@ -372,7 +336,6 @@ inline Proof prove_state(int N, int d, double alpha, const std::vector<mpreal>& 
       for (int r2 = 0; r2 < k; r2++) if (r2 != r) { double f = Jq[(size_t)r2 * n2 + best] / Jq[(size_t)r * n2 + best]; for (int c = 0; c < n2; c++) Jq[(size_t)r2 * n2 + c] -= f * Jq[(size_t)r * n2 + c]; } } }
   std::vector<int> keepEq; for (int c = 0; c < n2; c++) if (!dropped[c]) keepEq.push_back(c);
   const ival tend = ival::pi() * 2.0 / ival(N);
-  // --- point run: F(Z0)
   std::vector<ival> F0(n2);
   { Verified V(N, d, alpha, order, 0, 1, tol); V.debug = verbose;
     for (int i = 0; i < n2; i++) V.Z[i] = ival(Z0[i].v);
@@ -380,14 +343,12 @@ inline Proof prove_state(int N, int d, double alpha, const std::vector<mpreal>& 
     std::vector<ival> Zi(n2); for (int i = 0; i < n2; i++) Zi[i] = ival(Z0[i].v);
     ival g; for (int i = 0; i < n2; i++) { gs(Zi, i, g); sub(F0[i], V.Z[i], g); }
     if (verbose) std::printf("  point run: %ld steps, %ld rejected, h in [%.2e, %.2e], |F(Z0)| <= %.2e\n", V.steps, V.rejects, V.hmin, V.hmax, [&] { double mx = 0; for (auto& f : F0) mx = std::max(mx, f.mag()); return mx; }()); }
-  // --- box run: Φ and DΦ·Q over B = Z0 + Q[−r, r]^m, then Krawczyk: K = −Y F0 + (I − Y[J]) [−r, r]^m ⊂ int [−r, r]^m.
-  // The width of [J] is linear in the radius, so a failed contraction with a Newton term far below the radius is
-  // retried on a smaller box; only a Newton term too close to the radius needs more digits.
   std::vector<ival> B(n2), J((size_t)m * m); std::vector<double> Jm((size_t)m * m), Y;
   std::unique_ptr<Verified> Vp;
   for (int attempt = 0; attempt < 4; attempt++) {
-    Vp = std::make_unique<Verified>(N, d, alpha, order, m, threads, tol); Verified& V = *Vp; V.debug = verbose;
-    for (int i = 0; i < n2; i++) { double w = 0; for (int c = 0; c < m; c++) w += std::fabs(Q[(size_t)i * m + c]); V.Z[i] = ival(Z0[i].v); V.Z[i].inflate(0.0, radius * w); }
+    Vp = std::make_unique<Verified>(N, d, alpha, order, m, threads, tol); Verified& V = *Vp; V.debug = verbose; V.track = true;
+    pr.hull = 0;
+    for (int i = 0; i < n2; i++) { double w = 0; for (int c = 0; c < m; c++) w += std::fabs(Q[(size_t)i * m + c]); V.Z[i] = ival(Z0[i].v); V.Z[i].inflate(0.0, radius * w); pr.hull = std::max(pr.hull, radius * w); }
     for (int c = 0; c < m; c++) for (int i = 0; i < n2; i++) set_d(V.Psi[(size_t)c * n2 + i], Q[(size_t)i * m + c]);
     B = V.Z;
     if (!V.integrate(tend)) { pr.why = "box integration failed"; return pr; }
@@ -412,8 +373,6 @@ inline Proof prove_state(int N, int d, double alpha, const std::vector<mpreal>& 
     radius = rnew;
   }
   Verified& V = *Vp;
-  // closure: the dropped components agree because the conserved quantities do; ∂(P,E,L)/∂Y_D must be
-  // nonsingular on the hull of Φ(B) and S B
   { std::vector<ival> H(n2), Jc; ival gh; for (int i = 0; i < n2; i++) { H[i] = V.Z[i]; gs(B, i, gh); H[i].hull(gh); }
     conserved_jac<ival>(N, d, alpha, H.data(), trans, rots, Jc);
     std::vector<double> Mm((size_t)k * k), Ym; std::vector<ival> M((size_t)k * k);
@@ -424,7 +383,13 @@ inline Proof prove_state(int N, int d, double alpha, const std::vector<mpreal>& 
       for (int c = 0; c < k; c++) { set_zero(g); if (r == c) set_d(g, 1.0); for (int l = 0; l < k; l++) fma_sub(g, ival(Ym[(size_t)r * k + l]), M[(size_t)l * k + c]); rowsum += g.mag(); }
       cl = std::max(cl, rowsum); }
     pr.closure = cl; if (!(cl < 1.0)) { pr.why = "closure matrix not verifiably nonsingular"; return pr; } }
-  // the invariants of the proven orbit: energy on the box, the action from the run (N bodies over T/N)
+  { std::vector<ival> Gm = V.Gram; ival f, t;
+    for (int a = 0; a < d; a++) for (int b = 0; b < a; b++) Gm[(size_t)a * d + b] = Gm[(size_t)b * d + a];
+    pr.span = true;
+    for (int c = 0; c < d && pr.span; c++) { if (!Gm[(size_t)c * d + c].positive()) { pr.span = false; break; }
+      for (int r = c + 1; r < d; r++) { div(f, Gm[(size_t)r * d + c], Gm[(size_t)c * d + c]);
+        for (int j = c; j < d; j++) { mul(t, f, Gm[(size_t)c * d + j]); sub_inplace(Gm[(size_t)r * d + j], t); } } }
+    for (int p = 0; p < V.nb.np; p++) if (V.plo[p] > V.phi[p]) pr.nonrigid = true; }
   { ival E(0), r2, df, w;
     for (int i = 0; i < nd; i++) fma_add(E, B[nd + i], B[nd + i]); mul_d(E, E, 0.5);
     for (int i = 0; i < N; i++) for (int l = i + 1; l < N; l++) { set_zero(r2); for (int a = 0; a < d; a++) { sub(df, B[i * d + a], B[l * d + a]); fma_add(r2, df, df); }
