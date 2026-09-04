@@ -147,29 +147,6 @@ static int cmd_export(const Args& a) {
   std::fclose(f); std::printf("wrote %s (%d samples, %d bodies, %dD)\n", out.c_str(), S, N, d); return 0;
 }
 
-static void record_residuals(const Record& r, double& state_res, double& coef_res, double* period_ret = nullptr) {
-  const int N = r.h.N, d = r.h.d, nd = N * d;
-  const double* om = r.omega();
-  NBody<double> nb(N, d, r.h.alpha, 22);
-  std::vector<double> A, G, GN; const std::vector<double>* Gp = nullptr;
-  if (om) { A.assign(om, om + (size_t)d * d); for (double& e : A) e *= 2 * PI / N; la::expm_skew(d, A, G); Gp = &G; }
-  std::vector<double> cp, cv; initial_state(N, d, r.mode_list(), r.coef.data(), om, cp, cv);
-  double sc = 1.0; for (double v : cp) sc = std::max(sc, std::fabs(v)); for (double v : cv) sc = std::max(sc, std::fabs(v));
-  coef_res = chore_residual(nb, cp, cv, 1e-16, Gp) / sc;
-  std::vector<double> sp = cp, sv = cv;
-  const double* z = r.state();
-  if (z) { sp.assign(z, z + nd); sv.assign(z + nd, z + 2 * nd); }
-  state_res = z ? chore_residual(nb, sp, sv, 1e-16, Gp) / sc : coef_res;
-  if (period_ret) {
-    std::vector<double> p = sp, v = sv; nb.integrate(p, v, 2 * PI, 1e-16);
-    if (om) { A.assign(om, om + (size_t)d * d); for (double& e : A) e *= 2 * PI; la::expm_skew(d, A, GN); }
-    double ret = 0;
-    for (int k = 0; k < N; k++) for (int c = 0; c < d; c++) { double tp = sp[k * d + c], tv = sv[k * d + c];
-      if (!GN.empty()) { tp = tv = 0; for (int b = 0; b < d; b++) { tp += GN[(size_t)c * d + b] * sp[k * d + b]; tv += GN[(size_t)c * d + b] * sv[k * d + b]; } }
-      ret = std::max(ret, std::max(std::fabs(p[k * d + c] - tp), std::fabs(v[k * d + c] - tv))); }
-    *period_ret = ret / sc; }
-}
-
 static int cmd_verify_all(const Args& a) {
   Catalog cat = load_cat(a.pos.at(0)); double gate = a.num("gate", 1e-9);
   std::printf("%5s %2s/%-2s %2s %4s %10s %10s %10s %10s\n", "id", "de", "d", "N", "K", "ret_err", "state", "coef", "period");

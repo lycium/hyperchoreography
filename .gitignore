@@ -1,5 +1,6 @@
 hyperchoreography
 hyperchoreography_test
+hyperchoreography_mpinfo
 *.tmp
 *.state
 .DS_Store

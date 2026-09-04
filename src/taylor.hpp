@@ -1,6 +1,7 @@
 // Taylor-series N-body integrator, generic over the scalar type (double / mpreal); in-place arithmetic only.
 #pragma once
 #include "mpreal.hpp"
+#include "pool.hpp"
 #include <vector>
 #include <cmath>
 #include <algorithm>
@@ -160,6 +161,7 @@ double shoot_newton(NBody<T>& nb, std::vector<T>& Z, double itol, int max_iter, 
   if (verbose) { std::printf("  iter 0: residual %.3e  [%.1fs]\n", maxF, secs()); std::fflush(stdout); }
   T hstep = two_pow_T<T>(hstep_log2), mu = two_pow_T<T>(mu_log2), mu0 = two_pow_T<T>(mu_log2), tmp(0);
   int flat = 0;                    // consecutive iterations that bought less than a factor `stall`
+  Pool jac(threads);               // outside the loop: one thread per proof, not one per iteration
   for (int it = 1; it <= max_iter && maxF > target; it++) {
     if (threads <= 1) {
       for (int c = 0; c < n2; c++) {
@@ -170,8 +172,7 @@ double shoot_newton(NBody<T>& nb, std::vector<T>& Z, double itol, int max_iter, 
     } else {
       // one column per task; W.J is preallocated at the working precision, so no element is resized
       std::atomic<int> nextc{0}; std::atomic<bool> blew{false};
-      std::vector<std::thread> pool; pool.reserve(threads);
-      for (int t = 0; t < threads; t++) pool.emplace_back([&] {
+      jac.run([&](int) {
         NBody<T> nbl(nb.N, nb.d, nb.alpha, nb.order);
         std::vector<T> Zc, p, v, Fp, Fm; T tl(0);
         for (int c = nextc.fetch_add(1); c < n2 && !blew.load(); c = nextc.fetch_add(1)) {
@@ -184,7 +185,6 @@ double shoot_newton(NBody<T>& nb, std::vector<T>& Z, double itol, int max_iter, 
           for (int r = 0; r < n2; r++) { sub(tl, Fp[r], Fm[r]); div(tl, tl, hstep); div_ui(W.J[(size_t)r * n2 + c], tl, 2u); }
         }
       });
-      for (auto& t : pool) t.join();
       if (blew.load()) return INFINITY;
     }
     T dmax(0);

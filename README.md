@@ -8,6 +8,7 @@ against the true equations of motion — in double, and in MPFR to any number of
 ```
 make                  # native build (clang/gcc; -mcpu=native on arm64, -march=native elsewhere)
 make test             # self-checks of every kernel (derivatives, symmetry, integrator, dedup, I/O)
+make mpinfo           # which GMP this build links, and which mpn assembly it is actually running
 
 ./hyperchoreography search   --d 3 --N 4 --K 24 --threads 16 --minutes 600 --out d3n4.bin   # Ctrl-C any time; rerun to resume
 ./hyperchoreography continue --root circle --d 3 --N 4 --K 32 --covers 9 --depth 2 --out d3n4.bin
@@ -23,6 +24,14 @@ make gallery                                          # docs/index.html, served 
 Dependencies: a C++20 compiler; MPFR + GMP for `refine` and `prove` (`make NOMPFR=1` drops them); on macOS,
 Accelerate for LAPACK `dsyevd` above n = 64 (`make NOACCEL=1` drops it). Everything else — symmetric
 eigensolver, pivoted LU, optimisers, Taylor integrator, MPFR wrapper — is in `src/`.
+
+The GMP you already have is probably the wrong one. GMP binds its `mpn` assembly to a CPU, and the table it
+uses in 6.3.0 stops at Zen 3, so anything newer falls through to the baseline k8 path; MSYS2 ships that path
+outright. Nothing reports it and the flags do not give it away — a package can record `-march=native` and
+dispatch to k8 anyway. `make mpinfo` asks the library which path it took; `tools/deps.sh` builds a GMP and an
+MPFR that know the machine into `$HOME/.local/opt/gmp-zen`, which the Makefile picks up (`MPPREFIX=` for
+elsewhere). On a Zen 5: `prove --digits 40` in 6.4 s rather than 7.7 s, `refine --digits 100` in 21.0 s
+rather than 26.6 s, to identical digits.
 
 Naming: **dimension first, then bodies** (`d3n4.bin`); `list` sorts by (deff, N, action).
 

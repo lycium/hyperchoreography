@@ -2,6 +2,7 @@
 #pragma once
 #include "invariants.hpp"
 #include <string>
+#include <filesystem>
 #include <map>
 #include <cstdio>
 #include <cstdint>
@@ -75,6 +76,28 @@ struct Record {
         && std::fread(Lsv.data(), 8, Lsv.size(), f) == Lsv.size() && std::fread(pca.data(), 8, pca.size(), f) == pca.size()
         && (extra.empty() || std::fread(extra.data(), 8, extra.size(), f) == extra.size())
         && (h.symlen == 0 || std::fread(&sym[0], 1, h.symlen, f) == (size_t)h.symlen);
+  }
+  // the same bytes write()/read() put in a file, in memory: a record on the wire
+  std::string bytes() const {
+    RecHdr hh = h; hh.nm = (int32_t)modes.size(); hh.symlen = (int32_t)sym.size(); hh.nextra = (int32_t)extra.size();
+    hh.nbytes = (uint32_t)(sizeof(RecHdr) + modes.size() * 4 + (coef.size() + Lsv.size() + pca.size() + extra.size()) * 8 + sym.size());
+    std::string o; o.reserve(hh.nbytes); auto put = [&](const void* p, size_t n) { if (n) o.append((const char*)p, n); };
+    put(&hh, sizeof hh); put(modes.data(), modes.size() * 4); put(coef.data(), coef.size() * 8); put(Lsv.data(), Lsv.size() * 8);
+    put(pca.data(), pca.size() * 8); put(extra.data(), extra.size() * 8); put(sym.data(), sym.size());
+    return o;
+  }
+  bool from_bytes(const std::string& b) {
+    if (b.size() < sizeof(RecHdr)) return false;
+    std::memcpy(&h, b.data(), sizeof h);
+    if (h.magic != 0x31434552u || h.nm < 0 || h.d <= 0 || h.N < 0 || h.symlen < 0 || h.nextra < 0) return false;
+    if (h.d > 4096 || h.N > (1 << 20) || h.nm > (1 << 24) || h.nextra > (1 << 26) || h.symlen > (1 << 16)) return false;   // no overflow below
+    size_t nb = sizeof(RecHdr) + (size_t)h.nm * 4 + ((size_t)h.nm * 2 * h.d + 2 * (size_t)h.d + h.nextra) * 8 + h.symlen;
+    if (nb != h.nbytes || nb != b.size()) return false;
+    const char* p = b.data() + sizeof(RecHdr); auto get = [&](void* dst, size_t n) { if (n) std::memcpy(dst, p, n); p += n; };
+    modes.resize(h.nm); coef.resize((size_t)h.nm * 2 * h.d); Lsv.resize(h.d); pca.resize(h.d); extra.resize(h.nextra); sym.resize(h.symlen);
+    get(modes.data(), modes.size() * 4); get(coef.data(), coef.size() * 8); get(Lsv.data(), Lsv.size() * 8); get(pca.data(), pca.size() * 8);
+    get(extra.data(), extra.size() * 8); get(sym.data(), sym.size());
+    return true;
   }
   // JSON dump
   std::string to_json(bool with_coef = true) const {
@@ -156,7 +179,7 @@ struct Catalog {
   void save(const std::string& path) const {
     std::string tmp = path + ".tmp"; FILE* f = std::fopen(tmp.c_str(), "wb"); if (!f) throw std::runtime_error("cannot write " + tmp);
     std::fwrite(MAGIC, 1, 8, f); for (auto& r : recs) r.write(f); std::fclose(f);
-    std::rename(tmp.c_str(), path.c_str());
+    std::filesystem::rename(tmp, path);          // std::rename will not overwrite on Windows
   }
 };
 
@@ -164,5 +187,5 @@ struct SearchState {                 // <catalog>.state — resumable trial coun
   uint64_t magic = 0x3154415453ull;  // "STAT1"
   int64_t seed = 0, next_trial = 0, trials_done = 0, found = 0; double elapsed = 0;
   bool load(const std::string& p) { FILE* f = std::fopen(p.c_str(), "rb"); if (!f) return false; bool ok = std::fread(this, sizeof *this, 1, f) == 1 && magic == 0x3154415453ull; std::fclose(f); return ok; }
-  void save(const std::string& p) const { std::string t = p + ".tmp"; FILE* f = std::fopen(t.c_str(), "wb"); if (!f) return; std::fwrite(this, sizeof *this, 1, f); std::fclose(f); std::rename(t.c_str(), p.c_str()); }
+  void save(const std::string& p) const { std::string t = p + ".tmp"; FILE* f = std::fopen(t.c_str(), "wb"); if (!f) return; std::fwrite(this, sizeof *this, 1, f); std::fclose(f); std::error_code ec; std::filesystem::rename(t, p, ec); }
 };

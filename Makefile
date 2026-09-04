@@ -21,10 +21,18 @@ ifeq ($(shell uname -s),Darwin)
   endif
 endif
 ifndef NOMPFR
-  BREW := $(shell brew --prefix 2>/dev/null)
-  ifneq ($(BREW),)
-    CXXFLAGS += -I$(BREW)/include
-    LDFLAGS  += -L$(BREW)/lib
+  # A GMP that does not recognise the CPU falls back to its baseline k8 assembly and says nothing.
+  # tools/deps.sh builds one that does, into MPPREFIX; `make mpinfo` says which you ended up with.
+  MPPREFIX ?= $(HOME)/.local/opt/gmp-zen
+  ifneq ($(wildcard $(MPPREFIX)/include/mpfr.h),)
+    CXXFLAGS += -isystem $(MPPREFIX)/include
+    LDFLAGS  += -L$(MPPREFIX)/lib
+  else
+    BREW := $(shell brew --prefix 2>/dev/null)
+    ifneq ($(BREW),)
+      CXXFLAGS += -I$(BREW)/include
+      LDFLAGS  += -L$(BREW)/lib
+    endif
   endif
   CXXFLAGS += -DHAVE_MPFR
   LDFLAGS  += -lmpfr -lgmp
@@ -38,6 +46,10 @@ hyperchoreography: $(SRC) $(HDRS)
 test: src/tests.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -o hyperchoreography_test src/tests.cpp $(LDFLAGS) && ./hyperchoreography_test
 
+# Same flags as the binary above, so it links and reports on the same library.
+mpinfo: tools/mpinfo.cpp
+	$(CXX) $(CXXFLAGS) -o hyperchoreography_mpinfo tools/mpinfo.cpp $(LDFLAGS) && ./hyperchoreography_mpinfo
+
 # docs/ is what GitHub Pages serves.  The eight is kept out of the selection deliberately: it is the one
 # orbit everybody has already seen.  The rest is the score's ranking overruled by eye.
 gallery: hyperchoreography
@@ -45,5 +57,5 @@ gallery: hyperchoreography
 	  --no-hero 'd2-3_n3.bin#0' --no-hero 'd5-6_n7.bin#100' --hero 'd2-4_n4.bin#6'
 
 clean:
-	rm -f hyperchoreography hyperchoreography_test
-.PHONY: clean test gallery
+	rm -f hyperchoreography hyperchoreography_test hyperchoreography_mpinfo
+.PHONY: clean test gallery mpinfo

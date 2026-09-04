@@ -1,5 +1,6 @@
 // Minimal MPFR wrapper and the in-place scalar primitives used by the hot loops.
 #pragma once
+#include <cmath>
 #ifdef HAVE_MPFR
 #include <mpfr.h>
 #include <string>

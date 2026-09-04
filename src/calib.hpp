@@ -3,6 +3,7 @@
 // of the loop can see. d = 7 (G₂, k = 3) is one rung of a tower that reaches every dimension.
 #pragma once
 #include "g2.hpp"
+#include <bit>
 #include <map>
 #include <stdexcept>
 
@@ -131,7 +132,7 @@ inline std::vector<double> calib_psi(const Wedge& W, int id) {
   else if (id == CAL_SL) {                                  // Re[(e0+ie1) ∧ (e2+ie3) ∧ … ∧ (e_{2k−2}+ie_{2k−1})]
     if (d < 2 * k) throw std::runtime_error("special-Lagrangian form needs d >= 2k");
     std::vector<int> I(k);
-    for (int S = 0; S < (1 << k); S++) { int pc = __builtin_popcount((unsigned)S); if (pc & 1) continue;
+    for (int S = 0; S < (1 << k); S++) { int pc = (int)std::popcount((unsigned)S); if (pc & 1) continue;
       for (int p = 0; p < k; p++) I[p] = 2 * p + ((S >> p) & 1);
       wedge_add(W, I.data(), (pc / 2) & 1 ? -1.0 : 1.0, psi.data()); } }
   else if (id == CAL_G2) {                                  // associative 3-form: the seven Fano lines

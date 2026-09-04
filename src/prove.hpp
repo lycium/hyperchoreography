@@ -1,6 +1,7 @@
 #pragma once
 #ifdef HAVE_MPFR
 #include "interval.hpp"
+#include "pool.hpp"
 #include "taylor.hpp"
 #include <thread>
 #include <atomic>
@@ -63,6 +64,7 @@ inline void horner(const std::vector<T>& coef, size_t stride, int p, const T& h,
 struct Verified {
   int N, d, nd, n2, order, m, threads; double alpha;
   NBody<ival> nb, nbw, nbq; Tangent<ival> tg1; std::vector<std::unique_ptr<Tangent<ival>>> tg;
+  Pool pool;                       // built once; the tangent fork below runs on every step
   std::vector<ival> Z, Psi, Zn, Psin, Wz, Wpsi, tmpv; ival A, t, px, hI, hp, coefp;
   double log2tol, hprev = 0; long steps = 0, rejects = 0; double maxwid = 0, hmin = INFINITY, hmax = 0; bool debug = false, took_last = false;
   bool track = false; std::vector<ival> Gram; std::vector<double> plo, phi;
@@ -79,7 +81,7 @@ struct Verified {
   }
   Verified(int N_, int d_, double alpha_, int order_, int m_, int threads_, double tol)
     : N(N_), d(d_), nd(N_ * d_), n2(2 * N_ * d_), order(order_), m(m_), threads(std::max(1, threads_)), alpha(alpha_),
-      nb(N_, d_, alpha_, order_), nbw(N_, d_, alpha_, order_), nbq(N_, d_, alpha_, std::min(order_, 6)), tg1(N_, d_, alpha_, 1), log2tol(std::log2(tol)) {
+      nb(N_, d_, alpha_, order_), nbw(N_, d_, alpha_, order_), nbq(N_, d_, alpha_, std::min(order_, 6)), tg1(N_, d_, alpha_, 1), pool(std::max(1, threads_)), log2tol(std::log2(tol)) {
     for (int i = 0; i < threads; i++) tg.emplace_back(std::make_unique<Tangent<ival>>(N_, d_, alpha_, order_));
     Z.assign(n2, ival(0)); Psi.assign((size_t)m * n2, ival(0)); Zn = Z; Psin = Psi; Wz = Z; Wpsi = Psi; tmpv.assign(n2, ival(0));
   }
@@ -133,7 +135,7 @@ struct Verified {
           tg_.series(nbw, wj, wj + nd);
           for (int i = 0; i < n2; i++) { mul(c, hq, i < nd ? tg_.X[(size_t)p * nd + i] : tg_.V[(size_t)p * nd + i - nd]); add_inplace(nj[i], c); if (!nj[i].finite()) bad = true; }
         } };
-      if (m > 0) { std::vector<std::thread> pool; for (int tid = 1; tid < threads; tid++) pool.emplace_back(work, tid); work(0); for (auto& th : pool) th.join(); }
+      if (m > 0) pool.run(work);
       if (bad.load()) { if (debug) std::printf("    step %ld: tangent remainder not finite at h=%.3e\n", steps, h); h *= 0.5; last = false; continue; }
       for (int k = 0; k <= p; k++) { NBody<ival>& src = k < p ? nb : nbw; set_zero(coefp);
         for (int i = 0; i < nd; i++) for (int j = 0; j <= k; j++) fma_add(coefp, src.V[(size_t)j * nd + i], src.V[(size_t)(k - j) * nd + i]);

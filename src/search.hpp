@@ -118,6 +118,31 @@ inline double return_error(const Problem& P, const double* x, NBody<double>& nb)
 }
 inline double return_error(const Problem& P, const double* x) { NBody<double> nb(P.N, P.d, P.alpha, 22); return return_error(P, x, nb); }
 
+// A stored record re-checked against the ODE: the T/N shift residual of the certified state
+// and of the coefficients, and optionally the full-period return, all relative to the loop's scale.
+inline void record_residuals(const Record& r, double& state_res, double& coef_res, double* period_ret = nullptr) {
+  const int N = r.h.N, d = r.h.d, nd = N * d;
+  const double* om = r.omega();
+  NBody<double> nb(N, d, r.h.alpha, 22);
+  std::vector<double> A, G, GN; const std::vector<double>* Gp = nullptr;
+  if (om) { A.assign(om, om + (size_t)d * d); for (double& e : A) e *= 2 * PI / N; la::expm_skew(d, A, G); Gp = &G; }
+  std::vector<double> cp, cv; initial_state(N, d, r.mode_list(), r.coef.data(), om, cp, cv);
+  double sc = 1.0; for (double v : cp) sc = std::max(sc, std::fabs(v)); for (double v : cv) sc = std::max(sc, std::fabs(v));
+  coef_res = chore_residual(nb, cp, cv, 1e-16, Gp) / sc;
+  std::vector<double> sp = cp, sv = cv;
+  const double* z = r.state();
+  if (z) { sp.assign(z, z + nd); sv.assign(z + nd, z + 2 * nd); }
+  state_res = z ? chore_residual(nb, sp, sv, 1e-16, Gp) / sc : coef_res;
+  if (period_ret) {
+    std::vector<double> p = sp, v = sv; nb.integrate(p, v, 2 * PI, 1e-16);
+    if (om) { A.assign(om, om + (size_t)d * d); for (double& e : A) e *= 2 * PI; la::expm_skew(d, A, GN); }
+    double ret = 0;
+    for (int k = 0; k < N; k++) for (int c = 0; c < d; c++) { double tp = sp[k * d + c], tv = sv[k * d + c];
+      if (!GN.empty()) { tp = tv = 0; for (int b = 0; b < d; b++) { tp += GN[(size_t)c * d + b] * sp[k * d + b]; tv += GN[(size_t)c * d + b] * sv[k * d + b]; } }
+      ret = std::max(ret, std::max(std::fabs(p[k * d + c] - tp), std::fabs(v[k * d + c] - tv))); }
+    *period_ret = ret / sc; }
+}
+
 struct Orbit {
   std::vector<double> Z; int Ms = 0; double residual = INF, energy = 0, action = 0, minsep = INF, maxr = 0, Lnorm = 0, rms = 0;
   std::vector<double> Lsv, coef; std::vector<int> modes; int K = 0;
@@ -418,8 +443,10 @@ inline Inertia inertia_gauge(const Problem& P, const double* x, std::vector<doub
   I.zero += ng; return I;
 }
 
-// Morse index, nullity and the calibration twist — computed only for records that are new or replaced
-inline void record_extras(const Config& cfg, Record& rec, Ctx& ctx) {
+// Morse index, nullity and the calibration twist — computed only for records that are new or replaced.
+// `index` off stops before the index, which is the expensive half (177 s a record at d = 11) and the
+// only half a caller deciding whether it wants the record at all does not need.
+inline void record_extras(const Config& cfg, Record& rec, Ctx& ctx, bool index = true) {
   int ck = 0, cid = 0; calib_pick(rec.h.d, ck, cid);
   if (ck && (int)rec.extra.size() >= Record::NEX) {
     const Wedge& W = wedge_basis(rec.h.d, ck); const std::vector<double> psi = calib_psi(W, cid);
@@ -444,6 +471,7 @@ inline void record_extras(const Config& cfg, Record& rec, Ctx& ctx) {
   double gn = 0; ctx.g.resize(P.n); double A0 = action_grad(P, x.data(), ctx.g.data(), ctx.w);
   if (!std::isfinite(A0)) return; for (double v : ctx.g) gn += v * v;
   rec.h.grad_norm = std::sqrt(gn);                       // residual of the truncation, before the polish
+  if (!index) return;
   Symmetry none; polish(P, none, ctx, x, cfg.newton_iters, cfg.gtol);   // the index is only defined at a critical point
   double A1 = action_grad(P, x.data(), nullptr, ctx.w);
   if (std::fabs(A1 - A0) < 1e-3 * std::fabs(A0) && hessian(P, x.data(), ctx.H, ctx.w))
