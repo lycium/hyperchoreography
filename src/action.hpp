@@ -33,6 +33,9 @@ struct Problem {
     return l * ((target + l - 1) / l);
   }
   void init(int N_, int d_, int K_, int M_ = 0, double alpha_ = 1.0) {
+    if (N_ < 2 || d_ < 1 || K_ < 1 || M_ < 0 || !std::isfinite(alpha_) || alpha_ <= 0)
+      throw std::invalid_argument("problem: invalid body count, dimension, resolution or exponent");
+    Om.clear(); OmOm.clear(); Gsh.clear();
     N = N_; d = d_; K = K_; alpha = alpha_;
     M = M_ > 0 ? M_ : auto_M(N, K);
     if (M % N) throw std::runtime_error("M must be a multiple of N");
@@ -63,7 +66,15 @@ struct Problem {
   }
   // q_j(t) = exp(Ωt) q(t + 2πj/N): only the kinetic term changes, from ½∫|q̇|² to ½∫|q̇ + Ωq|²
   void set_omega(const std::vector<double>& O) {
-    Om = O; if (Om.empty()) { OmOm.clear(); Gsh.clear(); return; }
+    if (!O.empty() && O.size() != (size_t)d * d) throw std::invalid_argument("frame: invalid matrix shape");
+    for (double x : O) if (!std::isfinite(x)) throw std::invalid_argument("frame: nonfinite rate");
+    Om = O;
+    if (!Om.empty()) {
+      for (int a = 0; a < d; a++) { Om[(size_t)a * d + a] = 0;
+        for (int b = a + 1; b < d; b++) { double x = 0.5 * Om[(size_t)a * d + b] - 0.5 * Om[(size_t)b * d + a]; Om[(size_t)a * d + b] = x; Om[(size_t)b * d + a] = -x; } }
+      if (std::all_of(Om.begin(), Om.end(), [](double x) { return x == 0; })) Om.clear();
+    }
+    if (Om.empty()) { OmOm.clear(); Gsh.clear(); return; }
     OmOm.assign((size_t)d * d, 0.0);
     for (int a = 0; a < d; a++) for (int b = 0; b < d; b++) { double s = 0;
       for (int k = 0; k < d; k++) s -= Om[(size_t)a * d + k] * Om[(size_t)k * d + b]; OmOm[(size_t)a * d + b] = s; }

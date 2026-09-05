@@ -9,6 +9,8 @@
 #include <atomic>
 #include <thread>
 #include <chrono>
+#include <memory>
+#include <stdexcept>
 #include "linalg.hpp"
 
 template <class T> T PI_T();
@@ -24,8 +26,9 @@ struct NBody {
   std::vector<T> D, S, W;       // per pair: differences, |D|², |D|^{2 aexp}
   std::vector<T> Acc, conv, cw;
   T sk, acc, tmp, invs0, h, t, dt, px, pv;
-  std::vector<T> p2, v2;
+  std::vector<T> p2, v2, residual_pos, residual_vel;
   NBody(int N_, int d_, double alpha_, int order_) : N(N_), d(d_), order(order_), np(N_ * (N_ - 1) / 2), alpha(alpha_), aexp(-(alpha_ + 2.0) / 2.0) {
+    if (N < 2 || d < 1 || order < 1 || !std::isfinite(alpha) || alpha <= 0) throw std::invalid_argument("N-body: invalid dimensions, order or exponent");
     size_t nd = (size_t)N * d, K = order + 1;
     X.assign(K * nd, T(0)); V.assign(K * nd, T(0)); D.assign(K * np * d, T(0)); S.assign(K * np, T(0)); W.assign(K * np, T(0));
     Acc.assign(nd, T(0)); conv.assign(d, T(0)); p2.assign(nd, T(0)); v2.assign(nd, T(0));
@@ -86,23 +89,34 @@ struct NBody {
       set(pos[i], px); set(vel[i], pv);
     }
   }
-  // optional dense output at sorted times ts
+  // Optional dense output at sorted times ts. Negative return means failure, never a partial success.
   int integrate(std::vector<T>& pos, std::vector<T>& vel, const T& tend, double tol, const std::vector<T>* ts = nullptr, std::vector<T>* samp = nullptr) {
     size_t nd = (size_t)N * d;
+    if (order < 2 || pos.size() != nd || vel.size() != nd || !(tol > 0) || !std::isfinite(tol) ||
+        !std::isfinite(to_double(tend)) || tend < T(0) || (ts == nullptr) != (samp == nullptr)) return -1;
+    if (ts) for (size_t i = 0; i < ts->size(); i++)
+      if (!std::isfinite(to_double((*ts)[i])) || (*ts)[i] < T(0) || (*ts)[i] > tend || (i && (*ts)[i] < (*ts)[i - 1])) return -1;
     double scale = 0; for (size_t i = 0; i < nd; i++) scale = std::max(scale, std::max(std::fabs(to_double(pos[i])), std::fabs(to_double(vel[i]))));
-    double log2tol = std::log2(tol * std::max(1.0, scale));
+    for (size_t i = 0; i < nd; i++) if (!std::isfinite(to_double(pos[i])) || !std::isfinite(to_double(vel[i]))) return -1;
+    double log2tol = std::log2(tol) + std::log2(std::max(1.0, scale));
     set_zero(t); int steps = 0; size_t si = 0;
     if (samp) samp->assign(ts->size() * 2 * nd, T(0));
+    if (ts) while (si < ts->size() && (*ts)[si] == T(0)) {
+      for (size_t i = 0; i < nd; i++) { set((*samp)[si * 2 * nd + i], pos[i]); set((*samp)[si * 2 * nd + nd + i], vel[i]); } ++si;
+    }
     while (t < tend) {
       series(pos.data(), vel.data());
       set_d(h, stepsize(log2tol));
       add(tmp, t, h); if (tmp > tend) sub(h, tend, t);
+      add(tmp, t, h); if (!(h > T(0)) || !(tmp > t) || !std::isfinite(to_double(h))) return -1;
       if (ts) { add(tmp, t, h); while (si < ts->size() && (*ts)[si] <= tmp) { sub(dt, (*ts)[si], t); eval(dt, &(*samp)[si * 2 * nd], &(*samp)[si * 2 * nd + nd]); si++; } }
       eval(h, p2.data(), v2.data());
+      for (size_t i = 0; i < nd; i++) if (!std::isfinite(to_double(p2[i])) || !std::isfinite(to_double(v2[i]))) return -1;
       for (size_t i = 0; i < nd; i++) { set(pos[i], p2[i]); set(vel[i], v2[i]); }
       add_inplace(t, h); steps++;
-      if (steps > 2000000) break;
+      if (steps > 2000000) return -1;
     }
+    if (ts && si != ts->size()) return -1;
     return steps;
   }
 };
@@ -121,9 +135,9 @@ T nbody_energy(int N, int d, double alpha, const T* pos, const T* vel) {
 template <class T>
 double chore_residual(NBody<T>& nb, const std::vector<T>& pos, const std::vector<T>& vel, double tol, const std::vector<T>* G = nullptr, std::vector<T>* F = nullptr) {
   int N = nb.N, d = nb.d; size_t nd = (size_t)N * d;
-  std::vector<T> p = pos, v = vel;
+  std::vector<T>& p = nb.residual_pos; std::vector<T>& v = nb.residual_vel; p = pos; v = vel;
   T tend = T(2) * T(PI_T<T>()) / N;
-  nb.integrate(p, v, tend, tol);
+  if (nb.integrate(p, v, tend, tol) < 0) return INFINITY;
   double mx = 0; if (F) F->assign(2 * nd, T(0));
   for (int j = 0; j < N; j++) for (int a = 0; a < d; a++) { int j1 = (j + 1) % N;
     T tp = pos[j1 * d + a], tv = vel[j1 * d + a];
@@ -143,7 +157,12 @@ template <> inline double two_pow_T<double>(long e) { return std::ldexp(1.0, (in
 template <> inline mpreal two_pow_T<mpreal>(long e) { return mpreal::two_pow(e); }
 #endif
 
-template <class T> struct ShootWork { std::vector<T> F, Fn, Fp, Fm, J, JtJ, A, rhs, rhs0, Zp, Zm, Z0; };
+template <class T> struct ShootWork { std::vector<T> F, Fn, Fp, Fm, J, JtJ, A, rhs, rhs0, Zp, Zm, Z0, pos, vel; std::vector<int> pivots; };
+
+template <class T> struct ShootColumnWork {
+  NBody<T> nb; std::vector<T> Z, pos, vel, Fp, Fm; T tmp;
+  explicit ShootColumnWork(const NBody<T>& source) : nb(source.N, source.d, source.alpha, source.order) {}
+};
 
 // Newton–LM on F(Z) = Φ_{2π/N}(Z) − G S Z; central-difference Jacobian (step 2^hstep_log2), damping
 // μ·max diag(JᵀJ) from 2^mu_log2, raised ×8 and retried against the same Jacobian until ‖F‖ falls (fixed
@@ -151,7 +170,8 @@ template <class T> struct ShootWork { std::vector<T> F, Fn, Fp, Fm, J, JtJ, A, r
 template <class T>
 double shoot_newton(NBody<T>& nb, std::vector<T>& Z, double itol, int max_iter, double target, long hstep_log2, long mu_log2, ShootWork<T>& W, bool verbose = false, const std::vector<T>* G = nullptr, int threads = 1, double stall = 0, int lm_retries = 8) {
   const int N = nb.N, d = nb.d, nd = N * d, n2 = 2 * nd;
-  auto residual = [&](const std::vector<T>& Zc, std::vector<T>& F) { std::vector<T> p(Zc.begin(), Zc.begin() + nd), v(Zc.begin() + nd, Zc.end()); return chore_residual(nb, p, v, itol, G, &F); };
+  if (Z.size() != (size_t)n2) return INFINITY;
+  auto residual = [&](const std::vector<T>& Zc, std::vector<T>& F) { W.pos.assign(Zc.begin(), Zc.begin() + nd); W.vel.assign(Zc.begin() + nd, Zc.end()); return chore_residual(nb, W.pos, W.vel, itol, G, &F); };
   auto remove_cm = [&](std::vector<T>& Zc) { for (int half = 0; half < 2; half++) for (int c = 0; c < d; c++) { T m(0); for (int k = 0; k < N; k++) m += Zc[half * nd + k * d + c]; m /= N; for (int k = 0; k < N; k++) Zc[half * nd + k * d + c] -= m; } };
   W.J.assign((size_t)n2 * n2, T(0)); W.JtJ.assign((size_t)n2 * n2, T(0)); W.rhs.assign(n2, T(0));
   remove_cm(Z);
@@ -161,7 +181,11 @@ double shoot_newton(NBody<T>& nb, std::vector<T>& Z, double itol, int max_iter, 
   if (verbose) { std::printf("  iter 0: residual %.3e  [%.1fs]\n", maxF, secs()); std::fflush(stdout); }
   T hstep = two_pow_T<T>(hstep_log2), mu = two_pow_T<T>(mu_log2), mu0 = two_pow_T<T>(mu_log2), tmp(0);
   int flat = 0;                    // consecutive iterations that bought less than a factor `stall`
-  Pool jac(threads);               // outside the loop: one thread per proof, not one per iteration
+  if (maxF <= target || max_iter <= 0) return maxF;
+  threads = std::clamp(threads, 1, n2);
+  Pool jac(threads);
+  std::vector<std::unique_ptr<ShootColumnWork<T>>> columns;
+  if (threads > 1) for (int i = 0; i < threads; i++) columns.emplace_back(std::make_unique<ShootColumnWork<T>>(nb));
   for (int it = 1; it <= max_iter && maxF > target; it++) {
     if (threads <= 1) {
       for (int c = 0; c < n2; c++) {
@@ -172,9 +196,9 @@ double shoot_newton(NBody<T>& nb, std::vector<T>& Z, double itol, int max_iter, 
     } else {
       // one column per task; W.J is preallocated at the working precision, so no element is resized
       std::atomic<int> nextc{0}; std::atomic<bool> blew{false};
-      jac.run([&](int) {
-        NBody<T> nbl(nb.N, nb.d, nb.alpha, nb.order);
-        std::vector<T> Zc, p, v, Fp, Fm; T tl(0);
+      jac.run([&](int tid) {
+        auto& col = *columns[tid]; NBody<T>& nbl = col.nb;
+        auto& Zc = col.Z; auto& p = col.pos; auto& v = col.vel; auto& Fp = col.Fp; auto& Fm = col.Fm; T& tl = col.tmp;
         for (int c = nextc.fetch_add(1); c < n2 && !blew.load(); c = nextc.fetch_add(1)) {
           for (int sgn = 0; sgn < 2; sgn++) {
             Zc = Z; if (sgn) Zc[c] -= hstep; else Zc[c] += hstep;
@@ -195,7 +219,9 @@ double shoot_newton(NBody<T>& nb, std::vector<T>& Z, double itol, int max_iter, 
     W.Z0 = Z; bool ok = false; double newF = INFINITY, dn = 0;
     for (int t = 0; t < lm_retries && !ok; t++) {                      // LM retries reuse the Jacobian
       W.A = W.JtJ; mul(tmp, mu, dmax); for (int i = 0; i < n2; i++) add_inplace(W.A[(size_t)i * n2 + i], tmp);
-      W.rhs = W.rhs0; if (!la::lu_solve(n2, W.A, W.rhs)) break;
+      W.rhs = W.rhs0;
+      if (!la::lu_factor(n2, W.A, W.pivots)) { mul_d(mu, mu, 8.0); continue; }
+      la::lu_substitute(n2, W.A, W.pivots, W.rhs);
       Z = W.Z0; dn = 0; for (int i = 0; i < n2; i++) { Z[i] += W.rhs[i]; dn = std::max(dn, std::fabs(to_double(W.rhs[i]))); }
       remove_cm(Z); newF = residual(Z, W.Fn);
       if (newF < maxF) { ok = true; W.F.swap(W.Fn); if (mu > mu0) mul_d(mu, mu, 0.2); } else mul_d(mu, mu, 8.0);

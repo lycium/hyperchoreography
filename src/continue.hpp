@@ -75,16 +75,20 @@ struct Continuer {
     for (int it = 0; it < max_it; it++) {
       pp.set(Pa, s); double A = action_grad(Pa, x.data(), g.data(), ctx.w); if (!std::isfinite(A)) return -1;
       double gn = 0; for (double v : g) gn += v * v; gn = std::sqrt(gn);
-      if (gn < cfg.gtol) return it;
-      if (!hess_at(Pa, s, x)) return -1; ga.resize(n); pp.dgrad(Pa, x.data(), ga.data(), s, ctx.w);
       int ng = gauge_basis(Pa, x.data(), Gv); rg.assign(ng, 0.0); for (int k = 0; k < ng; k++) for (int i = 0; i < n; i++) rg[k] += Gv[(size_t)i * ng + k] * (x[i] - xp[i]);
       double rt = 0; for (int i = 0; i < n; i++) rt += t[i] * (x[i] - xp[i]); rt += t[n] * (s - sp);
+      double constraint = std::fabs(rt); for (double v : rg) constraint = std::max(constraint, std::fabs(v));
+      if (gn < cfg.gtol && constraint < cfg.gtol) return it;
+      if (!hess_at(Pa, s, x)) return -1; ga.resize(n); if (!pp.dgrad(Pa, x.data(), ga.data(), s, ctx.w)) return -1;
       if (!bordered_solve(ng, t, g, rg, rt, sol, mu)) return -1;
       for (int i = 0; i < n; i++) x[i] += sol[i]; s += sol[n];
       if (s < pp.guard_lo || s > pp.guard_hi) return -1;
     }
     pp.set(Pa, s); action_grad(Pa, x.data(), g.data(), ctx.w); double gn = 0; for (double v : g) gn += v * v;
-    return std::sqrt(gn) < 100 * cfg.gtol ? max_it : -1;
+    int ng = gauge_basis(Pa, x.data(), Gv); double constraint = 0, rt = t[n] * (s - sp);
+    for (int i = 0; i < n; i++) rt += t[i] * (x[i] - xp[i]); constraint = std::fabs(rt);
+    for (int k = 0; k < ng; k++) { double r = 0; for (int i = 0; i < n; i++) r += Gv[(size_t)i * ng + k] * (x[i] - xp[i]); constraint = std::max(constraint, std::fabs(r)); }
+    return std::sqrt(gn) < 100 * cfg.gtol && constraint < 100 * cfg.gtol ? max_it : -1;
   }
   bool polish_at(Problem& Pa, double s, std::vector<double>& x, int iters = 40) { pp.set(Pa, s); Symmetry none; return polish(Pa, none, ctx, x, iters, cfg.gtol); }
 

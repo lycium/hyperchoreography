@@ -56,8 +56,9 @@ static const Record& rec_by_id(const Catalog& c, long id) { for (auto& r : c.rec
 static int cmd_search(const Args& a) {
   Config cfg;
   cfg.N = (int)a.num("N", 3); cfg.d = (int)a.num("d", 2); cfg.K = (int)a.num("K", 16); cfg.Kmax = (int)a.num("Kmax", std::max(4 * cfg.K, 64));
-  cfg.sym = named_sym(a.get("sym", "none"), cfg.d); cfg.threads = (int)a.num("threads", std::thread::hardware_concurrency()); cfg.seed = (uint64_t)a.num("seed", 1);
-  cfg.trials = (long)a.num("trials", (double)LONG_MAX); cfg.minutes = a.num("minutes", 1e30); cfg.out = a.get("out", "catalog.bin");
+  cfg.sym = named_sym(a.get("sym", "none"), cfg.d); cfg.threads = (int)a.num("threads", std::thread::hardware_concurrency()); cfg.seed = std::stoull(a.get("seed", "1"));
+  cfg.trials = a.has("trials") ? std::stol(a.get("trials")) : LONG_MAX; cfg.minutes = a.num("minutes", 1e30); cfg.out = a.get("out", "catalog.bin");
+  if (cfg.trials < 0 || !(cfg.minutes >= 0) || !std::isfinite(cfg.minutes)) throw std::invalid_argument("search: invalid trial or time budget");
   cfg.alpha_start = a.num("alpha-start", 1.0); cfg.alpha_steps = (int)a.num("alpha-steps", 8); cfg.min_deff = (int)a.num("min-deff", 1); cfg.min_rigid = a.num("min-rigid", cfg.min_rigid);
   cfg.lbfgs_min = (int)a.num("lbfgs-min", 20); cfg.lbfgs_max = (int)a.num("lbfgs-max", 400); cfg.newton_iters = (int)a.num("newton", 60);
   cfg.gtol = a.num("gtol", 1e-10); cfg.ret_tol = a.num("ret-tol", 1e-8); cfg.K0min = (int)a.num("K0", 2); cfg.K0max = (int)a.num("K0max", 6);
@@ -89,11 +90,19 @@ static int cmd_search(const Args& a) {
       if (tr >= (uint64_t)cfg.trials || elapsed() > cfg.minutes * 60.0) { g_stop = true; break; }
       TrialOut o; try { o = run_trial(cfg, tr, ctx); } catch (std::exception& e) { o.ok = false; o.why = std::string("exception: ") + e.what(); }
       done++;
+      if (o.ok) {
+        { std::lock_guard<std::mutex> lk(mu);
+          long dup = cat.find_duplicate(o.rec, cfg.tol_inv, cfg.tol_dist);
+          if (dup >= 0 && !Catalog::better(o.rec, cat.recs[dup])) { cat.absorb((size_t)dup, o.rec); dups++; continue; } }
+        // The Hessian/index and calibration can take minutes. Keep them off the catalog lock;
+        // another worker may insert a duplicate meanwhile, so recheck before publishing.
+        try { record_extras(cfg, o.rec, ctx); }
+        catch (std::exception& e) { o.ok = false; o.why = std::string("metadata exception: ") + e.what(); }
+      }
       std::lock_guard<std::mutex> lk(mu);
       if (!o.ok) { failed++; reasons[o.why]++; continue; }
       double dist; long dup = cat.find_duplicate(o.rec, cfg.tol_inv, cfg.tol_dist, &dist);
-      if (dup >= 0) { if (cat.absorb((size_t)dup, o.rec)) record_extras(cfg, cat.recs[dup], ctx); dups++; continue; }
-      record_extras(cfg, o.rec, ctx);
+      if (dup >= 0) { cat.absorb((size_t)dup, o.rec); dups++; continue; }
       o.rec.h.id = -1; size_t idx = cat.push(o.rec); found++; const Record& r = cat.recs[idx];
       std::printf("+ id=%lld d=%d/%d N=%d K=%d A=%.9f E=%.6f morse=%d null=%d minsep=%.3f ret=%.1e cover=%d sym=\"%s\" (trial %llu, %.2fs)\n", (long long)r.h.id, r.h.deff, r.h.d, r.h.N, r.h.K, r.h.action, r.h.energy, r.h.morse, r.h.nullity, r.h.minsep, r.h.ret_err, r.h.cover, r.sym.c_str(), (unsigned long long)tr, r.h.secs);
       std::fflush(stdout);
@@ -102,11 +111,11 @@ static int cmd_search(const Args& a) {
   });
   double last_ck = 0;
   const int64_t base_done = st.trials_done; const double base_elapsed = st.elapsed;
-  auto checkpoint = [&] { std::lock_guard<std::mutex> lk(mu); cat.save(cfg.out); st.next_trial = (int64_t)counter.load(); st.trials_done = base_done + done.load(); st.found = (int64_t)cat.recs.size(); st.elapsed = base_elapsed + elapsed(); st.save(cfg.out + ".state"); };
+  auto checkpoint = [&] { std::lock_guard<std::mutex> lk(mu); cat.save(cfg.out); st.next_trial = (int64_t)counter.load(); st.trials_done = base_done + done.load(); st.found = (int64_t)cat.recs.size(); st.elapsed = base_elapsed + elapsed(); st.save(cfg.out + ".state"); return cat.recs.size(); };
   while (active.load() > 0) {
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    if (elapsed() - last_ck >= cfg.checkpoint_secs) { last_ck = elapsed(); checkpoint();
-      std::printf("[%6.0fs] trials %ld (%.1f/s) | unique %zu (+%ld) | duplicates %ld | failed %ld\n", elapsed(), done.load(), done.load() / std::max(1e-9, elapsed()), cat.recs.size(), found.load(), dups.load(), failed.load()); std::fflush(stdout); }
+    if (elapsed() - last_ck >= cfg.checkpoint_secs) { last_ck = elapsed(); const size_t records = checkpoint();
+      std::printf("[%6.0fs] trials %ld (%.1f/s) | unique %zu (+%ld) | duplicates %ld | failed %ld\n", elapsed(), done.load(), done.load() / std::max(1e-9, elapsed()), records, found.load(), dups.load(), failed.load()); std::fflush(stdout); }
   }
   for (auto& t : th) t.join();
   checkpoint();
@@ -121,7 +130,7 @@ static int cmd_list(const Args& a) {
   std::sort(rs.begin(), rs.end(), [&](const Record* x, const Record* y) { if (sort == "id") return x->h.id < y->h.id; if (sort == "hits") return x->h.hits > y->h.hits; if (sort == "twist") return x->twist() > y->twist(); if (sort == "rigid") return x->rigid() < y->rigid();
     if (x->h.deff != y->h.deff) return x->h.deff < y->h.deff; if (x->h.N != y->h.N) return x->h.N < y->h.N; return x->h.action < y->h.action; });
   std::printf("%5s %2s/%-2s %2s %4s %14s %12s %5s %4s %7s %8s %10s %6s %8s %5s %3s %s\n", "id", "de", "d", "N", "K", "action", "energy", "morse", "null", "minsep", "ret_err", "twist", "tw_rel", "rigid", "hits", "cov", "sym");
-  for (auto r : rs) std::printf("%5lld %2d/%-2d %2d %4d %14.9f %12.7f %5d %4d %7.4f %8.1e %10.4g %6.3f %8.2e %5d %3d %s%s\n", (long long)r->h.id, r->h.deff, r->h.d, r->h.N, r->h.K, r->h.action, r->h.energy, r->h.morse, r->h.nullity, r->h.minsep, r->h.ret_err, r->twist(), r->extra.size() > 1 ? r->extra[1] : 0.0, r->rigid(), r->h.hits, r->h.cover, r->sym.c_str(), r->proven() > 0 ? " proven" : "");
+  for (auto r : rs) std::printf("%5lld %2d/%-2d %2d %4d %14.9f %12.7f %5d %4d %7.4f %8.1e %10.4g %6.3f %8.2e %5d %3d %s%s\n", (long long)r->h.id, r->h.deff, r->h.d, r->h.N, r->h.K, r->h.action, r->h.energy, r->h.morse, r->h.nullity, r->h.minsep, r->h.ret_err, r->twist(), r->extra.size() > 1 ? r->extra[1] : 0.0, r->rigid(), r->h.hits, r->h.cover, r->sym.c_str(), r->proven() > 0 ? " proven" : r->recorded_proof() > 0 ? " legacy-proof (rerun)" : "");
   std::printf("%zu records\n", rs.size());
   return 0;
 }
@@ -156,13 +165,13 @@ static int cmd_verify_all(const Args& a) {
     if (r.layout() < 1) nolayout++;
     rank.emplace_back(sres, (long)r.h.id);
     std::printf("%5lld %2d/%-2d %2d %4d %10.1e %10.1e %10.1e %10.1e%s\n", (long long)r.h.id, r.h.deff, r.h.d, r.h.N, r.h.K, r.h.ret_err, sres, cres, per, sres > gate ? "  **" : "");
-    if (sres > gate) bad++;
+    if (!(sres <= gate)) bad++;
     if (sres > worst) { worst = sres; worst_id = (long)r.h.id; } }
   std::printf("%zu records; %d above %.0e (marked **); worst is id %ld at %.2e\n", cat.recs.size(), bad, gate, worst_id, worst);
-  if (nolayout) std::printf("%d records predate the certified state and carry only coefficients\n", nolayout);
+  if (nolayout) std::printf("%d records predate stored numerical states and carry only coefficients\n", nolayout);
   if (bad) { std::sort(rank.begin(), rank.end(), [](auto& x, auto& y) { return x.first > y.first; });
     std::printf("worst ids:  "); for (size_t i = 0; i < rank.size() && i < 8 && rank[i].first > gate; i++) std::printf("%ld ", rank[i].second); std::printf("\n"); }
-  return 0;
+  return bad ? 1 : 0;
 }
 
 static int cmd_verify(const Args& a) {
@@ -175,21 +184,22 @@ static int cmd_verify(const Args& a) {
   NBody<double> nb(N, d, r.h.alpha, 22);
   double E0 = nbody_energy(N, d, r.h.alpha, pos.data(), vel.data());
   std::vector<double> p = pos, v = vel; int steps = nb.integrate(p, v, 2 * PI, 1e-16);
+  if (steps < 0) throw std::runtime_error("full-period verification integration failed");
   double E1 = nbody_energy(N, d, r.h.alpha, p.data(), v.data());
   std::printf("record %lld: d=%d (deff=%d) N=%d K=%d action=%.12f energy=%.12f\n", (long long)r.h.id, r.h.d, r.h.deff, r.h.N, r.h.K, r.h.action, r.h.energy);
   if (om) std::printf("  rotating frame: Omega stored with the record\n");
-  if (!r.state()) std::printf("  ** no certified state stored (layout 0) — the numbers below are the coefficients' **\n");
-  std::printf("  certified state, shift residual        = %.3e   (stored ret_err %.1e)\n", sres, r.h.ret_err);
+  if (!r.state()) std::printf("  ** no numerical state stored (layout 0) — the numbers below are the coefficients' **\n");
+  std::printf("  numerical state, shift residual        = %.3e   (stored ret_err %.1e)\n", sres, r.h.ret_err);
   std::printf("  stored coefficients, shift residual    = %.3e   (stored extra[6] %.1e)\n", cres, r.coef_err());
   std::printf("  full-period return |Phi_T(Z) - G^N Z|  = %.3e  (%d Taylor steps)\n  energy drift over one period          = %.3e\n  energy from initial state             = %.12f\n", per, steps, E1 - E0, E0);
   if (std::fabs(E0 - r.h.energy) > 1e-6 * std::max(1.0, std::fabs(r.h.energy))) std::printf("  ** stale record: reconstructed energy %.9g disagrees with stored %.9g **\n", E0, r.h.energy);
   std::printf("  initial conditions (t=0):\n"); for (int k = 0; k < N; k++) { std::printf("   body %d  q =", k); for (int c = 0; c < d; c++) std::printf(" %+.15f", pos[k * d + c]); std::printf("   v ="); for (int c = 0; c < d; c++) std::printf(" %+.15f", vel[k * d + c]); std::printf("\n"); }
-  return 0;
+  return sres <= a.num("gate", 1e-9) ? 0 : 1;
 }
 
 static int cmd_merge(const Args& a) {
   if (a.pos.size() < 2) { usage(); return 1; }
-  Catalog out; try { out.load(a.pos[0]); } catch (...) {}
+  Catalog out; out.load(a.pos[0]);  // an absent destination is fine; a corrupt one must not be overwritten
   double tol_inv = a.num("tol-inv", 1e-4), tol_dist = a.num("tol-dist", 1e-3);
   double min_rigid = a.num("min-rigid", 0.0); int min_deff = (int)a.num("min-deff", 0);
   long added = 0, merged = 0, dropped = 0;
@@ -340,16 +350,34 @@ static int cmd_prove(const Args& a) {
     Proof P = prove_state(N, dp, 1.0, Z, fr, radius, tol, order, threads, verbose);
     if (!P.ok) { std::printf(" NOT PROVEN (%s; Newton %.1e/%.1e, contraction %.2e, closure %.2e)\n", P.why.c_str(), P.newton, radius, P.kappa, P.closure); continue; }
     proven++;
-    std::printf(" PROVEN in %.1fs\n  a choreography of N=%d bodies in R^%d, period 2pi%s, exists with initial state within %.1e (max norm) of the refined state,\n"
+    std::printf(" PROVEN in %.1fs\n  %s of N=%d bodies in R^%d exists with initial state within %.1e (max norm) of the refined state,\n"
                 "  the only zero of the shooting map in the slice box Z0 + Q[-r, r]^m, r = %.1e; the bodies span R^%d: %s; not a relative equilibrium: %s.\n"
                 "  Krawczyk: |Y F| = %.1e, contraction %.2e, closure %.2e; slice dim %d, %d gauge generators;\n"
                 "  %ld validated Taylor steps (%ld rejected), h in [%.1e, %.1e], state width <= %.1e\n"
-                "  energy in %s\n  action in %s\n", P.seconds, N, dp, fr.rotating() ? " in the rotating frame" : "", P.hull, P.radius, dp, P.span ? "verified" : "NOT verified",
+                "  energy in %s\n  action in %s\n", P.seconds, fr.rotating() ? "a relative choreography, rotating-frame period 2pi," : "an inertial choreography, period 2pi,", N, dp, P.hull, P.radius, dp, P.span ? "verified" : "NOT verified",
                 P.nonrigid ? "verified" : "NOT verified", P.newton, P.kappa, P.closure, P.m, P.k, P.steps, P.rejects, P.hmin, P.hmax, P.maxwid, P.energy.str(digits / 2 + 4).c_str(), P.action.str(digits / 2 + 4).c_str());
-    if (write && r.extra.size() > 7) { r.extra[7] = P.radius; cat.save(path); }
+    if (fr.rotating()) {
+      bool periodic = true; std::printf("  certified frame rates (modulo N):");
+      for (double w : fr.rate) { std::printf(" %a", w); periodic &= w == std::round(w); }
+      std::printf("\n  Phi_(2pi)(Z) = G^N Z; G^N = I: %s. A common inertial curve is an additional condition.\n", periodic ? "verified from integer rates" : "not asserted");
+    }
+    if (write) {
+      // Upgrade the payload without changing its initial state or frame. Old proof markers are
+      // never trusted by this revision; the layout tag records that this run recomputed the proof.
+      const auto sources = r.citations();
+      const double* oldom = r.omega(); std::vector<double> om;
+      if (oldom) om.assign(oldom, oldom + (size_t)d * d);
+      r.extra.resize(Record::NEX + (size_t)d * d + 2 * (size_t)nd, 0.0);
+      if (!om.empty()) std::copy(om.begin(), om.end(), r.extra.begin() + Record::NEX);
+      std::copy(pos.begin(), pos.end(), r.extra.begin() + Record::NEX + (size_t)d * d);
+      std::copy(vel.begin(), vel.end(), r.extra.begin() + Record::NEX + (size_t)d * d + nd);
+      r.extra[5] = Record::PROOF_LAYOUT; r.extra[7] = P.radius;
+      for (const auto& source : sources) r.add_citation(source);
+      cat.save(path);
+    }
   }
   if (write) std::printf("%d proven, catalogue saved\n", proven); else std::printf("%d of %zu proven\n", proven, recs.size());
-  return 0;
+  return proven == (int)recs.size() ? 0 : 1;
 }
 
 static int cmd_refine(const Args& a) {
@@ -384,7 +412,8 @@ static int cmd_refine(const Args& a) {
 
   mpreal E = nbody_energy(N, d, P.alpha, Z.data(), Z.data() + nd);
   double fullret = 0;
-  { std::vector<mpreal> pf(Z.begin(), Z.begin() + nd), vf(Z.begin() + nd, Z.end()); nb.integrate(pf, vf, twopi, itol);
+  { std::vector<mpreal> pf(Z.begin(), Z.begin() + nd), vf(Z.begin() + nd, Z.end());
+    if (nb.integrate(pf, vf, twopi, itol) < 0) throw std::runtime_error("refinement full-period integration failed");
     for (int k = 0; k < N; k++) for (int c = 0; c < d; c++) {
       mpreal tp = Z[k * d + c], tv = Z[nd + k * d + c];
       if (!GN.empty()) { tp = mpreal(0); tv = mpreal(0);
@@ -394,7 +423,7 @@ static int cmd_refine(const Args& a) {
   const int Mseg = std::max(8, (std::max(64, 16 * Kout) + N - 1) / N), Ms = Mseg * N;
   std::vector<mpreal> ts(Mseg); for (int i = 0; i < Mseg; i++) ts[i] = twopi * i / Ms;
   std::vector<mpreal> ps(Z.begin(), Z.begin() + nd), vs(Z.begin() + nd, Z.end()), seg;
-  nb.integrate(ps, vs, twopi / N, itol, &ts, &seg);
+  if (nb.integrate(ps, vs, twopi / N, itol, &ts, &seg) < 0) throw std::runtime_error("refinement sampling integration failed");
   mpreal A(0);
   for (int i = 0; i < Mseg; i++) { const mpreal* sp = &seg[(size_t)i * 2 * nd];
     for (int b = 0; b < N; b++) { mpreal ke(0); for (int c = 0; c < d; c++) ke += sp[nd + b * d + c] * sp[nd + b * d + c]; A += ke * 0.5; }

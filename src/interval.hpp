@@ -4,10 +4,25 @@
 // sqrt or pow of one reaching ≤ 0) yields the whole line, which no inclusion test can pass.
 #pragma once
 #ifdef HAVE_MPFR
+#if defined(__FAST_MATH__) || (defined(__FINITE_MATH_ONLY__) && __FINITE_MATH_ONLY__)
+#error "Validated arithmetic requires finite checks and outward bounds; disable fast-math."
+#endif
 #include <mpfr.h>
 #include <cmath>
 #include <algorithm>
 #include <string>
+#include <cstdio>
+
+// Upper bounds on nonnegative binary64 arithmetic, including underflow. These bounds are used by
+// inclusion tests, not just step-size heuristics. Do not compile this code with -ffast-math.
+inline double add_up(double a, double b) {
+  if (a == 0) return b; if (b == 0) return a;
+  return std::nextafter(a + b, INFINITY);
+}
+inline double mul_up(double a, double b) {
+  if (a == 0 || b == 0) return 0;
+  return std::nextafter(a * b, INFINITY);
+}
 
 struct ival {
   mpfr_t lo, hi;
@@ -26,18 +41,19 @@ struct ival {
   static ival entire() { ival r; mpfr_set_inf(r.lo, -1); mpfr_set_inf(r.hi, 1); return r; }
   static ival sym(double m) { return ival(-m, m); }                 // [−m, m]
   double mid() const { return 0.5 * (mpfr_get_d(lo, MPFR_RNDN) + mpfr_get_d(hi, MPFR_RNDN)); }
-  double mag() const { return std::max(std::fabs(mpfr_get_d(lo, MPFR_RNDU)), std::fabs(mpfr_get_d(hi, MPFR_RNDU))); }   // ≥ sup|x|
+  double mag() const { return finite() ? std::max(std::fabs(mpfr_get_d(lo, MPFR_RNDA)), std::fabs(mpfr_get_d(hi, MPFR_RNDA))) : INFINITY; }   // ≥ sup|x|
   double wid() const { mpfr_t t; mpfr_init2(t, 64); mpfr_sub(t, hi, lo, MPFR_RNDU); double w = mpfr_get_d(t, MPFR_RNDU); mpfr_clear(t); return w; }
-  bool finite() const { return mpfr_number_p(lo) && mpfr_number_p(hi); }
+  bool finite() const { return mpfr_number_p(lo) && mpfr_number_p(hi) && mpfr_cmp(lo, hi) <= 0; }
   bool contains(const ival& o) const { return mpfr_cmp(lo, o.lo) <= 0 && mpfr_cmp(o.hi, hi) <= 0; }
   bool interior(const ival& o) const { return mpfr_cmp(lo, o.lo) < 0 && mpfr_cmp(o.hi, hi) < 0; }   // o ⊂ int(this)
   bool positive() const { return mpfr_sgn(lo) > 0; }
   void hull(const ival& o) { if (mpfr_cmp(o.lo, lo) < 0) mpfr_set(lo, o.lo, MPFR_RNDD); if (mpfr_cmp(o.hi, hi) > 0) mpfr_set(hi, o.hi, MPFR_RNDU); }
   void inflate(double rel, double abs_) {                           // widen by rel·mag + abs on each side
-    ival m(rel * mag() + abs_); mpfr_sub(lo, lo, m.hi, MPFR_RNDD); mpfr_add(hi, hi, m.hi, MPFR_RNDU); }
+    ival m(add_up(mul_up(rel, mag()), abs_)); mpfr_sub(lo, lo, m.hi, MPFR_RNDD); mpfr_add(hi, hi, m.hi, MPFR_RNDU); }
   std::string str(int digits = 20) const {
-    char buf[32]; std::snprintf(buf, sizeof buf, "%%.%dRe", digits - 1);
-    char* a = nullptr; char* b = nullptr; mpfr_asprintf(&a, buf, lo); mpfr_asprintf(&b, buf, hi);
+    char buf[32]; std::snprintf(buf, sizeof buf, "%%.%dRDe", std::max(1, digits) - 1);
+    char* a = nullptr; char* b = nullptr; mpfr_asprintf(&a, buf, lo);
+    std::snprintf(buf, sizeof buf, "%%.%dRUe", std::max(1, digits) - 1); mpfr_asprintf(&b, buf, hi);
     std::string s = std::string("[") + a + ", " + b + "]"; mpfr_free_str(a); mpfr_free_str(b); return s; }
 };
 
@@ -46,6 +62,11 @@ struct ival_scratch { mpfr_t a, b, c, d; ival inv; ival_scratch() { for (mpfr_pt
   ~ival_scratch() { for (mpfr_ptr p : {a, b, c, d}) mpfr_clear(p); } };
 inline ival_scratch& iscratch() { static thread_local ival_scratch s;
   if (mpfr_get_prec(s.a) != ival::prec()) for (mpfr_ptr p : {s.a, s.b, s.c, s.d, s.inv.lo, s.inv.hi}) mpfr_set_prec(p, ival::prec()); return s; }
+
+inline double expm1_up(double x) {
+  ival_scratch& s = iscratch(); mpfr_set_d(s.a, x, MPFR_RNDN);
+  mpfr_expm1(s.a, s.a, MPFR_RNDU); return mpfr_get_d(s.a, MPFR_RNDU);
+}
 
 inline double to_double(const ival& x) { return x.mid(); }
 inline double log2abs(const ival& x) { double m = x.mag(); return m == 0 ? -1e300 : std::log2(m); }
@@ -78,6 +99,13 @@ inline void div(ival& r, const ival& a, const ival& b) {
 inline void div_ui(ival& r, const ival& a, unsigned k) { mpfr_div_ui(r.lo, a.lo, k, MPFR_RNDD); mpfr_div_ui(r.hi, a.hi, k, MPFR_RNDU); }
 inline void fma_add(ival& acc, const ival& a, const ival& b) { ival_scratch& s = iscratch(); mul_into(s.a, s.b, a, b, s); mpfr_add(acc.lo, acc.lo, s.a, MPFR_RNDD); mpfr_add(acc.hi, acc.hi, s.b, MPFR_RNDU); }
 inline void fma_sub(ival& acc, const ival& a, const ival& b) { ival_scratch& s = iscratch(); mul_into(s.a, s.b, a, b, s); mpfr_sub(acc.lo, acc.lo, s.b, MPFR_RNDD); mpfr_sub(acc.hi, acc.hi, s.a, MPFR_RNDU); }
+// Exact binary64 preconditioners need no temporary MPFR interval per matrix product.
+inline void fma_add_d(ival& acc, double a, const ival& b) { ival_scratch& s = iscratch();
+  mpfr_mul_d(s.a, a >= 0 ? b.lo : b.hi, a, MPFR_RNDD); mpfr_mul_d(s.b, a >= 0 ? b.hi : b.lo, a, MPFR_RNDU);
+  mpfr_add(acc.lo, acc.lo, s.a, MPFR_RNDD); mpfr_add(acc.hi, acc.hi, s.b, MPFR_RNDU); }
+inline void fma_sub_d(ival& acc, double a, const ival& b) { ival_scratch& s = iscratch();
+  mpfr_mul_d(s.a, a >= 0 ? b.lo : b.hi, a, MPFR_RNDD); mpfr_mul_d(s.b, a >= 0 ? b.hi : b.lo, a, MPFR_RNDU);
+  mpfr_sub(acc.lo, acc.lo, s.b, MPFR_RNDD); mpfr_sub(acc.hi, acc.hi, s.a, MPFR_RNDU); }
 inline void sqrt_(ival& r, const ival& a) { if (mpfr_sgn(a.lo) <= 0) { r = ival::entire(); return; } mpfr_sqrt(r.lo, a.lo, MPFR_RNDD); mpfr_sqrt(r.hi, a.hi, MPFR_RNDU); }
 inline void pow_d(ival& r, const ival& a, double e) {                // a > 0; monotone in a, direction by the sign of e
   if (mpfr_sgn(a.lo) <= 0) { r = ival::entire(); return; }

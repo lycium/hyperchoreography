@@ -134,7 +134,8 @@ inline void record_residuals(const Record& r, double& state_res, double& coef_re
   if (z) { sp.assign(z, z + nd); sv.assign(z + nd, z + 2 * nd); }
   state_res = z ? chore_residual(nb, sp, sv, 1e-16, Gp) / sc : coef_res;
   if (period_ret) {
-    std::vector<double> p = sp, v = sv; nb.integrate(p, v, 2 * PI, 1e-16);
+    std::vector<double> p = sp, v = sv;
+    if (nb.integrate(p, v, 2 * PI, 1e-16) < 0) { *period_ret = INF; return; }
     if (om) { A.assign(om, om + (size_t)d * d); for (double& e : A) e *= 2 * PI; la::expm_skew(d, A, GN); }
     double ret = 0;
     for (int k = 0; k < N; k++) for (int c = 0; c < d; c++) { double tp = sp[k * d + c], tv = sv[k * d + c];
@@ -153,7 +154,7 @@ inline bool orbit_fit(int N, int d, double alpha, Orbit& O, Ctx& ctx, int Ms_req
   std::vector<double> ts(Mseg); for (int j = 0; j < Mseg; j++) ts[j] = 2 * PI * j / Ms;
   std::vector<double> p(O.Z.begin(), O.Z.begin() + nd), v(O.Z.begin() + nd, O.Z.end()), seg;
   NBody<double> nbi(N, d, alpha, 22);
-  nbi.integrate(p, v, 2 * PI / N, 1e-16, &ts, &seg);
+  if (nbi.integrate(p, v, 2 * PI / N, 1e-16, &ts, &seg) < 0) return false;
   for (double x : seg) if (!std::isfinite(x)) return false;
   std::vector<double>& S = ctx.samp; S.assign((size_t)Ms * 2 * d, 0.0);
   std::vector<double> Rt, Ai;                                       // q(t) = exp(−Ωt) Q(t), q̇ = exp(−Ωt)(Q̇ − ΩQ)
@@ -566,7 +567,7 @@ inline bool fit_loop(int N, int d, double alpha, Orbit& O, Ctx& ctx, int Ms, int
 // ODE validation, cover unwinding, shooting certification, Fourier re-extraction, canonical frame → record
 inline bool certify(const Config& cfg, const Problem*& P, std::vector<double>& x, const Symmetry& S, Ctx& ctx, Record& rec, std::string& why) {
   // at Ω = 0 deff can only be lost downstream, so gate before the ODE work; 1e-12 keeps the gate permissive
-  if (cfg.min_deff > 1) { std::vector<double> xc(x), sv; if (canonical_frame(P->nb, P->d, xc, sv, 1e-12) < cfg.min_deff) { why = "effective dimension below filter"; return false; } }
+  if (P->Om.empty() && cfg.min_deff > 1) { std::vector<double> xc(x), sv; if (canonical_frame(P->nb, P->d, xc, sv, 1e-12) < cfg.min_deff) { why = "effective dimension below filter"; return false; } }
   // rigid loops are the N-gon's high-d analogue and dominate the deff filter in a rotating frame
   if (rigid_defect(*P, x.data(), ctx.w) < cfg.min_rigid) { why = "relative equilibrium"; return false; }
   // one mode doubling if badly under-resolved
@@ -580,7 +581,9 @@ inline bool certify(const Config& cfg, const Problem*& P, std::vector<double>& x
     x.swap(x2); P = &P2; ret = return_error(*P, x.data(), nb);
   }
   if (!(ret <= cfg.ret_reject)) { why = "spurious (return error)"; return false; }
-  int cover = cover_multiplicity(*P, x.data());
+  // Dividing a rotating loop's frequencies by k also requires Omega -> Omega/k. Its Fourier gcd
+  // alone is not an inertial cover, and polishing at the old frame would change the orbit.
+  int cover = P->Om.empty() ? cover_multiplicity(*P, x.data()) : 1;
   if (cover > 1) {
     Problem Pu; unwind_cover(*P, x.data(), cover, Pu, x2); Pu.minsep = cfg.minsep;
     const Problem& P3 = ctx.problem(cfg, std::max(Pu.K, cfg.K)); std::vector<double> x3(P3.n, 0.0); P3.transfer(Pu, x2.data(), x3.data());
@@ -601,6 +604,8 @@ inline bool certify(const Config& cfg, const Problem*& P, std::vector<double>& x
     for (int a = 0; a < d; a++) for (int b = 0; b < d; b++) { double t = 0;
       for (int i = 0; i < d; i++) for (int j = 0; j < d; j++) t += Rc[(size_t)a * d + i] * P->Om[(size_t)i * d + j] * Rc[(size_t)b * d + j];
       Omc[(size_t)a * d + b] = t; }
+    for (int a = 0; a < d; a++) { Omc[(size_t)a * d + a] = 0;
+      for (int b = a + 1; b < d; b++) { const double v = 0.5 * (Omc[(size_t)a * d + b] - Omc[(size_t)b * d + a]); Omc[(size_t)a * d + b] = v; Omc[(size_t)b * d + a] = -v; } }
     std::vector<double> isv; deff = inertial_deff(P->N, O.modes, d, O.coef.data(), Omc.data(), isv);   // the dimension actually occupied
   }
   if (deff < cfg.min_deff) { why = "effective dimension below filter"; return false; }
@@ -618,7 +623,8 @@ inline bool certify(const Config& cfg, const Problem*& P, std::vector<double>& x
   for (int half = 0; half < 2; half++) for (int k = 0; k < P->N; k++) for (int a = 0; a < d; a++) {
     double t = 0; for (int b = 0; b < d; b++) t += Rc[(size_t)a * d + b] * O.Z[half * nd + k * d + b];
     Zc[half * nd + k * d + a] = t; }
-  rec.extra[6] = coef_residual(rec, nb);
+  record_residuals(rec, rec.h.ret_err, rec.extra[6]);
+  if (!(rec.h.ret_err <= cfg.shoot_tol * 100)) { why = "canonical state failed shooting check"; return false; }
   return true;
 }
 

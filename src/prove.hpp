@@ -25,7 +25,7 @@ struct Tangent {
   T& s(int k, int p) { return S[(size_t)k * np + p]; }
   T& w(int k, int p) { return W[(size_t)k * np + p]; }
   void series(NBody<T>& nb, const T* dpos, const T* dvel) {
-    const size_t K = order + 1;
+    const size_t K = nb.order + 1;  // the primal may carry more coefficients than this tangent
     for (int i = 0; i < nd; i++) { set(X[i], dpos[i]); set(V[i], dvel[i]); }
     for (int k = 0; k < order; k++) {
       int p = 0;
@@ -103,7 +103,7 @@ struct Verified {
   double lipschitz() {
     std::vector<double> row(nd, 0.0); std::vector<ival> e(n2, ival(0));
     for (int j = 0; j < nd; j++) { set_d(e[j], 1.0); tg1.series(nbq, e.data(), e.data() + nd); set_zero(e[j]);
-      for (int i = 0; i < nd; i++) row[i] += tg1.v(1, i / d, i % d).mag(); }
+      for (int i = 0; i < nd; i++) row[i] = add_up(row[i], tg1.v(1, i / d, i % d).mag()); }
     double a = 1.0; for (double r : row) a = std::max(a, r); return a;
   }
   double step(double h, bool last, const ival& hlast) {
@@ -118,8 +118,10 @@ struct Verified {
       for (int i = 0; i < n2; i++) { mul(coefp, hp, i < nd ? nbw.X[(size_t)p * nd + i] : nbw.V[(size_t)p * nd + i - nd]); rem = std::max(rem, coefp.mag()); }
       if (!(rem <= std::exp2(log2tol) * scale)) { const double f = std::isfinite(rem) ? std::max(0.3, 0.8 * std::pow(std::exp2(log2tol) * scale / rem, 1.0 / p)) : 0.5;
         if (debug) std::printf("    step %ld: remainder %.2e at h=%.3e, shrinking by %.2f\n", steps, rem, h, f); h *= f; last = false; continue; }
-      const double a = lipschitz(), gron = 1.001 * std::exp(a * h);
-      if (a * h > 4.0) { if (debug) std::printf("    step %ld: a h = %.3e at h=%.3e\n", steps, a * h, h); h *= 0.5; last = false; continue; }
+      const double a = m > 0 ? lipschitz() : 0, ah = mul_up(a, h);
+      if (ah > 4.0) { if (debug) std::printf("    step %ld: a h = %.3e at h=%.3e\n", steps, ah, h); h *= 0.5; last = false; continue; }
+      // ||psi(t)-psi(0)|| <= (exp(a h)-1)||psi(0)||, with every bound rounded upward.
+      const double growth = expm1_up(ah);
       bool ok = true;
       horner(nb.X, nd, p, hI, Zn.data(), px); horner(nb.V, nd, p, hI, Zn.data() + nd, px);
       for (int i = 0; i < n2 && ok; i++) { mul(coefp, hp, i < nd ? nbw.X[(size_t)p * nd + i] : nbw.V[(size_t)p * nd + i - nd]); add_inplace(Zn[i], coefp); ok = Zn[i].finite(); }
@@ -129,7 +131,7 @@ struct Verified {
         for (int j = next.fetch_add(1); j < m && !bad.load(); j = next.fetch_add(1)) {
           const ival* pj = psi(j); ival* wj = &Wpsi[(size_t)j * n2]; ival* nj = &Psin[(size_t)j * n2];
           double mx = 0; for (int i = 0; i < n2; i++) mx = std::max(mx, pj[i].mag());
-          const double rho = gron * h * a * mx;
+          const double rho = mul_up(growth, mx);
           for (int i = 0; i < n2; i++) { set(wj[i], pj[i]); wj[i].inflate(0.0, rho); }
           tg_.series(nb, pj, pj + nd); horner(tg_.X, nd, p, hI, nj, q); horner(tg_.V, nd, p, hI, nj + nd, q);
           tg_.series(nbw, wj, wj + nd);
@@ -137,7 +139,9 @@ struct Verified {
         } };
       if (m > 0) pool.run(work);
       if (bad.load()) { if (debug) std::printf("    step %ld: tangent remainder not finite at h=%.3e\n", steps, h); h *= 0.5; last = false; continue; }
-      for (int k = 0; k <= p; k++) { NBody<ival>& src = k < p ? nb : nbw; set_zero(coefp);
+      // The primitive has order p: L_0..L_(p-2) on Z, then h^p L_(p-1)(W)/p.
+      // NBody::series computes pair coefficients only through p-1; L_p is unavailable.
+      for (int k = 0; k < p; k++) { NBody<ival>& src = k < p - 1 ? nb : nbw; set_zero(coefp);
         for (int i = 0; i < nd; i++) for (int j = 0; j <= k; j++) fma_add(coefp, src.V[(size_t)j * nd + i], src.V[(size_t)(k - j) * nd + i]);
         mul_d(coefp, coefp, 0.5);
         for (int q = 0; q < nb.np; q++) for (int j = 0; j <= k; j++) fma_add(coefp, src.s(j, q), src.w(k - j, q));
@@ -153,9 +157,10 @@ struct Verified {
     return 0;
   }
   bool integrate(const ival& tend) {
+    if (!tend.finite() || mpfr_sgn(tend.lo) < 0 || !std::isfinite(log2tol) || order < 2 || alpha != 1.0) return false;
     set_zero(t); set_zero(A); ival rem; observe();
     for (;;) {
-      sub(rem, tend, t); if (mpfr_sgn(rem.lo) <= 0) return true;
+      sub(rem, tend, t); if (mpfr_sgn(rem.lo) <= 0) return mpfr_zero_p(rem.lo) && mpfr_zero_p(rem.hi);
       nb.series(Z.data(), Z.data() + nd);
       double h = nb.stepsize(log2tol);
       const bool last = h >= mpfr_get_d(rem.lo, MPFR_RNDD);
@@ -167,12 +172,28 @@ struct Verified {
 };
 
 inline void icos_isin(const ival& th, ival& c, ival& s) {
-  mpfr_cos(c.lo, th.lo, MPFR_RNDD); mpfr_cos(c.hi, th.hi, MPFR_RNDU); if (mpfr_cmp(c.lo, c.hi) > 0) mpfr_swap(c.lo, c.hi);
-  mpfr_sin(s.lo, th.lo, MPFR_RNDD); mpfr_sin(s.hi, th.hi, MPFR_RNDU); if (mpfr_cmp(s.lo, s.hi) > 0) mpfr_swap(s.lo, s.hi);
-  const double lo = mpfr_get_d(th.lo, MPFR_RNDD), hi = mpfr_get_d(th.hi, MPFR_RNDU), tol = 1e-6 + (hi - lo);
-  const double kc = std::round(0.5 * (lo + hi) / PI), ks = std::round((0.5 * (lo + hi) - PI / 2) / PI);
-  if (std::fabs(0.5 * (lo + hi) - kc * PI) < tol) c.hull(ival(std::fmod(kc, 2.0) == 0.0 ? 1.0 : -1.0));
-  if (std::fabs(0.5 * (lo + hi) - (PI / 2 + ks * PI)) < tol) s.hull(ival(std::fmod(ks, 2.0) == 0.0 ? 1.0 : -1.0));
+  if (!th.finite()) { c = ival(-1, 1); s = c; return; }
+  const ival angle(th); ival endpoint;
+  mpfr_cos(c.lo, angle.lo, MPFR_RNDD); mpfr_cos(c.hi, angle.lo, MPFR_RNDU);
+  mpfr_cos(endpoint.lo, angle.hi, MPFR_RNDD); mpfr_cos(endpoint.hi, angle.hi, MPFR_RNDU); c.hull(endpoint);
+  mpfr_sin(s.lo, angle.lo, MPFR_RNDD); mpfr_sin(s.hi, angle.lo, MPFR_RNDU);
+  mpfr_sin(endpoint.lo, angle.hi, MPFR_RNDD); mpfr_sin(endpoint.hi, angle.hi, MPFR_RNDU); s.hull(endpoint);
+  // Critical points are integer multiples of pi/2. The interval quotient overestimates their set;
+  // extra extrema only widen the result. No binary64 angle reduction or assumed monotonicity.
+  ival grid = angle / (ival::pi() * 0.5);
+  mpfr_ceil(grid.lo, grid.lo); mpfr_floor(grid.hi, grid.hi);
+  if (mpfr_cmp(grid.lo, grid.hi) > 0) return;
+  mpfr_sub(endpoint.hi, grid.hi, grid.lo, MPFR_RNDU);
+  if (mpfr_cmp_ui(endpoint.hi, 3) >= 0) { c = ival(-1, 1); s = c; return; }
+  mpz_t first, last; mpz_init(first); mpz_init(last);
+  mpfr_get_z(first, grid.lo, MPFR_RNDN); mpfr_get_z(last, grid.hi, MPFR_RNDN);
+  for (; mpz_cmp(first, last) <= 0; mpz_add_ui(first, first, 1)) {
+    switch (mpz_fdiv_ui(first, 4)) {
+      case 0: c.hull(ival(1)); break; case 1: s.hull(ival(1)); break;
+      case 2: c.hull(ival(-1)); break; case 3: s.hull(ival(-1)); break;
+    }
+  }
+  mpz_clear(first); mpz_clear(last);
 }
 
 struct Frame {
@@ -222,13 +243,18 @@ inline Frame frame_of(int N, int d, const double* Om, double snap = 1e-9) {
     }
     for (auto& f : fixed) axes.push_back(f);
     for (int a = 0; a < d; a++) for (int b = 0; b < d; b++) fr.R[(size_t)a * d + b] = axes[a][b];
+    // Only exp(2 pi Omega/N) enters the proof. Choose one logarithm modulo N, then snap
+    // near-integer rates and coincident angles to IDENTICAL doubles. Adding N to a double
+    // and subtracting it again is not exact, so it cannot justify a conservation law.
     const int np = fr.nplanes(); fr.cls.assign(np, 2);
+    for (double& w : fr.rate) { w = std::remainder(w, (double)N);
+      const double integer = std::round(w); if (std::fabs(w - integer) < snap) w = integer; }
     for (int i = 0; i < np; i++) { const double k = std::round(fr.rate[i] / N), h = std::round(fr.rate[i] / N - 0.5) + 0.5;
       if (std::fabs(fr.rate[i] - k * N) < snap) { fr.rate[i] = k * N; fr.cls[i] = 0; } else if (std::fabs(fr.rate[i] - h * N) < snap) { fr.rate[i] = h * N; fr.cls[i] = 1; } }
     for (int i = 0; i < np; i++) for (int j = i + 1; j < np; j++) if (fr.cls[i] == 2 && fr.cls[j] == 2) {
       const double ks = std::round((fr.rate[j] - fr.rate[i]) / N), ko = std::round((fr.rate[j] + fr.rate[i]) / N);
-      if (std::fabs(fr.rate[j] - fr.rate[i] - ks * N) < snap) fr.rate[j] = fr.rate[i] + ks * N;
-      else if (std::fabs(fr.rate[j] + fr.rate[i] - ko * N) < snap) fr.rate[j] = ko * N - fr.rate[i]; }
+      if (std::fabs(fr.rate[j] - fr.rate[i] - ks * N) < snap) fr.rate[j] = fr.rate[i];
+      else if (std::fabs(fr.rate[j] + fr.rate[i] - ko * N) < snap) fr.rate[j] = -fr.rate[i]; }
   }
   const int np = fr.nplanes(); std::vector<int> F, P;
   for (int i = 0; i < np; i++) { if (fr.cls[i] == 0) { F.push_back(2 * i); F.push_back(2 * i + 1); } if (fr.cls[i] == 1) { P.push_back(2 * i); P.push_back(2 * i + 1); } }
@@ -239,7 +265,7 @@ inline Frame frame_of(int N, int d, const double* Om, double snap = 1e-9) {
   for (int i = 0; i < np; i++) if (fr.cls[i] == 2) fr.rots.push_back(skew(2 * i, 2 * i + 1));
   for (int i = 0; i < np; i++) for (int j = i + 1; j < np; j++) if (fr.cls[i] == 2 && fr.cls[j] == 2) {
     const int ui = 2 * i, vi = 2 * i + 1, uj = 2 * j, vj = 2 * j + 1;
-    const bool same = std::fmod(fr.rate[j] - fr.rate[i], (double)N) == 0.0, opp = std::fmod(fr.rate[j] + fr.rate[i], (double)N) == 0.0;
+    const bool same = fr.rate[j] == fr.rate[i], opp = fr.rate[j] == -fr.rate[i];
     auto blk = [&](double x00, double x01, double x10, double x11) { std::vector<double> g((size_t)d * d, 0.0);
       g[(size_t)ui * d + uj] = x00; g[(size_t)ui * d + vj] = x01; g[(size_t)vi * d + uj] = x10; g[(size_t)vi * d + vj] = x11;
       for (int a : {ui, vi}) for (int b : {uj, vj}) g[(size_t)b * d + a] = -g[(size_t)a * d + b]; return g; };
@@ -286,13 +312,16 @@ struct Proof {
 };
 
 inline bool inverse_d(int n, const std::vector<double>& A, std::vector<double>& Y) {
-  Y.assign((size_t)n * n, 0.0); std::vector<double> b(n);
-  for (int c = 0; c < n; c++) { std::fill(b.begin(), b.end(), 0.0); b[c] = 1.0; if (!la::lu_solve(n, A, b)) return false; for (int r = 0; r < n; r++) Y[(size_t)r * n + c] = b[r]; }
+  Y.assign((size_t)n * n, 0.0); std::vector<double> b(n), LU(A); std::vector<int> pivots;
+  if (!la::lu_factor(n, LU, pivots)) return false;
+  for (int c = 0; c < n; c++) { std::fill(b.begin(), b.end(), 0.0); b[c] = 1.0; la::lu_substitute(n, LU, pivots, b); for (int r = 0; r < n; r++) Y[(size_t)r * n + c] = b[r]; }
   return true;
 }
 
 inline Proof prove_state(int N, int d, double alpha, const std::vector<mpreal>& Z0, const Frame& fr, double radius, double tol, int order, int threads, bool verbose = false) {
   Proof pr; auto t0 = std::chrono::steady_clock::now();
+  if (N < 2 || d < 1 || alpha != 1.0 || !(radius > 0) || !std::isfinite(radius) || !(tol > 0) || !std::isfinite(tol) ||
+      order < 2 || fr.N != N || fr.d != d || Z0.size() != 2 * (size_t)N * d) { pr.why = "invalid proof parameters"; return pr; }
   const int nd = N * d, n2 = 2 * nd; pr.dp = d; pr.radius = radius;
   std::vector<double> z(n2); for (int i = 0; i < n2; i++) z[i] = to_double(Z0[i]);
   std::vector<std::vector<double>> trans = fr.trans, rots; std::vector<std::vector<double>> gen;
@@ -350,7 +379,8 @@ inline Proof prove_state(int N, int d, double alpha, const std::vector<mpreal>& 
   for (int attempt = 0; attempt < 4; attempt++) {
     Vp = std::make_unique<Verified>(N, d, alpha, order, m, threads, tol); Verified& V = *Vp; V.debug = verbose; V.track = true;
     pr.hull = 0;
-    for (int i = 0; i < n2; i++) { double w = 0; for (int c = 0; c < m; c++) w += std::fabs(Q[(size_t)i * m + c]); V.Z[i] = ival(Z0[i].v); V.Z[i].inflate(0.0, radius * w); pr.hull = std::max(pr.hull, radius * w); }
+    for (int i = 0; i < n2; i++) { double w = 0; for (int c = 0; c < m; c++) w = add_up(w, std::fabs(Q[(size_t)i * m + c]));
+      const double width = mul_up(radius, w); V.Z[i] = ival(Z0[i].v); V.Z[i].inflate(0.0, width); pr.hull = std::max(pr.hull, width); }
     for (int c = 0; c < m; c++) for (int i = 0; i < n2; i++) set_d(V.Psi[(size_t)c * n2 + i], Q[(size_t)i * m + c]);
     B = V.Z;
     if (!V.integrate(tend)) { pr.why = "box integration failed"; return pr; }
@@ -362,11 +392,11 @@ inline Proof prove_state(int N, int d, double alpha, const std::vector<mpreal>& 
     if (!inverse_d(m, Jm, Y)) { pr.why = "reduced Jacobian singular"; return pr; }
     double kmax = 0, kappa = 0, nmax = 0; ival g, acc;
     for (int r = 0; r < m; r++) {
-      set_zero(acc); for (int c = 0; c < m; c++) fma_add(acc, ival(Y[(size_t)r * m + c]), F0[keepEq[c]]);
+      set_zero(acc); for (int c = 0; c < m; c++) fma_add_d(acc, Y[(size_t)r * m + c], F0[keepEq[c]]);
       nmax = std::max(nmax, acc.mag());
       double rowsum = 0;
-      for (int c = 0; c < m; c++) { set_zero(g); if (r == c) set_d(g, 1.0); for (int l = 0; l < m; l++) fma_sub(g, ival(Y[(size_t)r * m + l]), J[(size_t)l * m + c]); rowsum += g.mag(); }
-      kappa = std::max(kappa, rowsum); kmax = std::max(kmax, acc.mag() + rowsum * radius); }
+      for (int c = 0; c < m; c++) { set_zero(g); if (r == c) set_d(g, 1.0); for (int l = 0; l < m; l++) fma_sub_d(g, Y[(size_t)r * m + l], J[(size_t)l * m + c]); rowsum = add_up(rowsum, g.mag()); }
+      kappa = std::max(kappa, rowsum); kmax = std::max(kmax, add_up(acc.mag(), mul_up(rowsum, radius))); }
     pr.newton = nmax; pr.kappa = kappa;
     if (kmax < radius && kappa < 1.0) break;
     const double rnew = std::max(radius / (20 * std::max(kappa, 1.0)), 1e3 * nmax);
@@ -382,7 +412,7 @@ inline Proof prove_state(int N, int d, double alpha, const std::vector<mpreal>& 
     if (!inverse_d(k, Mm, Ym)) { pr.why = "closure matrix singular"; return pr; }
     double cl = 0; ival g;
     for (int r = 0; r < k; r++) { double rowsum = 0;
-      for (int c = 0; c < k; c++) { set_zero(g); if (r == c) set_d(g, 1.0); for (int l = 0; l < k; l++) fma_sub(g, ival(Ym[(size_t)r * k + l]), M[(size_t)l * k + c]); rowsum += g.mag(); }
+      for (int c = 0; c < k; c++) { set_zero(g); if (r == c) set_d(g, 1.0); for (int l = 0; l < k; l++) fma_sub_d(g, Ym[(size_t)r * k + l], M[(size_t)l * k + c]); rowsum = add_up(rowsum, g.mag()); }
       cl = std::max(cl, rowsum); }
     pr.closure = cl; if (!(cl < 1.0)) { pr.why = "closure matrix not verifiably nonsingular"; return pr; } }
   { std::vector<ival> Gm = V.Gram; ival f, t;

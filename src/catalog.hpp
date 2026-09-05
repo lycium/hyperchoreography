@@ -9,7 +9,7 @@
 #include <cstring>
 #include <stdexcept>
 
-struct RecHdr {                     // fixed-size record header, 152 bytes
+struct RecHdr {                     // fixed-size record header, 168 bytes
   uint32_t magic = 0x31434552u;     // "REC1"
   uint32_t nbytes = 0;              // total record size including header
   int64_t id = -1, seed = 0, trial = -1;
@@ -26,18 +26,47 @@ struct Record {
   RecHdr h;
   std::vector<int32_t> modes; std::vector<double> coef, Lsv, pca, extra; std::string sym;
   static constexpr int NEX = 8;
+  static constexpr int PROOF_LAYOUT = 2;  // layout 1 payload, proof recomputed with outward bounds
+  struct Citation {
+    int yymm, number, version, orbit; // modern arXiv identifier and the author's orbit number
+    bool operator==(const Citation&) const = default;
+  };
+  static constexpr int SOURCE_TAG = 0x53524331; // optional SRC1 suffix after the layout >= 1 state
+  size_t source_offset() const { return NEX + (size_t)h.d * h.d + 2 * (size_t)h.N * h.d; }
+  std::vector<Citation> citations() const {
+    const size_t off = source_offset(); std::vector<Citation> out;
+    if (!state() || extra.size() < off + 2 || extra[off] != SOURCE_TAG) return out;
+    const double count = extra[off + 1];
+    if (!std::isfinite(count) || count < 0 || count > 100000 || count != std::floor(count) || extra.size() != off + 2 + 4 * (size_t)count) return out;
+    for (size_t p = off + 2; p < extra.size(); p += 4) {
+      for (int j = 0; j < 4; j++) if (!std::isfinite(extra[p + j]) || extra[p + j] < 0 || extra[p + j] > 1000000 || extra[p + j] != std::floor(extra[p + j])) return {};
+      out.push_back({(int)extra[p], (int)extra[p + 1], (int)extra[p + 2], (int)extra[p + 3]});
+    }
+    return out;
+  }
+  void add_citation(Citation c) {
+    if (c.yymm < 704 || c.yymm > 9999 || c.number < 1 || c.number > 99999 || c.version < 1 || c.version > 1000000 || c.orbit < 1 || c.orbit > 1000000)
+      throw std::invalid_argument("invalid arXiv orbit citation");
+    if (!state()) throw std::runtime_error("source attribution requires a stored state");
+    auto refs = citations(); const size_t off = source_offset();
+    if (extra.size() != off && refs.empty()) throw std::runtime_error("cannot overwrite an unknown record suffix");
+    if (std::find(refs.begin(), refs.end(), c) != refs.end()) return;
+    refs.push_back(c); extra.resize(off + 2); extra[off] = SOURCE_TAG; extra[off + 1] = (double)refs.size();
+    for (const auto& r : refs) for (int value : {r.yymm, r.number, r.version, r.orbit}) extra.push_back(value);
+  }
   double twist() const { return extra.empty() ? 0.0 : extra[0]; }
   double rigid() const { return extra.size() > 4 ? extra[4] : -1.0; }   // 0 = relative equilibrium, −1 = not computed
   int layout() const { return extra.size() > 5 ? (int)extra[5] : 0; }
   double coef_err() const { return layout() >= 1 && extra.size() > 6 ? extra[6] : -1.0; }
-  double proven() const { return extra.size() > 7 ? extra[7] : 0.0; }   // radius of the proven box, 0 = no proof
+  double recorded_proof() const { return extra.size() > 7 ? extra[7] : 0.0; }
+  double proven() const { return layout() == PROOF_LAYOUT ? recorded_proof() : 0.0; }
   const double* omega() const {
     const size_t nom = (size_t)h.d * h.d;
     if (extra.size() < (size_t)NEX + nom) return nullptr;
     const double* o = &extra[NEX];
     if (layout() >= 1) { for (size_t i = 0; i < nom; i++) if (o[i] != 0.0) return o; return nullptr; }
     return o; }
-  // certified state of every body at t = 0, canonical axes
+  // numerically refined state of every body at t = 0, canonical axes; not a proof witness
   const double* state() const {
     const size_t off = (size_t)NEX + (size_t)h.d * h.d;
     return layout() >= 1 && extra.size() >= off + 2 * (size_t)h.N * h.d ? &extra[off] : nullptr; }
@@ -67,15 +96,20 @@ struct Record {
         && (sym.empty() || std::fwrite(sym.data(), 1, sym.size(), f) == sym.size());
   }
   bool read(FILE* f) {
-    if (std::fread(&h, sizeof h, 1, f) != 1) return false;
-    if (h.magic != 0x31434552u || h.nm < 0 || h.d <= 0 || h.symlen < 0 || h.nextra < 0) return false;
+    const size_t got = std::fread(&h, 1, sizeof h, f);
+    if (got == 0 && std::feof(f)) return false;
+    if (got != sizeof h) throw std::runtime_error("catalog: truncated record header or read error");
+    if (h.magic != 0x31434552u || h.N < 2 || h.d <= 0 || h.d > 4096 || h.nm < 0 || h.nm > (1 << 24) ||
+        h.symlen < 0 || h.symlen > (1 << 16) || h.nextra < 0 || h.nextra > (1 << 26)) throw std::runtime_error("catalog: invalid record header");
     size_t nb = sizeof(RecHdr) + (size_t)h.nm * 4 + ((size_t)h.nm * 2 * h.d + 2 * (size_t)h.d + h.nextra) * 8 + h.symlen;
-    if (nb != h.nbytes) return false;
+    if (nb != h.nbytes) throw std::runtime_error("catalog: inconsistent record length");
     modes.resize(h.nm); coef.resize((size_t)h.nm * 2 * h.d); Lsv.resize(h.d); pca.resize(h.d); extra.resize(h.nextra); sym.resize(h.symlen);
-    return (h.nm == 0 || std::fread(modes.data(), 4, h.nm, f) == (size_t)h.nm) && std::fread(coef.data(), 8, coef.size(), f) == coef.size()
+    bool ok = (h.nm == 0 || std::fread(modes.data(), 4, h.nm, f) == (size_t)h.nm) && std::fread(coef.data(), 8, coef.size(), f) == coef.size()
         && std::fread(Lsv.data(), 8, Lsv.size(), f) == Lsv.size() && std::fread(pca.data(), 8, pca.size(), f) == pca.size()
         && (extra.empty() || std::fread(extra.data(), 8, extra.size(), f) == extra.size())
         && (h.symlen == 0 || std::fread(&sym[0], 1, h.symlen, f) == (size_t)h.symlen);
+    if (!ok) throw std::runtime_error("catalog: truncated record body or read error");
+    return true;
   }
   // the same bytes write()/read() put in a file, in memory: a record on the wire
   std::string bytes() const {
@@ -89,7 +123,7 @@ struct Record {
   bool from_bytes(const std::string& b) {
     if (b.size() < sizeof(RecHdr)) return false;
     std::memcpy(&h, b.data(), sizeof h);
-    if (h.magic != 0x31434552u || h.nm < 0 || h.d <= 0 || h.N < 0 || h.symlen < 0 || h.nextra < 0) return false;
+    if (h.magic != 0x31434552u || h.nm < 0 || h.d <= 0 || h.N < 2 || h.symlen < 0 || h.nextra < 0) return false;
     if (h.d > 4096 || h.N > (1 << 20) || h.nm > (1 << 24) || h.nextra > (1 << 26) || h.symlen > (1 << 16)) return false;   // no overflow below
     size_t nb = sizeof(RecHdr) + (size_t)h.nm * 4 + ((size_t)h.nm * 2 * h.d + 2 * (size_t)h.d + h.nextra) * 8 + h.symlen;
     if (nb != h.nbytes || nb != b.size()) return false;
@@ -109,8 +143,13 @@ struct Record {
     if (!extra.empty()) { o += ",\"twist\":" + num(extra[0]) + ",\"twist_rel\":" + num(extra[1]) + ",\"calib_k\":" + num(extra[2]) + ",\"jet_rel\":" + num(extra[3]);
       if (const double* om = omega()) o += ",\"omega\":" + arr(std::vector<double>(om, om + (size_t)h.d * h.d));
       if (proven() > 0) o += ",\"proven\":" + num(extra[7]);
+      else if (recorded_proof() > 0) o += ",\"legacy_proof\":" + num(extra[7]);
       if (layout() >= 1) { o += ",\"coef_err\":" + num(extra[6]);
         const double* z = state(); if (z) o += ",\"state\":" + arr(std::vector<double>(z, z + 2 * (size_t)h.N * h.d)); } }
+    o += ",\"sources\":["; bool first_source = true;
+    for (const auto& c : citations()) { char id[32]; std::snprintf(id, sizeof id, "%04d.%05d", c.yymm, c.number);
+      o += (first_source ? "" : ",") + std::string("{\"arxiv\":\"") + id + "\",\"version\":" + std::to_string(c.version) + ",\"orbit_id\":" + std::to_string(c.orbit) + "}"; first_source = false; }
+    o += "]";
     o += ",\"grad_norm\":" + num(h.grad_norm) + ",\"ret_err\":" + num(h.ret_err) + ",\"sym\":\"" + sym + "\",\"seed\":" + std::to_string(h.seed) + ",\"trial\":" + std::to_string(h.trial) + ",\"hits\":" + std::to_string(h.hits) + ",\"secs\":" + num(h.secs);
     o += ",\"modes\":["; for (size_t i = 0; i < modes.size(); i++) o += (i ? "," : "") + std::to_string(modes[i]); o += "]";
     if (with_coef) o += ",\"coef\":" + arr(coef);
@@ -127,7 +166,8 @@ struct Catalog {
   bool load(const std::string& path) {
     FILE* f = std::fopen(path.c_str(), "rb"); if (!f) return false;
     char m[8]; if (std::fread(m, 1, 8, f) != 8 || std::memcmp(m, MAGIC, 8) != 0) { std::fclose(f); throw std::runtime_error("not a catalog file: " + path); }
-    Record r; while (r.read(f)) { push(r); r = Record(); }
+    try { Record r; while (r.read(f)) { push(r); r = Record(); } }
+    catch (...) { std::fclose(f); throw; }
     std::fclose(f); return true;
   }
   size_t push(Record r) { if (r.h.id < 0) r.h.id = next_id; next_id = std::max(next_id, r.h.id + 1); index.emplace(r.h.action, recs.size()); recs.push_back(std::move(r)); return recs.size() - 1; }
@@ -147,18 +187,10 @@ struct Catalog {
     long best = -1; double bestd = INF;
     for (auto it = lo; it != hi; ++it) {
       const Record& c = recs[it->second];
-      if (c.h.N != r.h.N || std::fabs(c.h.energy - r.h.energy) > tol_inv * std::fabs(r.h.energy) || std::fabs(c.h.rms - r.h.rms) > tol_inv * r.h.rms) continue;
-      double dist = loop_distance(r.h.N, r.mode_list(), r.h.d, r.coef.data(), c.mode_list(), c.h.d, c.coef.data());
-      if (same_spectrum(r, c)) dist = 0;
-      // Points of a continuous family are genuinely different loops — loop_distance is right to separate them
-      // and χ* really does vary along the family — but the catalogue wants one entry with a hit count, not a
-      // sampling of the family. Action and energy are exactly constant along a family, so match them to
-      // round-off; minsep is not, but it separates the case this must not fold — distinct orbits whose
-      // actions happen to agree closely, which at d=7 N=10 differ in minsep by percents (and in Morse index,
-      // not yet computed at this point). Heuristic, and deliberately narrow.
-      if (std::fabs(c.h.action - r.h.action) <= 1e-8 * std::fabs(r.h.action) &&
-          std::fabs(c.h.energy - r.h.energy) <= 1e-8 * std::fabs(r.h.energy) &&
-          std::fabs(c.h.minsep - r.h.minsep) <= 1e-3 * std::fabs(r.h.minsep)) dist = 0;
+      if (c.h.N != r.h.N || c.h.alpha != r.h.alpha || std::fabs(c.h.energy - r.h.energy) > tol_inv * std::fabs(r.h.energy) || std::fabs(c.h.rms - r.h.rms) > tol_inv * r.h.rms) continue;
+      const auto rm = r.mode_list(), cm = c.mode_list(); LoopAlignment fit;
+      double dist = loop_distance(r.h.N, rm, r.h.d, r.coef.data(), cm, c.h.d, c.coef.data(), 64, &fit);
+      if (dist < tol_dist) dist = aligned_loop_distance(rm, r.h.d, r.coef.data(), r.omega(), cm, c.h.d, c.coef.data(), c.omega(), fit);
       if (dist < bestd) { bestd = dist; best = (long)it->second; }
     }
     if (dist_out) *dist_out = bestd;
@@ -166,19 +198,27 @@ struct Catalog {
   }
   // keep the better-resolved duplicate (smaller residual, then fewer modes)
   static bool better(const Record& cand, const Record& cur) {
-    double rc = cand.h.ret_err > 0 ? cand.h.ret_err : 1e-300, ro = cur.h.ret_err > 0 ? cur.h.ret_err : 1e-300;
+    double rc = cand.h.ret_err >= 0 && std::isfinite(cand.h.ret_err) ? cand.h.ret_err : INF;
+    double ro = cur.h.ret_err >= 0 && std::isfinite(cur.h.ret_err) ? cur.h.ret_err : INF;
     if (rc < 0.1 * ro) return true; if (ro < 0.1 * rc) return false; return cand.h.K < cur.h.K;
   }
   bool absorb(size_t idx, const Record& cand, int add_hits = 1) {          // true when cand replaced the record
-    Record& cur = recs[idx]; cur.h.hits += add_hits;
-    if (better(cand, cur)) { int64_t id = cur.h.id; int hits = cur.h.hits; double a = cur.h.action; cur = cand; cur.h.id = id; cur.h.hits = hits;
+    Record& cur = recs[idx]; cur.h.hits += add_hits; const auto old_sources = cur.citations();
+    if ((better(cand, cur) && (old_sources.empty() || cand.state())) || (!cur.state() && !cand.citations().empty())) {
+      int64_t id = cur.h.id; int hits = cur.h.hits; double a = cur.h.action; cur = cand; cur.h.id = id; cur.h.hits = hits;
       if (a != cur.h.action) { for (auto it = index.lower_bound(a); it != index.end() && it->first == a; ++it) if (it->second == idx) { index.erase(it); break; } index.emplace(cur.h.action, idx); }
+      for (const auto& source : old_sources) cur.add_citation(source);
       return true; }
+    for (const auto& source : cand.citations()) cur.add_citation(source);
     return false;
   }
   void save(const std::string& path) const {
     std::string tmp = path + ".tmp"; FILE* f = std::fopen(tmp.c_str(), "wb"); if (!f) throw std::runtime_error("cannot write " + tmp);
-    std::fwrite(MAGIC, 1, 8, f); for (auto& r : recs) r.write(f); std::fclose(f);
+    bool ok = std::fwrite(MAGIC, 1, 8, f) == 8;
+    try { for (auto& r : recs) if (ok) ok = r.write(f); }
+    catch (...) { std::fclose(f); throw; }
+    if (std::fclose(f) != 0) ok = false;
+    if (!ok) throw std::runtime_error("catalog write failed; original preserved: " + path);
     std::filesystem::rename(tmp, path);          // std::rename will not overwrite on Windows
   }
 };

@@ -1,6 +1,9 @@
 hyperchoreography
 hyperchoreography_test
 hyperchoreography_mpinfo
+hyperchoreography_audit_test
+hyperchoreography_audit_bench
+hyperchoreography_reference
 *.tmp
 *.state
 .DS_Store

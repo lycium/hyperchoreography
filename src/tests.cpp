@@ -393,7 +393,7 @@ int main() {
     long dup = cat.find_duplicate(b);
     Record c = b; c.h.action *= 1 + 1e-6;    long fa = cat.find_duplicate(c);
     Record e = b; e.h.minsep *= 1 + 1e-2;    long fm = cat.find_duplicate(e);
-    CHECK(dup == 0 && fa < 0 && fm < 0 && raw > 1e-2, "continuous family folds on action+energy though the loops are %.2f apart; a 1e-6 action gap or a 1%% minsep gap does not fold", raw); }
+    CHECK(dup < 0 && fa < 0 && fm < 0 && raw > 1e-2, "distinct loops %.2f apart survive even with identical action, energy and minsep", raw); }
 
 #ifdef HAVE_MPFR
   std::printf("[interval arithmetic]\n");

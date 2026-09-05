@@ -4,6 +4,7 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <iterator>
 
 struct CurveStats {
   double action = 0, kinE = 0, potE = 0, energy = 0, energy_std = 0, minsep = 0, rms = 0, maxr = 0, Lnorm = 0;
@@ -155,7 +156,8 @@ inline double procrustes_res2(int Mc, int D, const std::vector<double>& A, const
   return nA + nB - 2 * nuc;
 }
 // relative distance modulo time shift, reversal and O(d)
-inline double loop_distance(int N, const std::vector<int>& mA_, int dA, const double* xa, const std::vector<int>& mB_, int dB, const double* xb, int max_modes = 64) {
+struct LoopAlignment { int eps = 1; double tau = 0; };
+inline double loop_distance(int N, const std::vector<int>& mA_, int dA, const double* xa, const std::vector<int>& mB_, int dB, const double* xb, int max_modes = 64, LoopAlignment* alignment = nullptr) {
   const int D = std::max(dA, dB); const int Mc = N * std::max(1, (256 + N - 1) / N);
   std::vector<int> mA(mA_.begin(), mA_.begin() + std::min<size_t>(mA_.size(), max_modes)), mB(mB_.begin(), mB_.begin() + std::min<size_t>(mB_.size(), max_modes));
   std::vector<double> A, B, Bs; sample_curve(mA, dA, xa, Mc, 1, 0, D, A); sample_curve(mB, dB, xb, Mc, 1, 0, D, B);
@@ -172,7 +174,10 @@ inline double loop_distance(int N, const std::vector<int>& mA_, int dA, const do
   double h = 2.0 * PI / Mc, lo = 2.0 * PI * bj / Mc - h, hi = 2.0 * PI * bj / Mc + h, gr = 0.6180339887498949;
   double c = hi - gr * (hi - lo), dd = lo + gr * (hi - lo), fc = res(c), fd = res(dd);
   for (int it = 0; it < 40; it++) { if (fc < fd) { hi = dd; dd = c; fd = fc; c = hi - gr * (hi - lo); fc = res(c); } else { lo = c; c = dd; fc = fd; dd = lo + gr * (hi - lo); fd = res(dd); } }
-  best = std::min(best, std::min(fc, fd));
+  double tau = 2.0 * PI * bj / Mc;
+  if (fc < best) { best = fc; tau = c; }
+  if (fd < best) { best = fd; tau = dd; }
+  if (alignment) { alignment->eps = beps; alignment->tau = tau; }
   return std::sqrt(std::max(0.0, best) / (0.5 * (nA + nB)));
 }
 inline double loop_distance(const Problem& PA, const double* xa, const Problem& PB, const double* xb) { return loop_distance(PA.N, PA.modes, PA.d, xa, PB.modes, PB.d, xb); }
@@ -210,6 +215,55 @@ inline void procrustes_rot(int d, const std::vector<double>& C, std::vector<doub
   Q.assign((size_t)d * d, 0.0);
   for (int a = 0; a < d; a++) for (int b = 0; b < d; b++) { double s = 0;
     for (int c = 0; c < d; c++) s += U[(size_t)a * d + c] * V[(size_t)b * d + c]; Q[(size_t)a * d + b] = s; }
+}
+
+// Validate a proposed alignment on ALL Fourier coefficients, using an explicit squared residual
+// instead of subtracting nearly equal norms. The same rotation must intertwine the two frames.
+// A failed fit may retain a duplicate; scalar invariants must never delete a distinct orbit.
+inline double aligned_loop_distance(const std::vector<int>& ma, int da, const double* xa, const double* oa,
+                                    const std::vector<int>& mb, int db, const double* xb, const double* ob,
+                                    const LoopAlignment& fit, double frame_tol = 1e-7) {
+  const int d = std::max(da, db);
+  std::vector<int> modes; std::set_union(ma.begin(), ma.end(), mb.begin(), mb.end(), std::back_inserter(modes));
+  const size_t rows = 2 * modes.size();
+  std::vector<double> a(rows * d, 0), b(rows * d, 0), cov((size_t)d * d, 0), rot;
+  for (size_t k = 0; k < modes.size(); k++) {
+    auto ia = std::lower_bound(ma.begin(), ma.end(), modes[k]), ib = std::lower_bound(mb.begin(), mb.end(), modes[k]);
+    if (ia != ma.end() && *ia == modes[k]) for (int h = 0; h < 2; h++) for (int c = 0; c < da; c++)
+      a[(2 * k + h) * d + c] = xa[(2 * (ia - ma.begin()) + h) * da + c];
+    if (ib != mb.end() && *ib == modes[k]) {
+      const double co = std::cos(modes[k] * fit.tau), si = std::sin(modes[k] * fit.tau);
+      for (int c = 0; c < db; c++) {
+        const double cm = xb[2 * (ib - mb.begin()) * db + c], sm = xb[(2 * (ib - mb.begin()) + 1) * db + c];
+        b[2 * k * d + c] = co * cm + si * sm;
+        b[(2 * k + 1) * d + c] = fit.eps * (-si * cm + co * sm);
+      }
+    }
+  }
+  for (size_t k = 0; k < rows; k++) for (int i = 0; i < d; i++) for (int j = 0; j < d; j++) cov[(size_t)i * d + j] += b[k * d + i] * a[k * d + j];
+  procrustes_rot(d, cov, rot);
+  double orth = 0, err = 0, scale = 0;
+  for (int i = 0; i < d; i++) for (int j = 0; j < d; j++) { double v = -(i == j);
+    for (int k = 0; k < d; k++) v += rot[(size_t)k * d + i] * rot[(size_t)k * d + j]; orth = std::max(orth, std::fabs(v)); }
+  if (!(orth < 1e-6)) return INF;
+  for (size_t k = 0; k < rows; k++) for (int i = 0; i < d; i++) {
+    double v = -b[k * d + i]; for (int j = 0; j < d; j++) v += rot[(size_t)i * d + j] * a[k * d + j];
+    err += v * v; scale += 0.5 * (a[k * d + i] * a[k * d + i] + b[k * d + i] * b[k * d + i]);
+  }
+  if (oa || ob) {
+    double mismatch = 0, norm = 1;
+    for (int i = 0; i < d; i++) for (int j = 0; j < d; j++) { double v = 0;
+      for (int k = 0; k < d; k++) {
+        if (ob && i < db && k < db) v += ob[(size_t)i * db + k] * rot[(size_t)k * d + j];
+        if (oa && k < da && j < da) v -= fit.eps * rot[(size_t)i * d + k] * oa[(size_t)k * da + j];
+      }
+      mismatch = std::max(mismatch, std::fabs(v));
+      if (oa && i < da && j < da) norm = std::max(norm, std::fabs(oa[(size_t)i * da + j]));
+      if (ob && i < db && j < db) norm = std::max(norm, std::fabs(ob[(size_t)i * db + j]));
+    }
+    if (!(mismatch <= frame_tol * norm)) return INF;
+  }
+  return scale > 0 ? std::sqrt(err / scale) : INF;
 }
 inline void best_frac(double v, int qmax, int& p, int& q) {
   double best = INF; p = 0; q = 1;

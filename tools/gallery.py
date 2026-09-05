@@ -311,10 +311,9 @@ RIGID_TOL = 1e-4
 
 
 def pooled_moment(rows, N, d):
-    """Second moment pooled over ALL N bodies and ALL samples.  Its rank (at
-    1e-5 relative) is exactly the stored `deff` -- pooled PCA *is* the object
-    deff measures, and it is the only correct one for rotating records where
-    the N bodies trace N different (rotated) curves."""
+    """Second moment pooled over all bodies and samples. The 1e-5 display
+    threshold need not reproduce a stored rank computed with another tolerance;
+    neither floating-point rank test is an interval dimension certificate."""
     cols = [[] for _ in range(d)]
     for j in range(N):
         lo, hi = j * d, (j + 1) * d
@@ -563,11 +562,13 @@ def build_record(binpath, path, rid, rigid, samples_max, tmpdir, warn, label=Non
         "Ln": g6(rec["Lnorm"]), "tw": g6(rec["twist"]), "twr": g6(rec["twist_rel"]),
         "ck": int(rec.get("calib_k", 0)), "jr": g6(rec.get("jet_rel", 0.0)),
         "re": g6(rec["ret_err"]), "ce": g6(rec.get("coef_err", -1.0)),
+        "proof": "revision2" if rec.get("proven", 0) > 0 else "legacy" if rec.get("legacy_proof", 0) > 0 else "none",
+        "sources": rec.get("sources", []),
         "hits": int(rec.get("hits", 0)), "seed": int(rec.get("seed", 0)),
         "trial": int(rec.get("trial", 0)), "secs": g6(rec.get("secs", 0.0)),
         "sym": rec.get("sym", ""), "rig": g6(rigid),
         "rot": 1 if rot else 0, "rotf": 1 if in_frame else 0,
-        "rates": rates, "closed": closed,
+        "rates": rates, "closed": closed, "view_rank": rank,
         "ev": [g6(v) for v in ev],
         "Lsv": [g6(v) for v in rec.get("Lsv", [])],
         "pca": [g6(v) for v in rec.get("pca", [])],
@@ -632,6 +633,9 @@ body{background:var(--bg);color:var(--fg);
   font:13px/1.45 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   -webkit-font-smoothing:antialiased}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+.audit-note{font-size:0.9rem;line-height:1.5;margin:0 0 1rem;padding:0.7rem 1rem;
+  color:var(--fg);background:var(--tile);border:1px solid var(--edge);border-radius:7px}
+.audit-note p{margin:0.5rem 0}.audit-note a{color:var(--sel)}
 a{color:var(--sel)}
 header{position:sticky;top:0;z-index:40;background:var(--hdr);backdrop-filter:blur(10px);
   border-bottom:1px solid var(--edge);padding:10px 16px 8px}
@@ -992,7 +996,7 @@ function fmt(x,n){ if(x===0) return '0';
   return x.toFixed(n===undefined?3:n); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function isRigid(r){ return r.rig<META.rigtol; }
-function budget(r){ return 2*Math.floor(r.N/2); }
+function budget(r){ return Math.min(r.d,2*(r.N-1)); } // invariant span of centered initial positions and velocities
 
 function badges(r){
   var h='';
@@ -1000,7 +1004,7 @@ function badges(r){
   if(r.rotf) h+='<span class="bd" style="color:var(--b-rot)">frame {'+r.rates.join(',')+'}</span>';
   if(!r.closed) h+='<span class="bd" style="color:var(--b-rig)">open r.p.o.</span>';
   if(r.cov>1) h+='<span class="bd" style="color:var(--b-cov)">cover '+r.cov+'</span>';
-  if(r.fam>0) h+='<span class="bd" style="color:var(--b-fam)">family '+r.fam+'</span>';
+  if(r.fam>0) h+='<span class="bd" style="color:var(--b-fam)">action cluster '+r.fam+'</span>';
   if(r.re>1e-9||r.ce>1e-6) h+='<span class="bd" style="color:var(--b-warn)">residual '+fmt(Math.max(r.re,r.ce),2)+'</span>';
   return h;
 }
@@ -1351,18 +1355,25 @@ function openDetail(r){
   var path=META.paths[r.f]||('catalog/'+r.f);
   var kv=[
     ['file / id', esc(path)+' &nbsp; #'+r.i],
-    ['N, d', r.N+', <b>'+r.de+'</b> of budget '+budget(r)+' (=2&lfloor;N/2&rfloor;)'],
+    ['N, effective d', r.N+', <b>'+r.de+'</b>; span bound '+budget(r)+' = min(ambient d, 2(N−1))'],
     ['ambient', 'R<sup>'+r.d+'</sup>, the space the search ran in'],
+    ['visible axes', (r.view_rank===undefined?'not recorded':r.view_rank)+' at the display threshold λ/λ₁ &gt; 1e−5'],
     ['action', r.A],['energy', r.E],
-    ['morse / nullity', r.mo+' / '+r.nu],
+    ['Morse / nullity (numerical)', r.mo+' / '+r.nu+'; not a Floquet stability test'],
     ['min separation', r.ms],['rms / max r', fmt(r.rms,4)+' / '+fmt(r.mxr,4)],
     ['|L|', r.Ln],['twist / rel', fmt(r.tw,4)+' / '+fmt(r.twr,4)],
     ['rigidity', r.rig+(isRigid(r)?' &nbsp;<b style="color:var(--b-rig)">relative equilibrium</b>':'')],
     ['K / M / cover', r.K+' / '+r.M+' / '+r.cov],
     ['calib k / jet rel', r.ck+' / '+fmt(r.jr,3)],
     ['state / coef residual', fmt(r.re,3)+' / '+fmt(r.ce,3)],
+    ['existence evidence', r.proof==='revision2' ? 'proof engine revision 2 run recorded; replay witness not embedded'
+        : r.proof==='legacy' ? 'historical proof flag — recomputation required' : 'numerical candidate; no current proof recorded'],
+    ['prior-work attribution', (r.sources||[]).map(function(s){
+        return '<a href="https://arxiv.org/abs/'+esc(s.arxiv)+'v'+s.version+'">'
+          +(s.arxiv==='2508.08568'?'Li &amp; Liao (2025)':'arXiv:'+esc(s.arxiv))+'</a>, O_'+s.orbit_id;
+      }).join('; ') || 'not yet cross-identified — not a novelty claim'],
     ['frame', r.rotf?('rotating, rates {'+r.rates.join(', ')+'}'
-        +(r.closed?'':' — inertial motion NOT 2&pi;-periodic, so the co-rotating frame is drawn')):'inertial'],
+        +(r.closed?' — numerical 2&pi; closure; a common inertial curve is not implied':' — 2&pi; closure not established; co-rotating frame shown')):'inertial'],
     ['sym', r.sym?('<span class="mono">'+esc(r.sym)+'</span>'):'—'],
     ['seed / trial / hits', r.seed+' / '+r.trial+' / '+r.hits],
     ['loop pca[]', '<span class="mono" style="font-size:10px">'+r.pca.map(function(v){return (+v).toPrecision(3);}).join(' ')+'</span>'],
@@ -1380,14 +1391,14 @@ function openDetail(r){
     +     '<button id="ovspin"'+(REDUCED?'':' class="on"')+'>auto-spin</button>'
     +     '<span class="hint">drag to orbit</span></div>'
     +   '<div style="margin-top:10px"><div class="hint">principal-plane strip — '
-    +     'd = 2&times;(full panels) + (line panels)</div><div id="ovstrip"></div></div>'
+    +     'visible axes = 2&times;(full panels) + (line panels), at the display threshold</div><div id="ovstrip"></div></div>'
     +   '<div style="margin-top:10px"><div class="hint">mutual distances |q<sub>0</sub>−q<sub>k</sub>|(t); '
     +     'flat lines = relative equilibrium. dashed = minsep '+fmt(r.ms,4)+'</div>'
     +     '<div id="ovrib"></div></div>'
     + '</div><div>'
     +   '<table class="kv">'+kv+'</table>'
     +   '<div class="spec"><div class="hint">pooled principal spectrum (over all '+r.N+' bodies)</div>'+spec+'</div>'
-    +   (fam.length? '<div class="fam" style="margin-top:8px"><span class="hint">family siblings: </span>'
+    +   (fam.length? '<div class="fam" style="margin-top:8px"><span class="hint">same-action candidates (not established family members): </span>'
         + fam.map(function(x){ return '<a href="#" data-f="'+esc(x.f)+'" data-i="'+x.i+'">'+esc(x.f)+'#'+x.i+'</a>'; }).join('')+'</div>' : '')
     +   '<div class="repro">./hyperchoreography show '+esc(path)+' --id '+r.i+'\n'
     +     './hyperchoreography export '+esc(path)+' --id '+r.i+' --samples 720 --out curve.csv</div>'
@@ -1600,17 +1611,19 @@ PAGE = r"""<!doctype html>
       (1,2)-plane plot renders a large class of high-dimensional records as a featureless circle — hence 3-D.
       Dots are the bodies, brightest first, body 0 ringed.</div>
     <div><b>Strip</b> — one panel per principal plane (1,2), (3,4), (5,6)…, in three states:
-      a <b>curve</b> = both axes live; a <b>horizontal line</b> = exactly one axis live;
+      a <b>curve</b> = both axes exceed the display threshold; a <b>horizontal line</b> = exactly one does;
       a <b>short grey rule</b> = neither (or the axis does not exist). So
-      <b>d = 2×(curve panels) + (line panels)</b>, countable by eye.
+      <b>visible axes = 2×(curve panels) + (line panels)</b>, countable by eye.
+      The threshold is λ/λ₁ &gt; 1e−5 and can differ from stored deff. This is not a dimension proof.
       Panels are normalised per axis, so shape here is qualitative only.</div>
     <div><b>Meter</b> — under each panel, two bars of height √(λ<sub>k</sub>/λ<sub>1</sub>):
       the magnitudes the strip's per-axis normalisation throws away. Grey = dead axis;
       a hairline = that axis does not exist at this d.</div>
     <div><b>Ribbon</b> — the mutual distances |q<sub>0</sub>−q<sub>k</sub>|(t), k = 1…⌊N/2⌋, over one
       period, floor = 0. Dead-flat lines mean a <b>relative equilibrium</b> (rigid body rotation);
-      wavy lines mean a genuine choreography. The lowest minimum is <i>minsep</i>.</div>
-    <div><b>even speed</b> — every orbit has the same period, so a loop whose path is 80 radii long
+      wavy lines show non-rigid motion, not an existence proof or a common inertial curve.
+      The lowest sampled minimum is <i>minsep</i>.</div>
+    <div><b>even speed</b> — every displayed loop uses a 2&pi; time window, so a loop whose path is 80 radii long
       sweeps the frame ~15× faster than one 5 radii long. On, each tile's clock is divided by its own
       path length so the grid reads at one pace; off, all tiles share the true time base.</div>
     <div><b>dimension colour</b>, fixed to 2…11 so it is stable across harvests:
@@ -1618,13 +1631,32 @@ PAGE = r"""<!doctype html>
     <div><b>Badges</b> — <span style="color:var(--b-rig)">rigid</span> relative equilibrium
       (rigidity &lt; 1e-4, a clean gap in the data — trivial however high its d); <span style="color:var(--b-rot)">frame {…}</span> rotating
       frame with its rotation-rate multiset; <span style="color:var(--b-cov)">cover</span> multiple
-      cover; <span style="color:var(--b-fam)">family</span> a continuous family (same N, same d, same action);
-      <span style="color:var(--b-warn)">residual</span> a record whose certified state exceeds 1e-9 or
+      cover; <span style="color:var(--b-fam)">action cluster</span> matching numerical action, N and ambient d
+      (neither orbit equivalence nor a continuous family is established);
+      <span style="color:var(--b-warn)">residual</span> a record whose numerical state residual exceeds 1e-9 or
       whose stored coefficients exceed 1e-6.
       Click any tile for the full record.</div>
   </div></details>
 </header>
-<main>__CARDS__<div id="grid"></div><div id="more"></div></main>
+<main>
+<details class="audit-note"><summary>Evidence, rotating frames, and prior work — audit update</summary>
+  <p>This gallery renders numerical Fourier approximations, not proof witnesses. Historical proof flags
+  require recomputation after corrections to interval bounds and the action remainder. The revised prover
+  has rechecked the figure eight and the full-dimensional 12-body example in R<sup>11</sup> (#13 in
+  d11_n12_g2.bin); the catalogue as a whole has not been re-proved.</p>
+  <p>For a rotating-frame record, Q<sub>j</sub>(t) = exp(Ωt)q(t + 2πj/N).
+  Closure after 2π does not imply that every body follows the same inertial curve.
+  Displayed dimensions, twist, stability-related indices, and action clusters are numerical diagnostics.</p>
+  <p>Prior work: Xiaoming Li and Shijun Liao report 21 equal-mass spatial choreographies within a larger
+  numerical periodic-orbit dataset in
+  <a href="https://arxiv.org/html/2508.08568v1">arXiv:2508.08568v1 (2025)</a>.
+  Their orbit identities and reported stability must be credited and compared before making novelty claims;
+  they are not interval existence certificates.</p>
+  <p>Read the <a href="https://github.com/lycium/hyperchoreography/blob/main/AUDIT.md">mathematical audit</a>,
+  <a href="https://github.com/lycium/hyperchoreography/blob/main/CREDITS.md">scientific credits</a>, and
+  <a href="https://github.com/lycium/hyperchoreography/blob/main/data/README.md">reference-seed workflow</a>.</p>
+</details>
+__CARDS__<div id="grid"></div><div id="more"></div></main>
 <div id="ov"></div>
 <script type="application/json" id="DATA">__DATA__</script>
 <script>__JS__
@@ -1942,13 +1974,8 @@ def main(argv=None):
     if a.max_records > 0:
         recs = recs[:a.max_records]
 
-    # ---- continuous families: same N, same d, same action (README 13.1) ---
-    # Grouped on the FULL-precision action, not the rounded display value, and
-    # chained so a genuine one-parameter family stays one group.  The AMBIENT
-    # dimension is part of the key: the C++ find_duplicate only dedupes inside
-    # one catalogue file, so the same orbit re-found in a higher d (identical
-    # action, minsep and deff, just embedded) shows up twice across files.  That
-    # is a re-discovery, not a one-parameter family.
+    # Action clusters are a navigation aid, NOT equivalence or a proof of a continuous family.
+    # Keep every record; scalar invariants cannot establish either assertion.
     order = sorted(range(len(recs)),
                    key=lambda k: (recs[k]["N"], recs[k]["d"], recs[k]["_a"]))
     fam = 0

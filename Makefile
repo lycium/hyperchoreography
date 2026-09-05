@@ -43,8 +43,18 @@ HDRS := $(wildcard src/*.hpp)
 hyperchoreography: $(SRC) $(HDRS)
 	$(CXX) $(CXXFLAGS) -o $@ $(SRC) $(LDFLAGS)
 
-test: src/tests.cpp $(HDRS)
+test: src/tests.cpp src/audit_tests.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -o hyperchoreography_test src/tests.cpp $(LDFLAGS) && ./hyperchoreography_test
+	$(CXX) $(CXXFLAGS) -o hyperchoreography_audit_test src/audit_tests.cpp $(LDFLAGS) && ./hyperchoreography_audit_test
+
+audit-test: src/audit_tests.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -o hyperchoreography_audit_test src/audit_tests.cpp $(LDFLAGS) && ./hyperchoreography_audit_test
+
+audit-bench: tools/audit_bench.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -o hyperchoreography_audit_bench tools/audit_bench.cpp $(LDFLAGS) && ./hyperchoreography_audit_bench
+
+hyperchoreography_reference: tools/reference_import.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -o $@ tools/reference_import.cpp $(LDFLAGS)
 
 # Same flags as the binary above, so it links and reports on the same library.
 mpinfo: tools/mpinfo.cpp
@@ -54,8 +64,12 @@ mpinfo: tools/mpinfo.cpp
 # orbit everybody has already seen.  The rest is the score's ranking overruled by eye.
 gallery: hyperchoreography
 	python3 tools/gallery.py --out docs/index.html \
-	  --no-hero 'd2-3_n3.bin#0' --no-hero 'd5-6_n7.bin#100' --hero 'd2-4_n4.bin#6'
+	  --no-hero 'd2-3_n3.bin#0' --no-hero 'd5-6_n7.bin#100' --hero 'd2-4_n4.bin#6' \
+	  --hero 'li-liao-2025-n3.bin#62'
+
+gallery-check: hyperchoreography
+	python3 tools/check_gallery.py docs/index.html
 
 clean:
-	rm -f hyperchoreography hyperchoreography_test hyperchoreography_mpinfo
-.PHONY: clean test gallery mpinfo
+	rm -f hyperchoreography hyperchoreography_test hyperchoreography_mpinfo hyperchoreography_audit_test hyperchoreography_audit_bench hyperchoreography_reference
+.PHONY: clean test audit-test audit-bench gallery gallery-check mpinfo
